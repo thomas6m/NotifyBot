@@ -1,232 +1,122 @@
-# NotifyBot Email Sender Documentation
+# NotifyBot Email Sender - Runbook
 
 ## Overview
 
-NotifyBot is a comprehensive batch email sender that automates email distribution based on content stored in files. It provides advanced features including attachment handling, recipient filtering, batch processing with delays, comprehensive logging, validation, error handling, and deduplication capabilities.
+NotifyBot is a bulk email sender script with advanced features such as RFC-compliant email validation, attachment filtering, batch sending with delays, dry-run mode, recipient filtering based on CSV data, and comprehensive logging.
 
-## Key Features
+## Prerequisites
 
-- **Batch Processing**: Send emails in configurable batches with customizable delays
-- **Recipient Filtering**: Advanced filtering based on CSV data conditions
-- **Attachment Support**: Automatic MIME type detection and file attachment
-- **Validation**: Email format validation and required file checking
-- **Logging**: Comprehensive logging with timestamps and error tracking
-- **Deduplication**: Automatic removal of duplicate recipients
-- **Dry Run Mode**: Test mode for sending drafts to approvers only
-- **Backup System**: Automatic backup creation before file modifications
+- Python 3.6 or newer installed
+- SMTP server running on localhost or accessible (default SMTP server is localhost)
+- Required Python package: `email-validator`
 
-## Dependencies and Imports
+Install dependencies via:
 
-### Core Libraries
-- `os` - File and directory operations
-- `csv` - CSV file processing (inventory.csv)
-- `re` - Regular expressions for email validation
-- `time` - Batch delay management
-- `logging` - Comprehensive logging functionality
-- `smtplib` - SMTP email sending
-- `sys` - System-specific parameters
-- `mimetypes` - Automatic file type detection for attachments
-- `shutil` - File operations and backup creation
-
-### Email and Utility Libraries
-- `email.message.EmailMessage` - Email composition and sending
-- `pathlib.Path` - Object-oriented file path handling
-- `typing` - Type hints for better code documentation
-- `email.utils.parseaddr` - Email address parsing
-- `datetime` - Timestamp generation and time calculations
-
-## Core Components
-
-### Email Validation
-```python
-EMAIL_REGEX = re.compile(r"[^@]+@[^@]+\.[^@]+")
-```
-Regular expression pattern for validating email addresses in standard format (example@domain.com).
-
-### Logging Configuration
-```python
-logging.basicConfig(
-    filename='notifybot.log',
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(funcName)s [line %(lineno)d] - %(message)s'
-)
-```
-Configures detailed logging with timestamps, log levels, function names, and line numbers.
-
-### Custom Exception Handling
-```python
-class MissingRequiredFilesError(Exception):
-    """Custom exception raised when required input files are missing."""
-    pass
-```
-
-## File Operations
-
-### File Reading Functions
-
-#### `read_file(path: Path) -> str`
-- Reads and returns the complete content of a file as a string
-- Handles file encoding and error cases
-
-#### `read_recipients(path: Path) -> List[str]`
-- Reads email addresses from a file
-- Validates each email using regex pattern
-- Returns only valid email addresses
-- Filters out malformed entries
-
-### File Writing and Management
-
-#### `write_to_txt(emails: List[str], path: Path) -> None`
-- Appends a list of email addresses to a text file
-- Ensures proper formatting and line breaks
-
-#### `deduplicate_file(path: Path) -> None`
-- Creates a backup of the original file
-- Removes duplicate lines while preserving order
-- Overwrites the original file with deduplicated content
-
-## Validation and Filtering
-
-### File Validation
-#### `check_required_files(base_path: Path, required_files: List[str]) -> None`
-Verifies the presence of all required files in the base directory:
-- `from.txt` - Sender email address
-- `subject.txt` - Email subject line
-- `body.html` - HTML email body content
-- `approver.txt` - Approver email addresses for dry runs
-
-### Filter Processing
-#### `parse_filter_file(filter_path: Path) -> Tuple[List[str], List[Dict[str, str]]]`
-- Parses the `filter.txt` file
-- Extracts filtering conditions for CSV data processing
-- Returns structured filter criteria
-
-#### `get_filtered_emailids(base_path: Path) -> List[str]`
-- Applies filter conditions to `inventory.csv`
-- Excludes email IDs already present in `to.txt`
-- Returns unique, filtered email addresses
-
-## Email Sending Engine
-
-### Core Sending Function
-#### `send_email()` Parameters:
-- `from_email: str` - Sender email address
-- `subject: str` - Email subject line
-- `body_html: str` - HTML formatted email body
-- `recipients: List[str]` - Primary recipient list
-- `cc_emails: List[str]` - CC recipient list
-- `bcc_emails: List[str]` - BCC recipient list
-- `attachments: List[Path]` - Optional file attachments
-- `log_sent: bool` - Enable detailed logging
-
-#### Functionality:
-1. Composes EmailMessage object with all components
-2. Validates and attaches files with automatic MIME type detection
-3. Establishes SMTP connection and sends email
-4. Logs success/failure status with detailed information
-5. Handles connection errors and retry logic
-
-## Recipient Management
-
-### `prepare_to_txt(base_path: Path) -> None`
-Comprehensive recipient list preparation:
-1. Adds newly filtered emails from inventory
-2. Appends additional emails from `additional_to.txt`
-3. Deduplicates the entire recipient list
-4. Creates backup before modifications
-
-## Main Execution Logic
-
-### `send_email_from_folder()` Parameters:
-- `base_folder: str` - Directory containing all email files
-- `dry_run: bool = False` - Enable test mode (sends only to approvers)
-- `batch_size: int = 500` - Number of emails per batch
-- `delay: int = 5` - Seconds to wait between batches
-- `attachments_folder: str = None` - Custom attachment directory
-
-### Execution Flow:
-1. **Validation Phase**: Checks for required files and validates content
-2. **Preparation Phase**: Reads email components and prepares recipient lists
-3. **Dry Run Mode**: Sends test email to approvers only
-4. **Batch Processing**: Sends emails in configured batches with delays
-5. **Logging**: Records all activities and errors
-
-## Command-Line Interface
-
-### Usage
 ```bash
-python notifybot.py <base_folder> [OPTIONS]
+pip install email-validator
 ```
 
-### Arguments
-- `base_folder` - **Required**: Directory containing email files
+## Files and Directory Structure
 
-### Options
-- `--dry-run` - Send draft to approvers only (no actual email distribution)
-- `--batch-size <number>` - Emails per batch (default: 500)
-- `--delay <seconds>` - Delay between batches (default: 5)
-- `--attachments-folder <path>` - Custom attachment directory
+Your email campaign folder should contain:
 
-### Examples
+### Required files:
+- `from.txt` — Sender email address (single line)
+- `subject.txt` — Email subject line
+- `body.html` — HTML content of the email body
+- `approver.txt` — List of approver emails (one per line)
+
+### Optional files:
+- `to.txt` — Primary recipient list (auto-generated if missing via filters)
+- `cc.txt` — CC recipient list
+- `bcc.txt` — BCC recipient list
+- `additional_to.txt` — Additional recipients appended
+- `inventory.csv` — CSV data for filtering recipients
+- `filter.txt` — CSV defining filter conditions
+- `attachments/` — Folder with files to attach
+
+## Running NotifyBot
+
+Run the script from the command line:
+
 ```bash
-# Regular email sending
 python notifybot.py /path/to/email/folder
-
-# Dry run with custom batch size
-python notifybot.py /path/to/email/folder --dry-run --batch-size 100
-
-# Custom delay and attachments
-python notifybot.py /path/to/email/folder --delay 10 --attachments-folder /path/to/attachments
 ```
 
-## Required File Structure
+### Command-line options:
 
-### Base Folder Contents
-```
-email_folder/
-├── from.txt          # Sender email address
-├── subject.txt       # Email subject line
-├── body.html         # HTML email body
-├── approver.txt      # Approver emails (for dry run)
-├── to.txt            # Primary recipient list
-├── cc.txt            # CC recipient list (optional)
-├── bcc.txt           # BCC recipient list (optional)
-├── additional_to.txt # Additional recipients (optional)
-├── filter.txt        # Filtering conditions (optional)
-├── inventory.csv     # Source data for filtering (optional)
-└── attachments/      # Attachment files (optional)
+- `--dry-run` - Sends the email only to approvers for testing
+- `--batch-size INTEGER` - Number of recipients per batch (default: 500)
+- `--delay INTEGER` - Seconds delay between batches (default: 5)
+- `--attachments-folder PATH` - Use a custom folder for attachments
+- `--max-attachment-size INTEGER` - Max size per attachment in MB (default: 10 MB)
+
+### Example commands:
+
+**Dry run:**
+```bash
+python notifybot.py --dry-run /path/to/campaign
 ```
 
-## Error Handling and Logging
+**Send with smaller batches and longer delay:**
+```bash
+python notifybot.py --batch-size 100 --delay 10 /path/to/campaign
+```
 
-### Logging Features
-- Comprehensive activity logging to `notifybot.log`
-- Timestamp tracking for all operations
-- Error categorization and detailed error messages
-- Function-level tracking with line numbers
+**Send with custom attachments folder:**
+```bash
+python notifybot.py --attachments-folder /custom/attachments /path/to/campaign
+```
 
-### Error Handling
-- Custom exception for missing required files
-- SMTP connection error handling
-- File I/O error management
-- Email validation error reporting
-- Graceful failure recovery
+## Email Sending Workflow
+
+1. **Validation**: Checks presence of required files and validates email addresses
+2. **Filtering**: If `inventory.csv` and `filter.txt` exist, uses filters to generate `to.txt` if missing
+3. **Recipient List**: Appends `additional_to.txt` emails and deduplicates the final recipient list
+4. **Dry-run Mode**: Sends the draft email only to approvers
+5. **Sending**: Sends emails in batches with specified batch size and delay
+6. **Attachments**: Attachments filtered by max size limit
+7. **Logging**: All operations are logged in `notifybot.log`
+
+## Logs and Monitoring
+
+- **Log file**: `notifybot.log` in the working directory
+- **Logs include**:
+  - File operations and validation errors
+  - Invalid emails skipped
+  - Sending results per batch
+  - Attachment processing warnings/errors
+
+Check this log file regularly for errors and summary information.
+
+## Common Issues & Troubleshooting
+
+| Issue | Message Example | Resolution |
+|-------|----------------|------------|
+| Missing required files | Error: Missing: from.txt, subject.txt | Ensure all required files are present in base folder |
+| Invalid email addresses | Warning: Invalid email skipped: bad-email | Correct or remove invalid emails from files |
+| SMTP connection failure | Failed to send to [...]: Connection refused | Verify SMTP server is running and accessible |
+| Attachments too large | Skipping large-file.pdf: 15.2MB > limit | Reduce attachment size or increase max size option |
+| No recipients | No recipients. | Check that to.txt is populated or filters are correctly applied |
 
 ## Best Practices
 
-### Performance Optimization
-- Use appropriate batch sizes to avoid server overload
-- Implement delays between batches for server stability
-- Monitor log files for performance issues
+- Always start with `--dry-run` to validate content and recipients
+- Use appropriate batch sizes and delay to avoid SMTP overload
+- Validate email address lists before large campaigns
+- Keep attachments small and relevant
+- Monitor logs actively for errors and warnings
+- Backup campaign folders before sending
 
-### Security Considerations
-- Validate all email addresses before sending
-- Use secure SMTP connections
-- Implement proper error handling to avoid information leakage
-- Regular backup of important files
+## Maintenance & Contribution
 
-### Maintenance
-- Regular log file rotation and cleanup
-- Periodic validation of email lists
-- Monitor for bounced emails and update lists accordingly
-- Test with dry run mode before production sends
+- The script uses Python 3 standard libraries and `email-validator`
+- Code follows PEP8 style and includes docstrings
+- To contribute: fork repo → create feature branch → test changes → submit PR
+- Review logs to detect regressions or runtime issues
+
+## Support
+
+- Check troubleshooting section and logs first
+- Report detailed issues including logs, command used, and environment details
+- Ensure your SMTP server configuration is correct and running
