@@ -5,12 +5,13 @@ Sends batch emails using content and recipients defined in flat files.
 Supports filtering, dry-run mode, batching, attachments, and logging.
 
 Author: Thomas Mathias (updated with attachments and colored error output)
-Additional improvements by ChatGPT:
 - Default attachments handling
-- Email validation and filtering
+- Email validation and filtering (improved regex validation)
 - Enhanced exception logging with traceback
 - Docstrings added to key functions
 - Backup before deduplication to prevent data loss
+- Logging summary and stats with timing info
+- Improved CLI help and attachments folder option
 """
 
 import os
@@ -26,6 +27,7 @@ from email.message import EmailMessage
 from pathlib import Path
 from typing import List, Tuple, Dict
 from email.utils import parseaddr
+from datetime import datetime
 
 
 # Configure logging
@@ -34,6 +36,13 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(funcName)s [line %(lineno)d] - %(message)s'
 )
+
+EMAIL_REGEX = re.compile(r"[^@]+@[^@]+\.[^@]+")
+
+
+def is_valid_email(email: str) -> bool:
+    """Validate email using regex."""
+    return bool(EMAIL_REGEX.fullmatch(email.strip()))
 
 
 class MissingRequiredFilesError(Exception):
@@ -53,6 +62,7 @@ def read_file(path: Path) -> str:
 def read_recipients(path: Path) -> List[str]:
     """
     Reads recipient email addresses from a file, ignoring empty lines.
+    Validates emails using regex.
     """
     if not path.is_file():
         logging.warning(f"{path.name} does not exist. Continuing without it.")
@@ -60,11 +70,10 @@ def read_recipients(path: Path) -> List[str]:
     try:
         with open(path, 'r', encoding='utf-8') as f:
             lines = [line.strip() for line in f if line.strip()]
-        # Validate emails and filter out invalid ones
         valid_emails = []
         for email in lines:
             realname, email_addr = parseaddr(email)
-            if '@' in email_addr and '.' in email_addr:
+            if is_valid_email(email_addr):
                 valid_emails.append(email)
             else:
                 warning_msg = f"Invalid email address skipped: {email}"
@@ -164,11 +173,10 @@ def get_filtered_emailids(base_path: Path) -> List[str]:
         logging.error(f"Error reading inventory file: {e}")
 
     existing_to = set(read_recipients(base_path / 'to.txt'))
-    # Validate filtered emails too
     valid_emails = []
     for email in sorted(email_set.difference(existing_to)):
         realname, email_addr = parseaddr(email)
-        if '@' in email_addr and '.' in email_addr:
+        if is_valid_email(email_addr):
             valid_emails.append(email)
         else:
             warning_msg = f"Invalid filtered email skipped: {email}"
@@ -266,7 +274,8 @@ def send_email_from_folder(
     base_folder: str,
     dry_run: bool = False,
     batch_size: int = 500,
-    delay: int = 5
+    delay: int = 5,
+    attachments_folder: str = None
 ) -> None:
     """
     Main entry point to send emails from a given folder.
@@ -276,11 +285,13 @@ def send_email_from_folder(
         dry_run (bool): If True, only sends draft to approvers.
         batch_size (int): Number of emails to send per batch.
         delay (int): Delay in seconds between batches.
+        attachments_folder (str): Path to folder containing attachments.
     """
     base_path = Path(base_folder)
-    attachments_folder = base_path / "attachments"
+    attachments_path = Path(attachments_folder) if attachments_folder else base_path / "attachments"
 
     logging.info(f"--- Start sending emails from {base_folder} ---")
+    start_time = datetime.now()
 
     required_files = ['from.txt', 'subject.txt', 'body.html', 'approver.txt']
 
@@ -319,8 +330,8 @@ def send_email_from_folder(
 
     # Collect attachments if folder exists
     attachments = []
-    if attachments_folder.is_dir():
-        attachments = [f for f in attachments_folder.iterdir() if f.is_file()]
+    if attachments_path.is_dir():
+        attachments = [f for f in attachments_path.iterdir() if f.is_file()]
         print(f"Found {len(attachments)} attachment(s) to include.")
 
     if not to_emails:
@@ -329,28 +340,42 @@ def send_email_from_folder(
         return
 
     total_sent = 0
+    error_count = 0
 
     for i in range(0, len(to_emails), batch_size):
         batch = to_emails[i:i + batch_size]
-        send_email(from_email, subject, body_html, batch, cc_emails, bcc_emails, attachments=attachments)
-        total_sent += len(batch)
+        try:
+            send_email(from_email, subject, body_html, batch, cc_emails, bcc_emails, attachments=attachments)
+            total_sent += len(batch)
+        except Exception as e:
+            error_count += 1
+            logging.error(f"Error sending batch starting at index {i}: {e}")
         if i + batch_size < len(to_emails):
             print(f"Waiting {delay} seconds before sending next batch...")
             time.sleep(delay)
 
+    end_time = datetime.now()
+    duration = (end_time - start_time).total_seconds()
+
     print("Emails sent successfully.")
-    print(f"Summary:\n - Sent: {total_sent}")
-    logging.info(f"Email Summary -> Sent: {total_sent}")
+    print(f"Summary:\n - Sent: {total_sent}\n - Errors: {error_count}\n - Duration: {duration:.2f} seconds")
+    logging.info(f"Email Summary -> Sent: {total_sent}, Errors: {error_count}, Duration: {duration:.2f} seconds")
 
 
 if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description="NotifyBot Email Sender")
-    parser.add_argument("base_folder", help="Base folder containing email files")
+    parser.add_argument("base_folder", help="Base folder containing email files (from.txt, subject.txt, body.html, etc.)")
     parser.add_argument("--dry-run", action="store_true", help="Only send draft to approver, skip actual email send")
     parser.add_argument("--batch-size", type=int, default=500, help="Number of emails per batch (default: 500)")
     parser.add_argument("--delay", type=int, default=5, help="Delay in seconds between batches (default: 5)")
+    parser.add_argument(
+        "--attachments-folder",
+        type=str,
+        default=None,
+        help="Specify a custom folder for attachments (default is 'attachments' folder inside base_folder)"
+    )
 
     args = parser.parse_args()
 
@@ -358,5 +383,6 @@ if __name__ == '__main__':
         base_folder=args.base_folder,
         dry_run=args.dry_run,
         batch_size=args.batch_size,
-        delay=args.delay
+        delay=args.delay,
+        attachments_folder=args.attachments_folder
     )
