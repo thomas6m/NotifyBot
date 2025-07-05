@@ -1,191 +1,259 @@
+#!/usr/bin/env python3
 """
 NotifyBot Email Sender Script
 
-Sends batch emails using content and recipients defined in flat files.
-Supports filtering, dry-run mode, batching, attachments, and logging.
-
-Author: Thomas Mathias (updated with attachments and colored error output)
-- Default attachments handling
-- Email validation and filtering (improved regex validation)
-- Enhanced exception logging with traceback
-- Docstrings added to key functions
-- Backup before deduplication to prevent data loss
-- Logging summary and stats with timing info
-- Improved CLI help and attachments folder option
+Features:
+- RFC-compliant email validation (email-validator)
+- Attachment size filtering (via CLI option)
+- Final summary printing and logging
+- PEP8 style + docstrings for each function
+- Uses existing to.txt (does NOT append filtered emails if to.txt exists)
+- Adds additional_to.txt emails and deduplicates before sending
+- Sends to approvers only on dry-run
 """
 
-import os
 import csv
-import re
-import time
 import logging
-import smtplib
-import sys
 import mimetypes
 import shutil
-from email.message import EmailMessage
-from pathlib import Path
-from typing import List, Tuple, Dict
-from email.utils import parseaddr
+import smtplib
+import sys
+import time
+import re
 from datetime import datetime
+from email.message import EmailMessage
+from email.utils import parseaddr
+from pathlib import Path
+from typing import List, Tuple, Dict, Optional
 
+from email_validator import validate_email, EmailNotValidError
 
 # Configure logging
 logging.basicConfig(
-    filename='notifybot.log',
+    filename="notifybot.log",
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(funcName)s [line %(lineno)d] - %(message)s'
+    format="%(asctime)s - %(levelname)s - %(funcName)s [line %(lineno)d] - %(message)s",
 )
-
-EMAIL_REGEX = re.compile(r"[^@]+@[^@]+\.[^@]+")
-
-
-def is_valid_email(email: str) -> bool:
-    """Validate email using regex."""
-    return bool(EMAIL_REGEX.fullmatch(email.strip()))
 
 
 class MissingRequiredFilesError(Exception):
-    """Custom exception raised when required input files are missing."""
+    """Raised when required input files are missing."""
     pass
 
 
-def read_file(path: Path) -> str:
+def is_valid_email(email: str) -> bool:
+    """
+    Validate email for proper RFC compliance.
+
+    Args:
+        email: Email address to validate.
+
+    Returns:
+        True if valid, False otherwise.
+    """
     try:
-        with open(path, 'r', encoding='utf-8') as f:
+        validate_email(email.strip())
+        return True
+    except EmailNotValidError:
+        return False
+
+
+def read_file(path: Path) -> str:
+    """
+    Read content from a text file.
+
+    Args:
+        path: Path to file.
+
+    Returns:
+        Stripped content or empty string if error occurs.
+    """
+    try:
+        with path.open("r", encoding="utf-8") as f:
             return f.read().strip()
-    except Exception as e:
-        logging.error(f"Failed to read file {path}: {e}")
+    except Exception as exc:
+        logging.error(f"Failed to read file {path}: {exc}")
         return ""
 
 
 def read_recipients(path: Path) -> List[str]:
     """
-    Reads recipient email addresses from a file, ignoring empty lines.
-    Validates emails using regex.
+    Parse a file of email addresses (one per line), validate, and dedupe.
+
+    Args:
+        path: Path to recipient list.
+
+    Returns:
+        List of valid email strings.
     """
     if not path.is_file():
-        logging.warning(f"{path.name} does not exist. Continuing without it.")
+        logging.warning(f"{path.name} missing, skipping.")
         return []
+
+    valid_emails: List[str] = []
+
     try:
-        with open(path, 'r', encoding='utf-8') as f:
-            lines = [line.strip() for line in f if line.strip()]
-        valid_emails = []
-        for email in lines:
-            realname, email_addr = parseaddr(email)
-            if is_valid_email(email_addr):
-                valid_emails.append(email)
-            else:
-                warning_msg = f"Invalid email address skipped: {email}"
-                logging.warning(warning_msg)
-                print(f"\033[93m{warning_msg}\033[0m")  # yellow warning
-        return valid_emails
-    except Exception as e:
-        logging.error(f"Failed to read recipients from {path}: {e}")
-        return []
+        with path.open("r", encoding="utf-8") as f:
+            for raw in f:
+                email = raw.strip()
+                if not email:
+                    continue
+                    
+                _, addr = parseaddr(email)
+                if is_valid_email(addr):
+                    valid_emails.append(email)
+                else:
+                    warning = f"Invalid email skipped: {email}"
+                    logging.warning(warning)
+                    print(f"\033[93m{warning}\033[0m")
+    except Exception as exc:
+        logging.error(f"Failed to read emails from {path}: {exc}")
+
+    return valid_emails
 
 
 def write_to_txt(emails: List[str], path: Path) -> None:
+    """
+    Append emails to a text file, one per line.
+
+    Args:
+        emails: List of emails to add.
+        path: File path to append to.
+    """
     try:
-        with open(path, 'a', encoding='utf-8') as f:
+        with path.open("a", encoding="utf-8") as f:
             for email in emails:
-                f.write(email + '\n')
-        logging.info(f"Appended {len(emails)} new emails to {path.name}.")
-    except Exception as e:
-        logging.error(f"Failed to write to {path}: {e}")
+                f.write(email + "\n")
+        logging.info(f"Appended {len(emails)} emails to {path.name}")
+    except Exception as exc:
+        logging.error(f"Failed to write to {path}: {exc}")
 
 
 def deduplicate_file(path: Path) -> None:
     """
-    Deduplicates lines in a file by rewriting it with unique entries.
-    Creates a backup copy before overwriting to avoid data loss.
+    Remove duplicate lines from a file, backing up the original.
+
+    Args:
+        path: Path to file to dedupe.
     """
+    if not path.is_file():
+        return
+
+    backup = path.with_name(
+        f"{path.stem}_{datetime.now():%Y%m%d_%H%M%S}{path.suffix}"
+    )
+    shutil.copy2(path, backup)
+    logging.info(f"Backup created: {backup.name}")
+
+    seen: set = set()
+    uniq: List[str] = []
+
     try:
-        if not path.is_file():
-            return
-        # Generate a backup file name with timestamp to avoid conflicts
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = path.with_name(f"{path.stem}_{timestamp}{path.suffix}.bak")
-        shutil.copy2(path, backup_path)
-        logging.info(f"Backup of {path.name} created at {backup_path.name}")
-
-        with open(path, 'r', encoding='utf-8') as f:
-            seen = set()
-            lines = []
+        with path.open("r", encoding="utf-8") as f:
             for line in f:
-                stripped = line.strip()
-                if stripped and stripped not in seen:
-                    seen.add(stripped)
-                    lines.append(stripped)
-        with open(path, 'w', encoding='utf-8') as f:
-            for line in lines:
-                f.write(line + '\n')
-        logging.info(f"Deduplicated entries in {path.name}.")
-    except Exception as e:
-        logging.error(f"Failed to deduplicate file {path}: {e}")
+                cleaned = line.strip()
+                if cleaned and cleaned not in seen:
+                    seen.add(cleaned)
+                    uniq.append(cleaned)
+                    
+        with path.open("w", encoding="utf-8") as f:
+            for line in uniq:
+                f.write(line + "\n")
+        logging.info(f"Deduplicated {path.name}")
+    except Exception as exc:
+        logging.error(f"Error deduplicating {path}: {exc}")
 
 
-def check_required_files(base_path: Path, required_files: List[str]) -> None:
-    missing = [f for f in required_files if not (base_path / f).is_file()]
+def check_required_files(base: Path, required: List[str]) -> None:
+    """
+    Validate that a directory contains all required files.
+
+    Args:
+        base: Base directory path.
+        required: List of filenames that must be present.
+
+    Raises:
+        MissingRequiredFilesError: If any required files are missing.
+    """
+    missing = [f for f in required if not (base / f).is_file()]
     if missing:
-        message = f"Missing required files: {', '.join(missing)}"
-        logging.error(message)
-        raise MissingRequiredFilesError(message)
+        msg = f"Missing: {', '.join(missing)}"
+        logging.error(msg)
+        raise MissingRequiredFilesError(msg)
 
 
 def parse_filter_file(filter_path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
+    """
+    Parse CSV-based filter definitions.
+
+    Args:
+        filter_path: Path to CSV filter file.
+
+    Returns:
+        Tuple of (headers, list-of-row-dicts).
+    """
     try:
-        with open(filter_path, newline='', encoding='utf-8') as f:
+        with filter_path.open(newline="", encoding="utf-8") as f:
             reader = csv.reader(f)
-            lines = list(reader)
-        keys = lines[0]
-        conditions = [dict(zip(keys, row)) for row in lines[1:]]
-        return keys, conditions
-    except Exception as e:
-        logging.error(f"Failed to parse filter file {filter_path}: {e}")
+            rows = list(reader)
+            
+        headers = rows[0]
+        data = [dict(zip(headers, r)) for r in rows[1:]]
+        return headers, data
+    except Exception as exc:
+        logging.error(f"Failed to parse filter {filter_path}: {exc}")
         return [], []
 
 
-def get_filtered_emailids(base_path: Path) -> List[str]:
+def get_filtered_emailids(base: Path) -> List[str]:
     """
-    Reads inventory.csv and filter.txt and returns filtered unique email IDs
-    excluding those already in to.txt.
-    """
-    inventory_file = base_path / 'inventory.csv'
-    filter_file = base_path / 'filter.txt'
+    Load inventory and filter to generate new recipient list.
 
-    if not inventory_file.is_file() or not filter_file.is_file():
+    Args:
+        base: Base directory for inventory.csv and filter.txt.
+
+    Returns:
+        List of fresh, validated email addresses.
+    """
+    inv = base / "inventory.csv"
+    flt = base / "filter.txt"
+
+    if not inv.is_file() or not flt.is_file():
         logging.warning("inventory.csv or filter.txt missing.")
         return []
 
-    _, conditions = parse_filter_file(filter_file)
-    email_set = set()
+    _, conds = parse_filter_file(flt)
+    found: set = set()
 
     try:
-        with open(inventory_file, 'r', encoding='utf-8') as csvfile:
-            reader = csv.DictReader(csvfile)
+        with inv.open("r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
             for row in reader:
-                for cond in conditions:
-                    if all(row.get(k, '').strip() == v.strip() for k, v in cond.items()):
-                        for email in re.split(r'[;,]', row.get('emailids', '')):
-                            email_clean = email.strip()
-                            if email_clean:
-                                email_set.add(email_clean)
-    except Exception as e:
-        logging.error(f"Error reading inventory file: {e}")
+                for cond in conds:
+                    if all(
+                        row.get(k, "").strip() == v.strip() 
+                        for k, v in cond.items()
+                    ):
+                        emails = row.get("emailids", "")
+                        for e in re.split(r"[;,]", emails):
+                            if e.strip():
+                                found.add(e.strip())
+    except Exception as exc:
+        logging.error(f"Error reading {inv}: {exc}")
 
-    existing_to = set(read_recipients(base_path / 'to.txt'))
-    valid_emails = []
-    for email in sorted(email_set.difference(existing_to)):
-        realname, email_addr = parseaddr(email)
-        if is_valid_email(email_addr):
-            valid_emails.append(email)
+    existing = set(read_recipients(base / "to.txt"))
+    valid: List[str] = []
+
+    for raw in sorted(found - existing):
+        _, addr = parseaddr(raw)
+        if is_valid_email(addr):
+            valid.append(raw)
         else:
-            warning_msg = f"Invalid filtered email skipped: {email}"
-            logging.warning(warning_msg)
-            print(f"\033[93m{warning_msg}\033[0m")  # yellow warning
+            warning = f"Invalid filtered email: {raw}"
+            logging.warning(warning)
+            print(f"\033[93m{warning}\033[0m")
 
-    return valid_emails
+    return valid
 
 
 def send_email(
@@ -193,85 +261,102 @@ def send_email(
     subject: str,
     body_html: str,
     recipients: List[str],
-    cc_emails: List[str],
-    bcc_emails: List[str],
-    attachments: List[Path] = None,
-    log_sent: bool = False
+    cc: List[str],
+    bcc: List[str],
+    attachments: Optional[List[Path]] = None,
+    max_attachment_size_mb: int = 10,
+    log_sent: bool = False,
 ) -> None:
     """
-    Composes and sends an email with optional attachments.
+    Compose and send a batch email with optional attachments.
 
     Args:
-        from_email (str): Sender email address.
-        subject (str): Email subject line.
-        body_html (str): HTML content of the email body.
-        recipients (List[str]): List of "To" recipient emails.
-        cc_emails (List[str]): List of "Cc" recipient emails.
-        bcc_emails (List[str]): List of "Bcc" recipient emails.
-        attachments (List[Path], optional): List of file paths to attach.
-        log_sent (bool): Whether to log successful sends.
+        from_email: Sender address.
+        subject: Email subject.
+        body_html: HTML body of the email.
+        recipients: List of 'To' recipients.
+        cc: List of 'Cc' recipients.
+        bcc: List of 'Bcc' recipients.
+        attachments: List of file Paths to send.
+        max_attachment_size_mb: Max size to attach each file.
+        log_sent: Whether to log the successful recipients.
     """
-    attachments = attachments or []
-
     msg = EmailMessage()
-    msg['Subject'] = subject
-    msg['From'] = from_email
-    msg['To'] = ', '.join(recipients)
-    if cc_emails:
-        msg['Cc'] = ', '.join(cc_emails)
-    msg.add_alternative(body_html, subtype='html')
+    msg["Subject"] = subject
+    msg["From"] = from_email
+    msg["To"] = ", ".join(recipients)
+    
+    if cc:
+        msg["Cc"] = ", ".join(cc)
+        
+    msg.set_content("This is a plain-text fallback version.")
+    msg.add_alternative(body_html, subtype="html")
 
-    # Attach files if any
-    for file_path in attachments:
+    for path in attachments or []:
+        size_mb = path.stat().st_size / (1024**2)
+        if size_mb > max_attachment_size_mb:
+            logging.warning(f"Skipping {path.name}: {size_mb:.1f}MB > limit")
+            continue
+            
+        ctype, encoding = mimetypes.guess_type(path.name)
+        ctype = ctype or "application/octet-stream"
+        maintype, subtype = ctype.split("/", 1)
+        
         try:
-            ctype, encoding = mimetypes.guess_type(str(file_path))
-            if ctype is None or encoding is not None:
-                ctype = 'application/octet-stream'
-            maintype, subtype = ctype.split('/', 1)
+            with path.open("rb") as fp:
+                msg.add_attachment(
+                    fp.read(), 
+                    maintype=maintype, 
+                    subtype=subtype, 
+                    filename=path.name
+                )
+            logging.info(f"Attached: {path.name}")
+        except Exception as exc:
+            logging.error(f"Error attaching {path.name}: {exc}")
+            print(f"\033[91mAttachment failed: {path.name}\033[0m")
+            return
 
-            with open(file_path, 'rb') as f:
-                file_data = f.read()
-
-            msg.add_attachment(file_data,
-                               maintype=maintype,
-                               subtype=subtype,
-                               filename=file_path.name)
-            logging.info(f"Attached file: {file_path.name}")
-        except Exception as e:
-            logging.error(f"Failed to attach file {file_path}: {e}")
-            print(f"\033[91mFailed to attach {file_path}: {e}\033[0m")  # Red error for attachment failures
-            return  # Stop execution if a critical attachment fails
-
-    all_recipients = list(dict.fromkeys(recipients + cc_emails + bcc_emails))
-
+    all_recipients = list(dict.fromkeys(recipients + cc + bcc))
+    
     try:
-        with smtplib.SMTP('localhost') as server:
+        with smtplib.SMTP("localhost") as server:
             server.send_message(msg, from_addr=from_email, to_addrs=all_recipients)
-        print(f"Sent to {len(recipients)} recipient(s).")
+        print(f"Sent to {len(recipients)} recipients.")
         if log_sent:
-            logging.info(f"Sent to {', '.join(recipients)}")
-    except Exception as e:
-        err_msg = f"Failed to send email to {', '.join(recipients)}: {e}"
-        logging.error(err_msg)
-        logging.exception(e)  # full traceback
-        print(f"\033[91m{err_msg}\033[0m")  # red color for error
+            logging.info(f"Sent to: {', '.join(recipients)}")
+    except Exception as exc:
+        error = f"Failed to send to {recipients}: {exc}"
+        logging.error(error)
+        print(f"\033[91m{error}\033[0m")
 
 
-def prepare_to_txt(base_path: Path) -> None:
+def prepare_to_txt(base: Path) -> None:
     """
-    Adds filtered and additional emails to to.txt and deduplicates it.
+    Prepare the to.txt recipient list:
+    - If to.txt does NOT exist, create it with filtered emails.
+    - Always append additional_to.txt emails if any.
+    - Deduplicate to.txt at the end.
+
+    Args:
+        base: Base directory path.
     """
-    new_emails = get_filtered_emailids(base_path)
-    if new_emails:
-        write_to_txt(new_emails, base_path / 'to.txt')
-        print(f"Added {len(new_emails)} new email(s) to to.txt")
+    to_path = base / "to.txt"
 
-    additional_to = read_recipients(base_path / 'additional_to.txt')
-    if additional_to:
-        write_to_txt(additional_to, base_path / 'to.txt')
-        print(f"Appended {len(additional_to)} email(s) from additional_to.txt to to.txt")
+    # Only add filtered emails if to.txt does NOT exist
+    if not to_path.is_file():
+        new_ids = get_filtered_emailids(base)
+        if new_ids:
+            write_to_txt(new_ids, to_path)
+            print(f"Added {len(new_ids)} filtered addresses.")
 
-    deduplicate_file(base_path / 'to.txt')
+    # Always add additional_to.txt emails if available
+    addl = read_recipients(base / "additional_to.txt")
+    if addl:
+        write_to_txt(addl, to_path)
+        print(f"Added {len(addl)} additional addresses.")
+
+    # Deduplicate final to.txt
+    deduplicate_file(to_path)
 
 
 def send_email_from_folder(
@@ -279,106 +364,151 @@ def send_email_from_folder(
     dry_run: bool = False,
     batch_size: int = 500,
     delay: int = 5,
-    attachments_folder: str = None
+    attachments_folder: Optional[str] = None,
+    max_attachment_size_mb: int = 10,
 ) -> None:
     """
-    Main entry point to send emails from a given folder.
+    Run the full email send process using files/directories.
 
     Args:
-        base_folder (str): Directory path with all email files.
-        dry_run (bool): If True, only sends draft to approvers.
-        batch_size (int): Number of emails to send per batch.
-        delay (int): Delay in seconds between batches.
-        attachments_folder (str): Path to folder containing attachments.
+        base_folder: Directory containing content files.
+        dry_run: Send only to approvers if True.
+        batch_size: Recipients per email batch.
+        delay: Seconds to wait between batches.
+        attachments_folder: Alternate folder for attachments.
+        max_attachment_size_mb: Max size for attachments.
     """
-    base_path = Path(base_folder)
-    attachments_path = Path(attachments_folder) if attachments_folder else base_path / "attachments"
+    base = Path(base_folder)
+    attach_path = (
+        Path(attachments_folder) if attachments_folder else base / "attachments"
+    )
+    logging.info(f"Start sending from {base_folder}")
+    start = datetime.now()
 
-    logging.info(f"--- Start sending emails from {base_folder} ---")
-    start_time = datetime.now()
-
-    required_files = ['from.txt', 'subject.txt', 'body.html', 'approver.txt']
-
+    required = ["from.txt", "subject.txt", "body.html", "approver.txt"]
     try:
-        check_required_files(base_path, required_files)
-    except MissingRequiredFilesError as e:
-        print(f"\033[91m{str(e)}\033[0m")  # Red color error
+        check_required_files(base, required)
+    except MissingRequiredFilesError as exc:
+        print(f"\033[91m{exc}\033[0m")
         sys.exit(1)
 
-    subject = read_file(base_path / 'subject.txt')
-    body_html = read_file(base_path / 'body.html')
-    from_email = read_file(base_path / 'from.txt')
-    approvers = read_recipients(base_path / 'approver.txt')
+    from_email = read_file(base / "from.txt")
+    subject = read_file(base / "subject.txt")
+    body_html = read_file(base / "body.html")
+    approvers = read_recipients(base / "approver.txt")
 
-    if not subject or not body_html:
-        print("\033[91mMissing subject or body. Exiting.\033[0m")
-        logging.error("Subject or body is missing.")
+    if not all([from_email, subject, body_html]):
+        logging.error("Missing subject/body/from.")
+        print("\033[91mMissing core files. Exiting.\033[0m")
         sys.exit(1)
-
+        
     if not approvers:
-        print("\033[93mApprover list is empty.\033[0m")  # Yellow warning
-        logging.warning("Approver list is empty.")
+        logging.warning("No approvers listed.")
+        print("\033[93mNo approvers defined.\033[0m")
         return
 
-    prepare_to_txt(base_path)
+    prepare_to_txt(base)
 
     if dry_run:
-        print("Dry-run mode: Draft email sent to approvers only.")
-        send_email(from_email, "[DRAFT] " + subject, body_html, approvers, [], [], attachments=None, log_sent=False)
-        logging.info("Dry-run complete. No actual recipients emailed.")
+        print("DRY-RUN: sending draft to approvers only.")
+        send_email(
+            from_email,
+            "[DRAFT] " + subject,
+            body_html,
+            approvers,
+            [],
+            [],
+            attachments=[],
+            log_sent=False,
+            max_attachment_size_mb=max_attachment_size_mb,
+        )
+        logging.info("Dry-run complete.")
         return
 
-    to_emails = read_recipients(base_path / 'to.txt')
-    cc_emails = read_recipients(base_path / 'cc.txt')
-    bcc_emails = read_recipients(base_path / 'bcc.txt')
+    to_list = read_recipients(base / "to.txt")
+    cc_list = read_recipients(base / "cc.txt")
+    bcc_list = read_recipients(base / "bcc.txt")
 
-    # Collect attachments if folder exists
     attachments = []
-    if attachments_path.is_dir():
-        attachments = [f for f in attachments_path.iterdir() if f.is_file()]
-        print(f"Found {len(attachments)} attachment(s) to include.")
+    if attach_path.is_dir():
+        attachments = [p for p in attach_path.iterdir() if p.is_file()]
+        print(f"Found {len(attachments)} attachments.")
 
-    if not to_emails:
-        print("\033[91mNo recipients found in to.txt.\033[0m")
-        logging.info("No recipients found in to.txt.")
+    if not to_list:
+        logging.info("to.txt empty.")
+        print("\033[91mNo recipients.\033[0m")
         return
 
-    total_sent = 0
-    error_count = 0
+    # Deduplicate again before sending (optional redundancy)
+    deduplicate_file(base / "to.txt")
+    to_list = read_recipients(base / "to.txt")
 
-    for i in range(0, len(to_emails), batch_size):
-        batch = to_emails[i:i + batch_size]
+    sent, errors = 0, 0
+    for i in range(0, len(to_list), batch_size):
+        batch = to_list[i : i + batch_size]
         try:
-            send_email(from_email, subject, body_html, batch, cc_emails, bcc_emails, attachments=attachments)
-            total_sent += len(batch)
-        except Exception as e:
-            error_count += 1
-            logging.error(f"Error sending batch starting at index {i}: {e}")
-        if i + batch_size < len(to_emails):
-            print(f"Waiting {delay} seconds before sending next batch...")
+            send_email(
+                from_email,
+                subject,
+                body_html,
+                batch,
+                cc_list,
+                bcc_list,
+                attachments=attachments,
+                max_attachment_size_mb=max_attachment_size_mb,
+                log_sent=True,
+            )
+            sent += len(batch)
+        except Exception as exc:
+            errors += 1
+            logging.error(f"Batch error {i}: {exc}")
+
+        if i + batch_size < len(to_list):
+            print(f"Waiting {delay} seconds...")
             time.sleep(delay)
 
-    end_time = datetime.now()
-    duration = (end_time - start_time).total_seconds()
-
-    print("Emails sent successfully.")
-    print(f"Summary:\n - Sent: {total_sent}\n - Errors: {error_count}\n - Duration: {duration:.2f} seconds")
-    logging.info(f"Email Summary -> Sent: {total_sent}, Errors: {error_count}, Duration: {duration:.2f} seconds")
+    duration = (datetime.now() - start).total_seconds()
+    summary = f"Summary — Sent: {sent}, Errors: {errors}, Time: {duration:.2f}s"
+    print(summary)
+    logging.info(summary)
 
 
-if __name__ == '__main__':
+def main() -> None:
+    """Entry point for CLI execution."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="NotifyBot Email Sender")
-    parser.add_argument("base_folder", help="Base folder containing email files (from.txt, subject.txt, body.html, etc.)")
-    parser.add_argument("--dry-run", action="store_true", help="Only send draft to approver, skip actual email send")
-    parser.add_argument("--batch-size", type=int, default=500, help="Number of emails per batch (default: 500)")
-    parser.add_argument("--delay", type=int, default=5, help="Delay in seconds between batches (default: 5)")
+    parser = argparse.ArgumentParser(description="NotifyBot Email Sender CLI")
+    parser.add_argument(
+        "base_folder", 
+        help="Directory with email source files"
+    )
+    parser.add_argument(
+        "--dry-run", 
+        action="store_true", 
+        help="Send to approvers only"
+    )
+    parser.add_argument(
+        "--batch-size", 
+        type=int, 
+        default=500, 
+        help="Number of recipients per batch"
+    )
+    parser.add_argument(
+        "--delay", 
+        type=int, 
+        default=5, 
+        help="Seconds delay between batches"
+    )
     parser.add_argument(
         "--attachments-folder",
         type=str,
-        default=None,
-        help="Specify a custom folder for attachments (default is 'attachments' folder inside base_folder)"
+        help="Alternate folder for attachments",
+    )
+    parser.add_argument(
+        "--max-attachment-size",
+        type=int,
+        default=10,
+        help="Max MB per attachment",
     )
 
     args = parser.parse_args()
@@ -388,5 +518,10 @@ if __name__ == '__main__':
         dry_run=args.dry_run,
         batch_size=args.batch_size,
         delay=args.delay,
-        attachments_folder=args.attachments_folder
+        attachments_folder=args.attachments_folder,
+        max_attachment_size_mb=args.max_attachment_size,
     )
+
+
+if __name__ == "__main__":
+    main()
