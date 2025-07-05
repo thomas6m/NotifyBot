@@ -1,444 +1,313 @@
-# NotifyBot Email Sender - Operations Runbook
+# Email Notification Script Documentation
 
 ## Overview
 
-This runbook provides step-by-step procedures for operating the NotifyBot Email Sender script in production environments.
+This Python script provides a comprehensive email notification system with advanced features including email validation, attachment handling, CSV-based filtering, logging, deduplication, and dry-run capabilities. It's designed for bulk email operations with proper error handling and batch processing.
 
-## Pre-Flight Checklist
+## Features
 
-### System Requirements Verification
+- **Email Validation**: RFC-compliant email validation using the `email_validator` library
+- **Attachment Filtering**: Size-based attachment filtering with configurable limits
+- **Comprehensive Logging**: Detailed logging with timestamps and function tracking
+- **Deduplication**: Automatic removal of duplicate email addresses
+- **Dry-run Mode**: Test mode for sending emails only to approvers
+- **CSV Filtering**: Advanced recipient filtering based on CSV data
+- **Batch Processing**: Configurable batch sizes with delays between sends
+- **Error Handling**: Robust error handling with custom exceptions
 
-- [ ] Python 3.6+ installed and accessible
-- [ ] Local SMTP server running (Postfix/Sendmail)
-- [ ] Sufficient disk space for logs and backups
-- [ ] Network connectivity verified
-- [ ] Script permissions set correctly (`chmod +x notifybot.py`)
+## Dependencies
 
-### Email Campaign Setup
+```python
+#!/usr/bin/env python3
 
-- [ ] All required files created in campaign folder
-- [ ] Email content reviewed and approved
-- [ ] Recipient lists validated
-- [ ] Attachments prepared and tested
-- [ ] Dry run completed successfully
+# Core Python modules
+from pathlib import Path
+import shutil
+import smtplib
+from email.message import EmailMessage
+import csv
+import re
+import logging
+import time
+import sys
+from datetime import datetime
+from typing import List, Optional, Tuple, Dict
 
-## Standard Operating Procedures
-
-### 1. Campaign Preparation
-
-#### Step 1.1: Create Campaign Directory
-
-```bash
-mkdir -p /campaigns/$(date +%Y%m%d)_campaign_name
-cd /campaigns/$(date +%Y%m%d)_campaign_name
+# External dependencies
+from email_validator import validate_email, EmailNotValidError
 ```
 
-#### Step 1.2: Prepare Required Files
+## Configuration
 
-Create the following files:
+### Logging Setup
 
-```bash
-# Sender information
-echo "noreply@company.com" > from.txt
-
-# Email subject
-echo "Monthly Newsletter - December 2024" > subject.txt
-
-# HTML body content
-cat > body.html << 'EOF'
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Newsletter</title>
-</head>
-<body>
-    <h1>Monthly Newsletter</h1>
-    <p>Dear Subscriber,</p>
-    <p>Here's your monthly update...</p>
-</body>
-</html>
-EOF
-
-# Approver list
-echo "manager@company.com" > approver.txt
-echo "backup@company.com" >> approver.txt
+```python
+logging.basicConfig(
+    filename="notifybot.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(funcName)s [line %(lineno)d] - %(message)s",
+)
 ```
 
-#### Step 1.3: Set Up Recipient Lists
+Creates a log file `notifybot.log` that captures:
+- Timestamps
+- Log levels
+- Function names
+- Line numbers
+- Detailed messages
 
-```bash
-# Primary recipients (if not using filtering)
-cat > to.txt << 'EOF'
-user1@company.com
-user2@company.com
-EOF
+### Custom Exception
 
-# Optional: CC recipients
-echo "cc@company.com" > cc.txt
-
-# Optional: BCC recipients
-echo "bcc@company.com" > bcc.txt
+```python
+class MissingRequiredFilesError(Exception):
+    """Raised when required input files are missing."""
+    pass
 ```
 
-#### Step 1.4: Configure Filtering (Optional)
+## Core Functions
 
-If using inventory-based filtering:
+### 1. Email Validation
 
-```bash
-# Create inventory CSV
-cat > inventory.csv << 'EOF'
-name,department,emailids,status,location
-John Doe,Engineering,john.doe@company.com,active,US
-Jane Smith,Marketing,jane.smith@company.com,active,UK
-EOF
-
-# Create filter conditions
-cat > filter.txt << 'EOF'
-department,status
-Engineering,active
-Marketing,active
-EOF
+```python
+def is_valid_email(email: str) -> bool:
+    """Validates email addresses using RFC standards."""
 ```
 
-### 2. Pre-Deployment Testing
+- Uses the `email_validator` package for RFC-compliant validation
+- Strips whitespace from input
+- Returns `True` for valid emails, `False` otherwise
 
-#### Step 2.1: Validate Configuration
+### 2. File Operations
 
-```bash
-# Check all required files exist
-ls -la from.txt subject.txt body.html approver.txt
-
-# Verify file contents
-echo "=== FROM ==="
-cat from.txt
-echo "=== SUBJECT ==="
-cat subject.txt
-echo "=== APPROVERS ==="
-cat approver.txt
+#### Read File Content
+```python
+def read_file(path: Path) -> str:
+    """Reads entire file content as a string, returns empty on failure."""
 ```
 
-#### Step 2.2: Perform Dry Run
-
-```bash
-# Execute dry run
-python3 /path/to/notifybot.py . --dry-run
-
-# Check logs for any issues
-tail -f notifybot.log
+#### Read and Validate Recipients
+```python
+def read_recipients(path: Path) -> List[str]:
+    """Reads emails line-by-line, validates and filters invalid emails."""
 ```
 
-#### Step 2.3: Verify Dry Run Results
+- Reads email addresses from text files
+- Validates each email address
+- Logs warnings for invalid emails
+- Returns list of valid email addresses
 
-- [ ] Approvers received draft email
-- [ ] Email formatting appears correct
-- [ ] Attachments (if any) are properly attached
-- [ ] No errors in log file
-- [ ] Subject line includes "[DRAFT]" prefix
-
-### 3. Production Deployment
-
-#### Step 3.1: Final Recipient List Review
-
-```bash
-# Check recipient count
-wc -l to.txt
-
-# Review first few recipients
-head -10 to.txt
-
-# Check for duplicates
-sort to.txt | uniq -d
+#### Write Emails to File
+```python
+def write_to_txt(emails: List[str], path: Path) -> None:
+    """Appends given emails (one per line) to a specified text file."""
 ```
 
-#### Step 3.2: Set Production Parameters
-
-```bash
-# Calculate optimal batch size based on recipient count
-RECIPIENT_COUNT=$(wc -l < to.txt)
-BATCH_SIZE=$((RECIPIENT_COUNT / 10))  # 10 batches
-BATCH_SIZE=$((BATCH_SIZE > 500 ? 500 : BATCH_SIZE))  # Cap at 500
-BATCH_SIZE=$((BATCH_SIZE < 50 ? 50 : BATCH_SIZE))    # Minimum 50
-
-echo "Recipient count: $RECIPIENT_COUNT"
-echo "Batch size: $BATCH_SIZE"
+#### File Deduplication
+```python
+def deduplicate_file(path: Path) -> None:
+    """Creates backup, removes duplicates, writes unique lines back."""
 ```
 
-#### Step 3.3: Execute Production Send
+- Creates a backup of the original file
+- Removes duplicate entries
+- Preserves original file structure
 
+### 3. File System Validation
+
+```python
+def check_required_files(base: Path, required: List[str]) -> None:
+    """Checks if all required files exist in base directory."""
+```
+
+- Validates presence of required input files
+- Raises `MissingRequiredFilesError` if any files are missing
+
+### 4. CSV Processing
+
+#### Parse Filter File
+```python
+def parse_filter_file(filter_path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
+    """Parses CSV file, returns headers and list of dictionaries (rows)."""
+```
+
+#### Get Filtered Email IDs
+```python
+def get_filtered_emailids(base: Path) -> List[str]:
+    """Filters inventory based on conditions and extracts valid emails."""
+```
+
+This function:
+- Reads `inventory.csv` and `filter.txt` from the base folder
+- Filters inventory rows matching filter conditions
+- Extracts emails from the 'emailids' column
+- Validates extracted emails
+- Excludes emails already present in `to.txt`
+- Returns list of new valid emails
+
+### 5. Email Sending
+
+```python
+def send_email(
+    from_email: str,
+    subject: str,
+    body_html: str,
+    recipients: List[str],
+    cc: List[str],
+    bcc: List[str],
+    attachments: Optional[List[Path]] = None,
+    max_attachment_size_mb: int = 10,
+    log_sent: bool = False,
+) -> None:
+```
+
+**Features:**
+- Composes emails with HTML content and plain text fallback
+- Handles attachments with configurable size limits
+- Uses local SMTP server (localhost) for sending
+- Comprehensive logging of success and errors
+- Real-time feedback via console output
+
+### 6. Recipient List Preparation
+
+```python
+def prepare_to_txt(base: Path) -> None:
+    """Prepares the to.txt recipient list with filtering and deduplication."""
+```
+
+**Process:**
+1. If `to.txt` doesn't exist:
+   - Gets filtered emails from inventory and filter files
+   - Writes filtered emails to `to.txt`
+2. Appends emails from `additional_to.txt` (if exists)
+3. Deduplicates the final `to.txt` file
+
+## Main Workflow
+
+### Primary Sending Function
+
+```python
+def send_email_from_folder(
+    base_folder: str,
+    dry_run: bool = False,
+    batch_size: int = 500,
+    delay: int = 5,
+    attachments_folder: Optional[str] = None,
+    max_attachment_size_mb: int = 10,
+) -> None:
+```
+
+**Workflow Steps:**
+
+1. **File Validation**: Checks for required files:
+   - `from.txt` - Sender email address
+   - `subject.txt` - Email subject line
+   - `body.html` - HTML email content
+   - `approver.txt` - Approver email addresses
+
+2. **Content Reading**: Reads sender, subject, body, and approver information
+
+3. **Recipient Preparation**: Calls `prepare_to_txt()` to build recipient list
+
+4. **Dry-run Mode**: If enabled, sends draft only to approvers for review
+
+5. **Production Mode**: 
+   - Reads recipient lists from `to.txt`, `cc.txt`, and `bcc.txt`
+   - Processes attachments from specified folder
+   - Sends emails in configurable batches
+   - Implements delays between batches
+
+6. **Final Processing**: 
+   - Performs final deduplication
+   - Logs comprehensive summary
+   - Reports sent emails, errors, and total execution time
+
+## Command Line Interface
+
+```python
+def main() -> None:
+    """Command line interface with argparse for configuration."""
+```
+
+**Available Options:**
+- `--base-folder`: Directory containing email files
+- `--dry-run`: Enable dry-run mode (send only to approvers)
+- `--batch-size`: Number of emails per batch (default: 500)
+- `--delay`: Delay between batches in seconds (default: 5)
+- `--attachments-folder`: Directory containing attachment files
+- `--max-attachment-size`: Maximum attachment size in MB (default: 10)
+
+## Required File Structure
+
+```
+email_folder/
+├── from.txt          # Sender email address
+├── subject.txt       # Email subject line
+├── body.html         # HTML email content
+├── approver.txt      # Approver email addresses
+├── inventory.csv     # Main data source (optional)
+├── filter.txt        # Filter conditions (optional)
+├── additional_to.txt # Additional recipients (optional)
+├── cc.txt           # CC recipients (optional)
+├── bcc.txt          # BCC recipients (optional)
+└── to.txt           # Main recipients (auto-generated)
+```
+
+## Usage Examples
+
+### Basic Usage
 ```bash
-# Start the email campaign
-python3 /path/to/notifybot.py . \
-    --batch-size $BATCH_SIZE \
+python3 email_script.py --base-folder /path/to/email/folder
+```
+
+### Dry-run Mode
+```bash
+python3 email_script.py --base-folder /path/to/email/folder --dry-run
+```
+
+### Custom Batch Configuration
+```bash
+python3 email_script.py \
+    --base-folder /path/to/email/folder \
+    --batch-size 100 \
     --delay 10 \
-    --attachments-folder ./attachments
-
-# Monitor progress
-tail -f notifybot.log
+    --attachments-folder /path/to/attachments \
+    --max-attachment-size 25
 ```
 
-### 4. Monitoring and Maintenance
+## Logging and Monitoring
 
-#### Step 4.1: Real-Time Monitoring
+The script provides comprehensive logging through:
 
-```bash
-# Monitor log file during send
-tail -f notifybot.log | grep -E "(ERROR|WARNING|INFO)"
+- **File Logging**: All activities logged to `notifybot.log`
+- **Console Output**: Real-time feedback during execution
+- **Error Tracking**: Detailed error messages and stack traces
+- **Performance Metrics**: Execution time and batch processing statistics
 
-# Check system resources
-top -p $(pgrep -f notifybot.py)
+## Error Handling
 
-# Monitor SMTP queue
-mailq
-```
+The script includes robust error handling for:
 
-#### Step 4.2: Progress Tracking
-
-```bash
-# Check send progress
-grep "Sent to" notifybot.log | wc -l
-
-# Monitor batch completion
-grep "Waiting.*seconds" notifybot.log | tail -5
-
-# Check for errors
-grep "ERROR" notifybot.log | tail -10
-```
-
-## Troubleshooting Guide
-
-### Common Issues and Solutions
-
-#### Issue: "Missing required files" Error
-
-**Symptoms:**
-- Script exits with red error message
-- Missing file names listed
-
-**Resolution:**
-```bash
-# Check which files are missing
-ls -la from.txt subject.txt body.html approver.txt
-
-# Create missing files
-touch missing_file.txt
-echo "content" > missing_file.txt
-```
-
-#### Issue: SMTP Connection Failures
-
-**Symptoms:**
-- "Failed to send email" errors
-- Connection refused messages
-
-**Resolution:**
-```bash
-# Check SMTP service status
-systemctl status postfix
-# or
-systemctl status sendmail
-
-# Restart SMTP service if needed
-sudo systemctl restart postfix
-
-# Test SMTP connectivity
-telnet localhost 25
-```
-
-#### Issue: High Error Rate
-
-**Symptoms:**
-- Many "Failed to send" messages
-- High error count in summary
-
-**Resolution:**
-```bash
-# Reduce batch size
-python3 /path/to/notifybot.py . --batch-size 10 --delay 30
-
-# Check recipient list for invalid emails
-grep -v "@" to.txt  # Should return nothing if all valid
-```
-
-#### Issue: Attachment Failures
-
-**Symptoms:**
-- "Failed to attach file" errors
-- Red error messages for attachments
-
-**Resolution:**
-```bash
-# Check attachment files exist
-ls -la attachments/
-
-# Verify file permissions
-chmod 644 attachments/*
-
-# Check file sizes
-find attachments/ -type f -exec ls -lh {} \;
-```
-
-### Emergency Procedures
-
-#### Emergency Stop
-
-If campaign needs to be stopped immediately:
-
-```bash
-# Find the process
-ps aux | grep notifybot.py
-
-# Kill the process
-kill -TERM <PID>
-
-# Check remaining recipients
-grep "Sent to" notifybot.log | wc -l
-```
-
-#### Rollback Procedures
-
-If issues are detected post-send:
-
-```bash
-# Create incident report
-cat > incident_report.txt << EOF
-Date: $(date)
-Campaign: $(pwd)
-Issue: [Description]
-Recipients affected: $(grep "Sent to" notifybot.log | wc -l)
-Action taken: [Description]
-EOF
-
-# Preserve logs
-cp notifybot.log incident_$(date +%Y%m%d_%H%M%S).log
-```
-
-## Maintenance Tasks
-
-### Daily Maintenance
-
-```bash
-# Check log file size
-ls -lh notifybot.log
-
-# Archive old logs (if > 100MB)
-if [ $(stat -f%z notifybot.log 2>/dev/null || stat -c%s notifybot.log) -gt 104857600 ]; then
-    mv notifybot.log notifybot_$(date +%Y%m%d).log
-fi
-
-# Clean up backup files older than 30 days
-find . -name "*.bak" -mtime +30 -delete
-```
-
-### Weekly Maintenance
-
-```bash
-# Check SMTP server health
-systemctl status postfix
-
-# Review error patterns
-grep "ERROR" notifybot.log | cut -d' ' -f5- | sort | uniq -c | sort -nr
-
-# Clean up old campaign directories
-find /campaigns -type d -mtime +90 -exec rm -rf {} \;
-```
-
-### Monthly Maintenance
-
-```bash
-# Archive and rotate logs
-mkdir -p /archives/$(date +%Y%m)
-mv notifybot_*.log /archives/$(date +%Y%m)/
-
-# Update email validation patterns if needed
-# Review and update recipient lists
-# Performance analysis and optimization
-```
-
-## Performance Optimization
-
-### Batch Size Optimization
-
-| Recipient Count | Recommended Batch Size | Delay (seconds) |
-|----------------|------------------------|-----------------|
-| < 100          | 25                     | 5               |
-| 100-1000       | 50                     | 10              |
-| 1000-5000      | 100                    | 15              |
-| 5000-10000     | 250                    | 20              |
-| > 10000        | 500                    | 30              |
-
-### Resource Monitoring
-
-```bash
-# Monitor disk usage
-df -h
-
-# Monitor memory usage
-free -h
-
-# Monitor network connections
-netstat -an | grep :25
-```
+- Missing required files
+- Invalid email addresses
+- SMTP connection failures
+- Attachment size violations
+- CSV parsing errors
+- File system permissions
 
 ## Security Considerations
 
-### Access Control
+- Uses local SMTP server (localhost) for sending
+- Validates all email addresses before processing
+- Implements file size limits for attachments
+- Provides dry-run mode for testing
+- Comprehensive logging for audit trails
 
-```bash
-# Set proper file permissions
-chmod 600 *.txt
-chmod 644 *.html
-chmod 755 notifybot.py
+## Best Practices
 
-# Limit access to campaign directories
-chown -R emailuser:emailgroup /campaigns
-chmod 750 /campaigns
-```
-
-### Log Security
-
-```bash
-# Ensure logs don't contain sensitive data
-grep -i password notifybot.log  # Should return nothing
-grep -i secret notifybot.log    # Should return nothing
-
-# Set log file permissions
-chmod 640 notifybot.log
-```
-
-## Compliance and Reporting
-
-### Campaign Reporting
-
-```bash
-# Generate campaign summary
-cat > campaign_summary.txt << EOF
-Campaign: $(basename $(pwd))
-Date: $(date)
-Total Recipients: $(wc -l < to.txt)
-Emails Sent: $(grep "Sent to" notifybot.log | wc -l)
-Errors: $(grep "ERROR" notifybot.log | wc -l)
-Duration: $(grep "Duration:" notifybot.log | tail -1 | cut -d: -f2)
-EOF
-```
-
-### Audit Trail
-
-```bash
-# Create audit log entry
-echo "$(date): Campaign $(basename $(pwd)) completed by $(whoami)" >> /var/log/email_campaigns.log
-```
-
-## Contact Information
-
-- **Primary Contact:** IT Operations Team
-- **Secondary Contact:** Email Administrator
-- **Emergency Contact:** On-call Engineer
-- **Escalation:** IT Manager
-
-## Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0     | 2024-01-01 | Initial version |
-| 1.1     | 2024-01-15 | Added attachment support |
-| 1.2     | 2024-02-01 | Enhanced error handling |
+1. **Always test with dry-run mode** before production sends
+2. **Monitor log files** for errors and warnings
+3. **Use appropriate batch sizes** to avoid overwhelming SMTP servers
+4. **Implement proper delays** between batches
+5. **Validate recipient lists** before bulk operations
+6. **Regular backup** of important data files
+7. **Monitor attachment sizes** to prevent delivery issues
