@@ -4,7 +4,7 @@ NotifyBot Email Sender Script
 Sends batch emails using content and recipients defined in flat files.
 Supports filtering, dry-run mode, batching, and logging.
 
-Author: [Your Name]
+Author: Thomas Mathias
 """
 
 import os
