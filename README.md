@@ -1,141 +1,212 @@
 # NotifyBot Email Sender
 
-A Python-based bulk email automation tool that sends personalized emails to filtered recipients from CSV inventory data.
+A Python script for sending batch emails with support for filtering, attachments, dry-run mode, and comprehensive logging.
 
 ## Features
 
-- **Bulk Email Sending**: Send emails to hundreds of recipients with batch processing
-- **CSV Filtering**: Filter recipients from inventory CSV files using flexible conditions
-- **Email Validation**: Automatic validation of email addresses
-- **Attachments Support**: Send multiple file attachments
-- **Dry Run Mode**: Preview emails by sending drafts to approvers
-- **Deduplication**: Automatic removal of duplicate email addresses
-- **Batch Processing**: Send emails in configurable batches with delays
-- **Comprehensive Logging**: Colored console output and detailed file logging
-- **Multiple Recipients**: Support for TO, CC, and BCC recipients
+- **Batch Email Sending**: Send emails to multiple recipients in configurable batches
+- **Dry Run Mode**: Test email content by sending drafts to approvers only
+- **Email Filtering**: Filter recipients from CSV inventory using condition files
+- **Attachment Support**: Automatically attach files from specified folders
+- **Duplicate Prevention**: Automatic deduplication of recipient lists
+- **Comprehensive Logging**: Detailed logging with timestamps and error tracking
+- **Email Validation**: Regex-based email address validation
+- **Colored Output**: Visual feedback with colored console output for errors and warnings
 
 ## Requirements
 
 - Python 3.6+
-- Local SMTP server (configured to run on localhost)
-- CSV files with inventory data
-- Required email template files
+- Local SMTP server (configured for localhost)
+- Required Python modules (all standard library):
+  - `smtplib`
+  - `email`
+  - `csv`
+  - `pathlib`
+  - `logging`
 
-## Quick Start
+## Installation
 
-1. **Setup your email folder structure**:
-   ```
-   your_email_folder/
-   ├── from.txt          # Sender email address
-   ├── subject.txt       # Email subject
-   ├── body.html         # HTML email body
-   ├── approver.txt      # Approver email addresses
-   ├── inventory.csv     # Recipient data
-   ├── filter.txt        # Filter conditions (CSV format)
-   ├── to.txt            # Additional recipients (optional)
-   ├── cc.txt            # CC recipients (optional)
-   ├── bcc.txt           # BCC recipients (optional)
-   ├── additional_to.txt # Extra recipients (optional)
-   └── attachment/       # Folder for attachments (optional)
-       ├── file1.pdf
-       └── file2.jpg
-   ```
+1. Download the `notifybot.py` script
+2. Ensure you have a local SMTP server running (e.g., Postfix, Sendmail)
+3. Make the script executable: `chmod +x notifybot.py`
 
-2. **Run dry-run first** (recommended):
-   ```bash
-   python notifybot.py your_email_folder --dry-run
-   ```
-
-3. **Send actual emails**:
-   ```bash
-   python notifybot.py your_email_folder
-   ```
-
-## File Formats
-
-### Required Files
-
-- **from.txt**: Single line with sender email address
-- **subject.txt**: Single line with email subject
-- **body.html**: HTML formatted email body
-- **approver.txt**: One email address per line for approval recipients
-
-### Optional Files
-
-- **inventory.csv**: CSV file with recipient data including 'emailids' column
-- **filter.txt**: CSV format filter conditions
-- **to.txt**: Additional recipients (one per line)
-- **cc.txt**: CC recipients (one per line)
-- **bcc.txt**: BCC recipients (one per line)
-- **additional_to.txt**: Extra recipients to be merged into to.txt
-
-### Filter File Format
-
-The `filter.txt` file should be in CSV format where:
-- First row contains column headers matching your inventory.csv
-- Subsequent rows contain filter conditions
-
-Example:
-```csv
-department,location,status
-IT,New York,active
-HR,Boston,active
-```
-
-## Command Line Options
-
-```bash
-python notifybot.py <base_folder> [OPTIONS]
-
-Arguments:
-  base_folder           Path to folder containing email files
-
-Options:
-  --dry-run            Send draft email to approvers only
-  --batch-size N       Number of emails per batch (default: 500)
-  --delay N            Seconds between batches (default: 5)
-  --log-level LEVEL    Logging level: DEBUG, INFO, WARNING, ERROR (default: INFO)
-```
-
-## Examples
+## Usage
 
 ### Basic Usage
+
 ```bash
-python notifybot.py ./email_campaign
+python notifybot.py /path/to/email/folder
 ```
 
-### Dry Run with Custom Batch Size
+### Advanced Usage
+
 ```bash
-python notifybot.py ./email_campaign --dry-run --batch-size 100
+python notifybot.py /path/to/email/folder \
+    --dry-run \
+    --batch-size 100 \
+    --delay 10 \
+    --attachments-folder /path/to/attachments
 ```
 
-### Debug Mode with Custom Delay
-```bash
-python notifybot.py ./email_campaign --log-level DEBUG --delay 10
+### Command Line Options
+
+- `base_folder`: **Required**. Directory containing email configuration files
+- `--dry-run`: Send draft email to approvers only (no actual recipients)
+- `--batch-size`: Number of emails per batch (default: 500)
+- `--delay`: Delay in seconds between batches (default: 5)
+- `--attachments-folder`: Custom path for attachments (default: `attachments/` in base folder)
+
+## File Structure
+
+Your email folder must contain these **required files**:
+
+```
+email_campaign/
+├── from.txt          # Sender email address
+├── subject.txt       # Email subject line
+├── body.html         # HTML email body
+├── approver.txt      # Approver email addresses (one per line)
+├── to.txt            # Primary recipients (auto-generated/managed)
+├── cc.txt            # CC recipients (optional)
+├── bcc.txt           # BCC recipients (optional)
+├── additional_to.txt # Additional recipients to add (optional)
+├── inventory.csv     # Recipient database (optional, for filtering)
+├── filter.txt        # Filter conditions (optional, CSV format)
+└── attachments/      # Folder for email attachments (optional)
+    ├── document1.pdf
+    ├── image1.jpg
+    └── spreadsheet.xlsx
+```
+
+### File Descriptions
+
+#### Required Files
+
+- **`from.txt`**: Contains the sender's email address
+- **`subject.txt`**: Contains the email subject line
+- **`body.html`**: Contains the HTML email body content
+- **`approver.txt`**: Contains approver email addresses (one per line) for dry-run mode
+
+#### Optional Files
+
+- **`to.txt`**: Primary recipients list (automatically managed by the script)
+- **`cc.txt`**: CC recipients (one per line)
+- **`bcc.txt`**: BCC recipients (one per line)
+- **`additional_to.txt`**: Additional recipients to add to the main list
+- **`inventory.csv`**: Database of potential recipients with metadata
+- **`filter.txt`**: CSV file defining filter conditions for inventory
+
+#### Inventory and Filtering
+
+The `inventory.csv` should contain recipient data with at least an `emailids` column:
+
+```csv
+name,department,emailids,status
+John Doe,Engineering,john.doe@company.com,active
+Jane Smith,Marketing,jane.smith@company.com;j.smith@company.com,active
+```
+
+The `filter.txt` defines conditions to filter recipients:
+
+```csv
+department,status
+Engineering,active
+Marketing,active
 ```
 
 ## Logging
 
-The script creates detailed logs in:
-- **Console**: Colored output showing progress and errors
-- **File**: `notifybot.log` with detailed timestamps and function information
+The script creates a detailed log file (`notifybot.log`) with:
+
+- Timestamp for each action
+- Function names and line numbers
+- Detailed error messages with full tracebacks
+- Summary statistics including timing information
 
 ## Error Handling
 
-The script includes comprehensive error handling for:
-- Missing required files
-- Invalid email addresses
-- SMTP connection issues
-- File read/write errors
-- CSV parsing errors
+The script includes comprehensive error handling:
 
-## Security Notes
+- **File Validation**: Checks for required files before execution
+- **Email Validation**: Validates email addresses using regex
+- **Backup Creation**: Creates timestamped backups before file modifications
+- **Colored Output**: Uses colored console output for better visibility:
+  - 🔴 Red: Critical errors
+  - 🟡 Yellow: Warnings
+  - ⚪ White: Normal output
 
-- Ensure your SMTP server is properly configured
-- Review recipient lists before sending
-- Use dry-run mode to test campaigns
-- Keep logs secure as they contain email addresses
+## Security Considerations
 
-## Support
+- The script connects to `localhost` SMTP server only
+- Email addresses are validated before sending
+- No sensitive data is logged (passwords, API keys)
+- Backup files are created to prevent data loss
 
-For issues or questions, check the log files for detailed error information. The script provides clear error messages and suggestions for common problems.
+## Troubleshooting
+
+### Common Issues
+
+1. **"Missing required files" error**
+   - Ensure all required files exist in the base folder
+   - Check file permissions
+
+2. **"Failed to send email" error**
+   - Verify SMTP server is running on localhost
+   - Check firewall settings
+   - Verify sender email address is valid
+
+3. **"Invalid email address" warnings**
+   - Review recipient lists for malformed email addresses
+   - Check for extra spaces or special characters
+
+4. **Attachment failures**
+   - Ensure attachment files exist and are readable
+   - Check file size limits on your SMTP server
+   - Verify attachment folder path
+
+### Log Analysis
+
+Check `notifybot.log` for detailed information about:
+- Email sending success/failure
+- File reading errors
+- Attachment processing
+- Performance statistics
+
+## Examples
+
+### Example 1: Simple Campaign
+
+```bash
+# Send emails to all recipients in to.txt
+python notifybot.py /home/user/campaigns/newsletter
+```
+
+### Example 2: Dry Run Test
+
+```bash
+# Test email content by sending only to approvers
+python notifybot.py /home/user/campaigns/newsletter --dry-run
+```
+
+### Example 3: Large Campaign with Custom Settings
+
+```bash
+# Send large campaign with smaller batches and longer delays
+python notifybot.py /home/user/campaigns/announcement \
+    --batch-size 50 \
+    --delay 30 \
+    --attachments-folder /shared/attachments
+```
+
+## Best Practices
+
+1. **Always test with --dry-run first**
+2. **Use appropriate batch sizes** (50-500 depending on server capacity)
+3. **Set reasonable delays** between batches to avoid overwhelming the server
+4. **Monitor logs** during and after sending
+5. **Keep backups** of recipient lists before major campaigns
+6. **Validate email content** in HTML format before sending
+
+## License
+
+This script is provided as-is for educational and internal use purposes.
