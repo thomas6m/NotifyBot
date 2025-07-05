@@ -103,7 +103,9 @@ def deduplicate_file(path: Path) -> None:
     try:
         if not path.is_file():
             return
-        backup_path = path.with_suffix(path.suffix + '.bak')
+        # Generate a backup file name with timestamp to avoid conflicts
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = path.with_name(f"{path.stem}_{timestamp}{path.suffix}.bak")
         shutil.copy2(path, backup_path)
         logging.info(f"Backup of {path.name} created at {backup_path.name}")
 
@@ -237,6 +239,8 @@ def send_email(
             logging.info(f"Attached file: {file_path.name}")
         except Exception as e:
             logging.error(f"Failed to attach file {file_path}: {e}")
+            print(f"\033[91mFailed to attach {file_path}: {e}\033[0m")  # Red error for attachment failures
+            return  # Stop execution if a critical attachment fails
 
     all_recipients = list(dict.fromkeys(recipients + cc_emails + bcc_emails))
 
