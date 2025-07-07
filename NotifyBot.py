@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import csv
 import logging
 import mimetypes
@@ -26,11 +27,6 @@ class MissingRequiredFilesError(Exception):
 
 
 def rotate_log_file() -> None:
-    """
-    Rotate the current log file by renaming it with a timestamp suffix.
-
-    If the log file exists, rename it to 'notifybot_YYYYMMDD_HHMMSS.log'.
-    """
     log_path = Path(LOG_FILENAME)
     if log_path.is_file():
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -43,9 +39,6 @@ def rotate_log_file() -> None:
 
 
 def setup_logging() -> None:
-    """
-    Configure logging to output INFO level messages with timestamp, function name, and line info.
-    """
     logging.basicConfig(
         filename=LOG_FILENAME,
         level=logging.INFO,
@@ -54,13 +47,6 @@ def setup_logging() -> None:
 
 
 def log_and_print(level: str, message: str) -> None:
-    """
-    Log a message and print it with colored terminal output.
-
-    Args:
-        level: Logging level as string ('info', 'warning', 'error').
-        message: The message to log and print.
-    """
     level = level.lower()
     color_codes = {
         "info": "\033[94m",    # Blue
@@ -82,15 +68,6 @@ def log_and_print(level: str, message: str) -> None:
 
 
 def is_valid_email(email: str) -> bool:
-    """
-    Validate the given email address using email_validator package.
-
-    Args:
-        email: The email address string to validate.
-
-    Returns:
-        True if valid, False otherwise.
-    """
     try:
         validate_email(email.strip())
         return True
@@ -99,15 +76,6 @@ def is_valid_email(email: str) -> bool:
 
 
 def read_file(path: Path) -> str:
-    """
-    Read and return the content of a file, stripping whitespace.
-
-    Args:
-        path: Path object to the file.
-
-    Returns:
-        File content as a stripped string, or empty string on error.
-    """
     try:
         with path.open("r", encoding="utf-8") as f:
             return f.read().strip()
@@ -117,16 +85,6 @@ def read_file(path: Path) -> str:
 
 
 def extract_emails(raw: str, delimiters: str = ";") -> List[str]:
-    """
-    Split a string by multiple delimiters and return a list of non-empty trimmed strings.
-
-    Args:
-        raw: Raw string containing emails separated by delimiters.
-        delimiters: String of delimiter characters (e.g. ";,").
-
-    Returns:
-        List of email strings.
-    """
     if not raw:
         return []
     pattern = f"[{re.escape(delimiters)}]"
@@ -134,16 +92,6 @@ def extract_emails(raw: str, delimiters: str = ";") -> List[str]:
 
 
 def read_recipients(path: Path, delimiters: str = ";") -> List[str]:
-    """
-    Read recipient emails from a file, validate them, and return a list of valid emails.
-
-    Args:
-        path: Path to the recipient file.
-        delimiters: Delimiters used to separate emails.
-
-    Returns:
-        List of valid email strings.
-    """
     if not path.is_file():
         log_and_print("warning", f"{path.name} missing, skipping.")
         return []
@@ -170,13 +118,6 @@ def read_recipients(path: Path, delimiters: str = ";") -> List[str]:
 
 
 def write_to_txt(emails: List[str], path: Path) -> None:
-    """
-    Append a list of emails to a text file.
-
-    Args:
-        emails: List of email strings.
-        path: Path to the file to append to.
-    """
     try:
         with path.open("a", encoding="utf-8") as f:
             for email in emails:
@@ -187,12 +128,6 @@ def write_to_txt(emails: List[str], path: Path) -> None:
 
 
 def deduplicate_file(path: Path) -> None:
-    """
-    Remove duplicate lines from a file, creating a timestamped backup first.
-
-    Args:
-        path: Path to the file to deduplicate.
-    """
     if not path.is_file():
         return
 
@@ -222,16 +157,6 @@ def deduplicate_file(path: Path) -> None:
 
 
 def check_required_files(base: Path, required: List[str]) -> None:
-    """
-    Verify that all required files exist in the base folder.
-
-    Args:
-        base: Path to base folder.
-        required: List of required filenames.
-
-    Raises:
-        MissingRequiredFilesError: If any required files are missing.
-    """
     missing = [f for f in required if not (base / f).is_file()]
     if missing:
         msg = f"Missing: {', '.join(missing)}"
@@ -240,15 +165,6 @@ def check_required_files(base: Path, required: List[str]) -> None:
 
 
 def parse_filter_file(filter_path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
-    """
-    Parse the filter.txt CSV file to extract headers and rows with defaults.
-
-    Args:
-        filter_path: Path to filter.txt.
-
-    Returns:
-        Tuple containing list of headers and list of row dictionaries.
-    """
     try:
         with filter_path.open(newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -271,18 +187,6 @@ def match_condition(
     mode: str = "exact",
     regex_flags: str = "",
 ) -> bool:
-    """
-    Compare actual and expected strings based on matching mode.
-
-    Args:
-        actual: The actual string value.
-        expected: The expected string value.
-        mode: Matching mode ("exact", "contains", "regex").
-        regex_flags: Flags for regex, e.g. "IGNORECASE", "MULTILINE".
-
-    Returns:
-        True if matched, False otherwise.
-    """
     actual = actual.strip()
     expected = expected.strip()
     mode = mode.strip().lower()
@@ -312,16 +216,6 @@ def match_condition(
 
 
 def get_filtered_emailids(base: Path, delimiters: str = ";") -> List[str]:
-    """
-    Retrieve filtered email IDs based on inventory.csv and filter.txt files.
-
-    Args:
-        base: Path to base folder.
-        delimiters: Delimiters used in email fields.
-
-    Returns:
-        List of filtered valid email addresses.
-    """
     inv = base / "inventory.csv"
     flt = base / "filter.txt"
 
@@ -367,15 +261,6 @@ def get_filtered_emailids(base: Path, delimiters: str = ";") -> List[str]:
 
 
 def sanitize_filename(filename: str) -> str:
-    """
-    Sanitize filename to ASCII only, replacing non-ASCII and unsafe chars with '_'.
-
-    Args:
-        filename: The original filename.
-
-    Returns:
-        Sanitized ASCII-only filename.
-    """
     nfkd_form = unicodedata.normalize("NFKD", filename)
     ascii_bytes = nfkd_form.encode("ASCII", "ignore")
     ascii_str = ascii_bytes.decode("ASCII")
@@ -393,23 +278,11 @@ def send_email(
     smtp_server: str = "localhost",
     dry_run: bool = False,
 ) -> None:
-    """
-    Send an email with HTML body only (no plain text fallback).
-
-    Args:
-        recipients: List of recipient email addresses.
-        subject: Email subject line.
-        body_html: HTML body content.
-        attachments: List of file Paths to attach.
-        smtp_server: SMTP server address.
-        dry_run: If True, do not actually send emails.
-    """
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = "notifybot@example.com"
     msg["To"] = ", ".join(recipients)
 
-    # Only HTML version
     msg.add_alternative(body_html, subtype="html")
 
     max_attachment_size = 15 * 1024 * 1024  # 15 MB
@@ -459,17 +332,10 @@ def send_email(
 
 def send_email_from_folder(
     base: Path,
+    attachment_subfolder: str = "attachment",
     dry_run: bool = False,
     batch_size: int = 30,
 ) -> None:
-    """
-    Compose and send emails from files in the base folder.
-
-    Args:
-        base: Path to base folder with input files.
-        dry_run: If True, only simulate sending.
-        batch_size: Number of recipients per email batch.
-    """
     required = ["body.html", "subject.txt"]
     check_required_files(base, required)
 
@@ -489,12 +355,19 @@ def send_email_from_folder(
     subject = read_file(base / "subject.txt")
     body_html = read_file(base / "body.html")
 
-    # Collect attachments in base folder excluding the body and subject files and known text files
+    # Attachments in base folder except known files
     attachments = [
         p
         for p in base.iterdir()
         if p.is_file() and p.name not in required + ["to.txt", "filter.txt"]
     ]
+
+    # Add attachments from the specified attachment folder inside base
+    attachment_folder = base / attachment_subfolder
+    if attachment_folder.is_dir():
+        attachments.extend(
+            p for p in attachment_folder.iterdir() if p.is_file()
+        )
 
     # Batch recipients and send emails
     for i in range(0, len(emails), batch_size):
@@ -511,17 +384,31 @@ def send_email_from_folder(
 
 
 def main() -> None:
-    """Main entry point for the notifybot script."""
     rotate_log_file()
     setup_logging()
 
+    parser = argparse.ArgumentParser(description="Notifybot email sender")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Simulate sending emails without actually sending",
+    )
+    parser.add_argument(
+        "--attachment-folder",
+        type=str,
+        default="attachment",
+        help="Subfolder name inside base folder to load attachments from (default: 'attachment')",
+    )
+    args = parser.parse_args()
+
     base_folder = Path(__file__).parent / "base"
 
-    # Command line options: add "--dry-run" to test without sending emails
-    dry_run = "--dry-run" in sys.argv
-
     try:
-        send_email_from_folder(base_folder, dry_run=dry_run)
+        send_email_from_folder(
+            base_folder,
+            attachment_subfolder=args.attachment_folder,
+            dry_run=args.dry_run,
+        )
     except MissingRequiredFilesError as exc:
         log_and_print("error", str(exc))
 
