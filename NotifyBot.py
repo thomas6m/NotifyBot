@@ -5,9 +5,10 @@ NotifyBot Email Sender Script
 Updated:
 - filter.txt supports field,value,mode (exact/contains/regex)
 - match_condition() enables flexible matching
+- Added log rotation: rename notifybot.log with timestamp suffix on each run
+- prepare_to_txt updated to skip inventory filter if to.txt exists
 """
 
-# (all imports remain the same)
 import csv
 import logging
 import mimetypes
@@ -21,19 +22,30 @@ from email.message import EmailMessage
 from email.utils import parseaddr
 from pathlib import Path
 from typing import List, Tuple, Dict, Optional
-
 from email_validator import validate_email, EmailNotValidError
 
-logging.basicConfig(
-    filename="notifybot.log",
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(funcName)s [line %(lineno)d] - %(message)s",
-)
-
+LOG_FILENAME = "notifybot.log"
 
 class MissingRequiredFilesError(Exception):
     pass
 
+def rotate_log_file():
+    log_path = Path(LOG_FILENAME)
+    if log_path.is_file():
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        rotated_name = log_path.with_name(f"notifybot_{timestamp}.log")
+        try:
+            log_path.rename(rotated_name)
+            print(f"Rotated log file to {rotated_name.name}")
+        except Exception as exc:
+            print(f"\033[91mFailed to rotate log file: {exc}\033[0m")
+
+def setup_logging():
+    logging.basicConfig(
+        filename=LOG_FILENAME,
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(funcName)s [line %(lineno)d] - %(message)s",
+    )
 
 def is_valid_email(email: str) -> bool:
     try:
@@ -42,7 +54,6 @@ def is_valid_email(email: str) -> bool:
     except EmailNotValidError:
         return False
 
-
 def read_file(path: Path) -> str:
     try:
         with path.open("r", encoding="utf-8") as f:
@@ -50,7 +61,6 @@ def read_file(path: Path) -> str:
     except Exception as exc:
         logging.error(f"Failed to read file {path}: {exc}")
         return ""
-
 
 def read_recipients(path: Path) -> List[str]:
     if not path.is_file():
@@ -77,7 +87,6 @@ def read_recipients(path: Path) -> List[str]:
 
     return valid_emails
 
-
 def write_to_txt(emails: List[str], path: Path) -> None:
     try:
         with path.open("a", encoding="utf-8") as f:
@@ -86,7 +95,6 @@ def write_to_txt(emails: List[str], path: Path) -> None:
         logging.info(f"Appended {len(emails)} emails to {path.name}")
     except Exception as exc:
         logging.error(f"Failed to write to {path}: {exc}")
-
 
 def deduplicate_file(path: Path) -> None:
     if not path.is_file():
@@ -116,14 +124,12 @@ def deduplicate_file(path: Path) -> None:
     except Exception as exc:
         logging.error(f"Error deduplicating {path}: {exc}")
 
-
 def check_required_files(base: Path, required: List[str]) -> None:
     missing = [f for f in required if not (base / f).is_file()]
     if missing:
         msg = f"Missing: {', '.join(missing)}"
         logging.error(msg)
         raise MissingRequiredFilesError(msg)
-
 
 def parse_filter_file(filter_path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
     try:
@@ -139,7 +145,6 @@ def parse_filter_file(filter_path: Path) -> Tuple[List[str], List[Dict[str, str]
     except Exception as exc:
         logging.error(f"Failed to parse filter {filter_path}: {exc}")
         return [], []
-
 
 def match_condition(actual: str, expected: str, mode: str = "exact") -> bool:
     actual = actual.strip()
@@ -159,7 +164,6 @@ def match_condition(actual: str, expected: str, mode: str = "exact") -> bool:
     else:
         logging.warning(f"Unknown match mode '{mode}', defaulting to exact.")
         return actual.lower() == expected.lower()
-
 
 def get_filtered_emailids(base: Path) -> List[str]:
     inv = base / "inventory.csv"
@@ -205,7 +209,6 @@ def get_filtered_emailids(base: Path) -> List[str]:
             print(f"\033[93m{warning}\033[0m")
 
     return valid
-
 
 def send_email(
     from_email: str,
@@ -266,23 +269,23 @@ def send_email(
         logging.error(error)
         print(f"\033[91m{error}\033[0m")
 
-
 def prepare_to_txt(base: Path) -> None:
     to_path = base / "to.txt"
 
+    # If to.txt exists, skip filtering from inventory.csv + filter.txt
     if not to_path.is_file():
         new_ids = get_filtered_emailids(base)
         if new_ids:
             write_to_txt(new_ids, to_path)
             print(f"Added {len(new_ids)} filtered addresses.")
 
+    # Always add additional_to.txt content
     addl = read_recipients(base / "additional_to.txt")
     if addl:
         write_to_txt(addl, to_path)
         print(f"Added {len(addl)} additional addresses.")
 
     deduplicate_file(to_path)
-
 
 def send_email_from_folder(
     base_folder: str,
@@ -293,6 +296,13 @@ def send_email_from_folder(
     max_attachment_size_mb: int = 10,
 ) -> None:
     base = Path(base_folder)
+
+    # Rotate log file before configuring logging
+    rotate_log_file()
+
+    # Setup fresh logging after rotation
+    setup_logging()
+
     attach_path = Path(attachments_folder) if attachments_folder else base / "attachments"
     logging.info(f"Start sending from {base_folder}")
     start = datetime.now()
@@ -383,7 +393,6 @@ def send_email_from_folder(
     print(summary)
     logging.info(summary)
 
-
 def main() -> None:
     import argparse
 
@@ -405,7 +414,6 @@ def main() -> None:
         attachments_folder=args.attachments_folder,
         max_attachment_size_mb=args.max_attachment_size,
     )
-
 
 if __name__ == "__main__":
     main()
