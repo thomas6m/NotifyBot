@@ -3,17 +3,18 @@
 import csv
 import logging
 import mimetypes
+import re
 import shutil
 import smtplib
 import sys
 import time
-import re
 import unicodedata
 from datetime import datetime
 from email.message import EmailMessage
 from email.utils import parseaddr
 from pathlib import Path
 from typing import List, Tuple, Dict
+
 from email_validator import validate_email, EmailNotValidError
 
 LOG_FILENAME = "notifybot.log"
@@ -154,7 +155,10 @@ def read_recipients(path: Path, delimiters: str = ";") -> List[str]:
                 for email in extract_emails(line.strip(), delimiters):
                     _, addr = parseaddr(email)
                     if not addr:
-                        log_and_print("warning", f"Skipping malformed email (empty addr): {email}")
+                        log_and_print(
+                            "warning",
+                            f"Skipping malformed email (empty addr): {email}",
+                        )
                         continue
                     if is_valid_email(addr):
                         valid_emails.append(email)
@@ -192,7 +196,9 @@ def deduplicate_file(path: Path) -> None:
     if not path.is_file():
         return
 
-    backup = path.with_name(f"{path.stem}_{datetime.now():%Y%m%d_%H%M%S}{path.suffix}")
+    backup = path.with_name(
+        f"{path.stem}_{datetime.now():%Y%m%d_%H%M%S}{path.suffix}"
+    )
     shutil.copy2(path, backup)
     log_and_print("info", f"Backup created: {backup.name}")
 
@@ -382,18 +388,18 @@ def sanitize_filename(filename: str) -> str:
 def send_email(
     recipients: List[str],
     subject: str,
-    body: str,
+    body_html: str,
     attachments: List[Path],
     smtp_server: str = "localhost",
     dry_run: bool = False,
 ) -> None:
     """
-    Send an email with optional attachments.
+    Send an email with HTML body only (no plain text fallback).
 
     Args:
         recipients: List of recipient email addresses.
         subject: Email subject line.
-        body: Email body content.
+        body_html: HTML body content.
         attachments: List of file Paths to attach.
         smtp_server: SMTP server address.
         dry_run: If True, do not actually send emails.
@@ -402,7 +408,9 @@ def send_email(
     msg["Subject"] = subject
     msg["From"] = "notifybot@example.com"
     msg["To"] = ", ".join(recipients)
-    msg.set_content(body)
+
+    # Only HTML version
+    msg.add_alternative(body_html, subtype="html")
 
     max_attachment_size = 15 * 1024 * 1024  # 15 MB
 
@@ -430,7 +438,9 @@ def send_email(
             maintype, subtype = ctype.split("/", 1)
             sanitized_name = sanitize_filename(path.name)
 
-            msg.add_attachment(data, maintype=maintype, subtype=subtype, filename=sanitized_name)
+            msg.add_attachment(
+                data, maintype=maintype, subtype=subtype, filename=sanitized_name
+            )
             log_and_print("info", f"Attached: {sanitized_name}")
         except Exception as exc:
             log_and_print("error", f"Error attaching {path.name}: {exc}")
@@ -448,78 +458,73 @@ def send_email(
 
 
 def send_email_from_folder(
-    base_folder: str,
+    base: Path,
     dry_run: bool = False,
-    batch_size: int = 10,
-    retries: int = 3,
-    delay: int = 3,
+    batch_size: int = 30,
 ) -> None:
     """
-    Main routine to read inputs from a base folder and send emails in batches.
+    Compose and send emails from files in the base folder.
 
     Args:
-        base_folder: Folder containing email inputs.
-        dry_run: If True, do not actually send emails.
+        base: Path to base folder with input files.
+        dry_run: If True, only simulate sending.
         batch_size: Number of recipients per email batch.
-        retries: Number of retries on failure.
-        delay: Delay in seconds between retries.
     """
-    base = Path(base_folder)
+    required = ["body.html", "subject.txt"]
+    check_required_files(base, required)
 
+    to_txt = base / "to.txt"
+    filter_txt = base / "filter.txt"
+
+    emails = read_recipients(to_txt)
+    if filter_txt.is_file():
+        emails += get_filtered_emailids(base)
+
+    if not emails:
+        log_and_print("error", "No valid recipients found.")
+        return
+
+    deduplicate_file(to_txt)
+
+    subject = read_file(base / "subject.txt")
+    body_html = read_file(base / "body.html")
+
+    # Collect attachments in base folder excluding the body and subject files and known text files
+    attachments = [
+        p
+        for p in base.iterdir()
+        if p.is_file() and p.name not in required + ["to.txt", "filter.txt"]
+    ]
+
+    # Batch recipients and send emails
+    for i in range(0, len(emails), batch_size):
+        batch = emails[i : i + batch_size]
+        log_and_print("info", f"Sending batch {i // batch_size + 1} with {len(batch)} recipients...")
+        send_email(
+            recipients=batch,
+            subject=subject,
+            body_html=body_html,
+            attachments=attachments,
+            dry_run=dry_run,
+        )
+        time.sleep(1)
+
+
+def main() -> None:
+    """Main entry point for the notifybot script."""
     rotate_log_file()
     setup_logging()
 
+    base_folder = Path(__file__).parent / "base"
+
+    # Command line options: add "--dry-run" to test without sending emails
+    dry_run = "--dry-run" in sys.argv
+
     try:
-        check_required_files(base, ["body.txt", "subject.txt"])
-    except MissingRequiredFilesError as e:
-        print(f"\033[91m{e}\033[0m")
-        sys.exit(1)
-
-    subject = read_file(base / "subject.txt")
-    body_template_raw = read_file(base / "body.txt")
-
-    to_emails = read_recipients(base / "to.txt")
-    if not to_emails:
-        log_and_print("warning", "No valid recipients found in to.txt")
-
-    filtered_emails = get_filtered_emailids(base)
-    if filtered_emails:
-        write_to_txt(filtered_emails, base / "to.txt")
-        deduplicate_file(base / "to.txt")
-        to_emails.extend(filtered_emails)
-        to_emails = list(dict.fromkeys(to_emails))  # Deduplicate in memory
-
-    attachments = [p for p in base.glob("attachments/*") if p.is_file()]
-
-    total = len(to_emails)
-    if total == 0:
-        log_and_print("warning", "No recipients to send emails to.")
-        return
-
-    for i in range(0, total, batch_size):
-        batch = to_emails[i : i + batch_size]
-        log_and_print("info", f"Sending email batch {i // batch_size + 1} with {len(batch)} recipients.")
-
-        attempt = 0
-        while attempt <= retries:
-            try:
-                send_email(
-                    recipients=batch,
-                    subject=subject,
-                    body=body_template_raw,
-                    attachments=attachments,
-                    dry_run=dry_run,
-                )
-                break
-            except Exception as exc:
-                attempt += 1
-                log_and_print("error", f"Attempt {attempt} failed: {exc}")
-                if attempt > retries:
-                    log_and_print("error", "Max retries reached, aborting.")
-                    break
-                time.sleep(delay)
+        send_email_from_folder(base_folder, dry_run=dry_run)
+    except MissingRequiredFilesError as exc:
+        log_and_print("error", str(exc))
 
 
 if __name__ == "__main__":
-    # You can adjust parameters here or pass them in some way
-    send_email_from_folder("email", dry_run=True, batch_size=5)
+    main()
