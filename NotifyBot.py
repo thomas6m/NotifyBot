@@ -23,10 +23,13 @@ LOG_FILENAME = "notifybot.log"
 
 class MissingRequiredFilesError(Exception):
     """Exception raised when required input files are missing."""
-    pass
 
 
 def rotate_log_file() -> None:
+    """Rotate the current log file by renaming it with a timestamp.
+
+    If the log file exists, rename it to notifybot_YYYYMMDD_HHMMSS.log.
+    """
     log_path = Path(LOG_FILENAME)
     if log_path.is_file():
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -39,6 +42,7 @@ def rotate_log_file() -> None:
 
 
 def setup_logging() -> None:
+    """Configure logging to output messages to a file."""
     logging.basicConfig(
         filename=LOG_FILENAME,
         level=logging.INFO,
@@ -47,11 +51,17 @@ def setup_logging() -> None:
 
 
 def log_and_print(level: str, message: str) -> None:
+    """Log a message at the given level and print it to the console with color.
+
+    Args:
+        level: The logging level as a string ('info', 'warning', 'error').
+        message: The message to log and print.
+    """
     level = level.lower()
     color_codes = {
-        "info": "\033[94m",    # Blue
-        "warning": "\033[93m", # Yellow
-        "error": "\033[91m",   # Red
+        "info": "\033[94m",  # Blue
+        "warning": "\033[93m",  # Yellow
+        "error": "\033[91m",  # Red
     }
     color = color_codes.get(level, "\033[0m")
 
@@ -68,6 +78,14 @@ def log_and_print(level: str, message: str) -> None:
 
 
 def is_valid_email(email: str) -> bool:
+    """Check if the provided email address is valid.
+
+    Args:
+        email: The email address to validate.
+
+    Returns:
+        True if valid, False otherwise.
+    """
     try:
         validate_email(email.strip())
         return True
@@ -76,6 +94,14 @@ def is_valid_email(email: str) -> bool:
 
 
 def read_file(path: Path) -> str:
+    """Read and return the content of a text file.
+
+    Args:
+        path: Path to the file.
+
+    Returns:
+        The file content as a string, or an empty string if an error occurs.
+    """
     try:
         with path.open("r", encoding="utf-8") as f:
             return f.read().strip()
@@ -85,6 +111,15 @@ def read_file(path: Path) -> str:
 
 
 def extract_emails(raw: str, delimiters: str = ";") -> List[str]:
+    """Extract a list of email addresses from a delimited string.
+
+    Args:
+        raw: Raw string containing emails.
+        delimiters: Delimiters separating emails.
+
+    Returns:
+        List of extracted email strings.
+    """
     if not raw:
         return []
     pattern = f"[{re.escape(delimiters)}]"
@@ -92,6 +127,15 @@ def extract_emails(raw: str, delimiters: str = ";") -> List[str]:
 
 
 def read_recipients(path: Path, delimiters: str = ";") -> List[str]:
+    """Read and validate email recipients from a text file.
+
+    Args:
+        path: Path to the recipients file.
+        delimiters: Delimiters separating emails in each line.
+
+    Returns:
+        List of valid email addresses.
+    """
     if not path.is_file():
         log_and_print("warning", f"{path.name} missing, skipping.")
         return []
@@ -118,6 +162,12 @@ def read_recipients(path: Path, delimiters: str = ";") -> List[str]:
 
 
 def write_to_txt(emails: List[str], path: Path) -> None:
+    """Append a list of emails to a text file.
+
+    Args:
+        emails: List of email strings to write.
+        path: File path to append to.
+    """
     try:
         with path.open("a", encoding="utf-8") as f:
             for email in emails:
@@ -128,12 +178,15 @@ def write_to_txt(emails: List[str], path: Path) -> None:
 
 
 def deduplicate_file(path: Path) -> None:
+    """Remove duplicate lines from a file, backing it up first.
+
+    Args:
+        path: Path to the file to deduplicate.
+    """
     if not path.is_file():
         return
 
-    backup = path.with_name(
-        f"{path.stem}_{datetime.now():%Y%m%d_%H%M%S}{path.suffix}"
-    )
+    backup = path.with_name(f"{path.stem}_{datetime.now():%Y%m%d_%H%M%S}{path.suffix}")
     shutil.copy2(path, backup)
     log_and_print("info", f"Backup created: {backup.name}")
 
@@ -157,6 +210,15 @@ def deduplicate_file(path: Path) -> None:
 
 
 def check_required_files(base: Path, required: List[str]) -> None:
+    """Check for required files in a directory, raise error if missing.
+
+    Args:
+        base: Base directory path.
+        required: List of required filenames.
+
+    Raises:
+        MissingRequiredFilesError: if any required file is missing.
+    """
     missing = [f for f in required if not (base / f).is_file()]
     if missing:
         msg = f"Missing: {', '.join(missing)}"
@@ -165,6 +227,14 @@ def check_required_files(base: Path, required: List[str]) -> None:
 
 
 def parse_filter_file(filter_path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
+    """Parse a CSV filter file into headers and list of row dicts.
+
+    Args:
+        filter_path: Path to filter.txt CSV file.
+
+    Returns:
+        Tuple containing list of headers and list of rows as dictionaries.
+    """
     try:
         with filter_path.open(newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -187,6 +257,17 @@ def match_condition(
     mode: str = "exact",
     regex_flags: str = "",
 ) -> bool:
+    """Check if a string matches a condition based on mode and regex flags.
+
+    Args:
+        actual: The string to test.
+        expected: The expected string or regex pattern.
+        mode: Match mode: 'exact', 'contains', or 'regex'.
+        regex_flags: Flags for regex (e.g. IGNORECASE|MULTILINE).
+
+    Returns:
+        True if condition matches, False otherwise.
+    """
     actual = actual.strip()
     expected = expected.strip()
     mode = mode.strip().lower()
@@ -216,6 +297,15 @@ def match_condition(
 
 
 def get_filtered_emailids(base: Path, delimiters: str = ";") -> List[str]:
+    """Filter email IDs from inventory.csv based on filter.txt conditions.
+
+    Args:
+        base: Base directory containing 'inventory.csv' and 'filter.txt'.
+        delimiters: Delimiters used for email separation.
+
+    Returns:
+        List of filtered and validated email addresses.
+    """
     inv = base / "inventory.csv"
     flt = base / "filter.txt"
 
@@ -261,6 +351,14 @@ def get_filtered_emailids(base: Path, delimiters: str = ";") -> List[str]:
 
 
 def sanitize_filename(filename: str) -> str:
+    """Sanitize a filename by removing/ replacing unsafe characters.
+
+    Args:
+        filename: Original filename.
+
+    Returns:
+        Sanitized filename safe for file systems.
+    """
     nfkd_form = unicodedata.normalize("NFKD", filename)
     ascii_bytes = nfkd_form.encode("ASCII", "ignore")
     ascii_str = ascii_bytes.decode("ASCII")
@@ -278,6 +376,16 @@ def send_email(
     smtp_server: str = "localhost",
     dry_run: bool = False,
 ) -> None:
+    """Send an email with optional attachments to recipients.
+
+    Args:
+        recipients: List of recipient email addresses.
+        subject: Email subject.
+        body_html: HTML content of the email body.
+        attachments: List of file paths to attach.
+        smtp_server: SMTP server address.
+        dry_run: If True, do not actually send email, just simulate.
+    """
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = "notifybot@example.com"
@@ -336,6 +444,14 @@ def send_email_from_folder(
     dry_run: bool = False,
     batch_size: int = 30,
 ) -> None:
+    """Send emails using data and files from a specified folder.
+
+    Args:
+        base: Base directory path containing required files.
+        attachment_subfolder: Name of subfolder for attachments inside base.
+        dry_run: If True, simulate sending without actual email sending.
+        batch_size: Number of recipients per email batch.
+    """
     required = ["body.html", "subject.txt"]
     check_required_files(base, required)
 
@@ -365,14 +481,14 @@ def send_email_from_folder(
     # Add attachments from the specified attachment folder inside base
     attachment_folder = base / attachment_subfolder
     if attachment_folder.is_dir():
-        attachments.extend(
-            p for p in attachment_folder.iterdir() if p.is_file()
-        )
+        attachments.extend(p for p in attachment_folder.iterdir() if p.is_file())
 
     # Batch recipients and send emails
     for i in range(0, len(emails), batch_size):
         batch = emails[i : i + batch_size]
-        log_and_print("info", f"Sending batch {i // batch_size + 1} with {len(batch)} recipients...")
+        log_and_print(
+            "info", f"Sending batch {i // batch_size + 1} with {len(batch)} recipients..."
+        )
         send_email(
             recipients=batch,
             subject=subject,
@@ -384,6 +500,7 @@ def send_email_from_folder(
 
 
 def main() -> None:
+    """Main entry point for the notifybot script."""
     rotate_log_file()
     setup_logging()
 
