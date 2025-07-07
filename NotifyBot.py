@@ -15,7 +15,6 @@ from email.utils import parseaddr
 from pathlib import Path
 from typing import List, Tuple, Dict
 from email_validator import validate_email, EmailNotValidError
-import string
 
 LOG_FILENAME = "notifybot.log"
 
@@ -28,7 +27,7 @@ class MissingRequiredFilesError(Exception):
 def rotate_log_file() -> None:
     """
     Rotate the current log file by renaming it with a timestamp suffix.
-    
+
     If the log file exists, rename it to 'notifybot_YYYYMMDD_HHMMSS.log'.
     """
     log_path = Path(LOG_FILENAME)
@@ -44,7 +43,7 @@ def rotate_log_file() -> None:
 
 def setup_logging() -> None:
     """
-    Configure logging to output INFO level messages with timestamp and line info.
+    Configure logging to output INFO level messages with timestamp, function name, and line info.
     """
     logging.basicConfig(
         filename=LOG_FILENAME,
@@ -63,17 +62,17 @@ def log_and_print(level: str, message: str) -> None:
     """
     level = level.lower()
     color_codes = {
-        'info': "\033[94m",    # Blue
-        'warning': "\033[93m", # Yellow
-        'error': "\033[91m",   # Red
+        "info": "\033[94m",    # Blue
+        "warning": "\033[93m", # Yellow
+        "error": "\033[91m",   # Red
     }
     color = color_codes.get(level, "\033[0m")
 
-    if level == 'info':
+    if level == "info":
         logging.info(message)
-    elif level == 'warning':
+    elif level == "warning":
         logging.warning(message)
-    elif level == 'error':
+    elif level == "error":
         logging.error(message)
     else:
         logging.info(message)
@@ -371,11 +370,11 @@ def sanitize_filename(filename: str) -> str:
     Returns:
         Sanitized ASCII-only filename.
     """
-    nfkd_form = unicodedata.normalize('NFKD', filename)
-    ascii_bytes = nfkd_form.encode('ASCII', 'ignore')
-    ascii_str = ascii_bytes.decode('ASCII')
+    nfkd_form = unicodedata.normalize("NFKD", filename)
+    ascii_bytes = nfkd_form.encode("ASCII", "ignore")
+    ascii_str = ascii_bytes.decode("ASCII")
 
-    sanitized = re.sub(r'[^\w\.-]', '_', ascii_str)
+    sanitized = re.sub(r"[^\w\.-]", "_", ascii_str)
 
     return sanitized or "attachment"
 
@@ -499,7 +498,7 @@ def send_email_from_folder(
 
     for i in range(0, total, batch_size):
         batch = to_emails[i : i + batch_size]
-        log_and_print("info", f"Sending email batch {i//batch_size + 1} with {len(batch)} recipients.")
+        log_and_print("info", f"Sending email batch {i // batch_size + 1} with {len(batch)} recipients.")
 
         attempt = 0
         while attempt <= retries:
