@@ -1,122 +1,652 @@
-# NotifyBot Email Sender - Runbook
+# NotifyBot Email Sender - Detailed Code Analysis
 
-## Overview
+## File Header and Imports
 
-NotifyBot is a bulk email sender script with advanced features such as RFC-compliant email validation, attachment filtering, batch sending with delays, dry-run mode, recipient filtering based on CSV data, and comprehensive logging.
-
-## Prerequisites
-
-- Python 3.6 or newer installed
-- SMTP server running on localhost or accessible (default SMTP server is localhost)
-- Required Python package: `email-validator`
-
-Install dependencies via:
-
-```bash
-pip install email-validator
+```python
+#!/usr/bin/env python3
+"""
+NotifyBot Email Sender Script
+...
+"""
 ```
 
-## Files and Directory Structure
+**Purpose**: Shebang line makes the script executable on Unix systems, followed by a comprehensive docstring explaining recent updates.
 
-Your email campaign folder should contain:
+### Import Analysis
 
-### Required files:
-- `from.txt` — Sender email address (single line)
-- `subject.txt` — Email subject line
-- `body.html` — HTML content of the email body
-- `approver.txt` — List of approver emails (one per line)
-
-### Optional files:
-- `to.txt` — Primary recipient list (auto-generated if missing via filters)
-- `cc.txt` — CC recipient list
-- `bcc.txt` — BCC recipient list
-- `additional_to.txt` — Additional recipients appended
-- `inventory.csv` — CSV data for filtering recipients
-- `filter.txt` — CSV defining filter conditions
-- `attachments/` — Folder with files to attach
-
-## Running NotifyBot
-
-Run the script from the command line:
-
-```bash
-python notifybot.py /path/to/email/folder
+```python
+import csv
+import logging
+import mimetypes
+import shutil
+import smtplib
+import sys
+import time
+import re
+from datetime import datetime
+from email.message import EmailMessage
+from email.utils import parseaddr
+from pathlib import Path
+from typing import List, Tuple, Dict, Optional
+from email_validator import validate_email, EmailNotValidError
 ```
 
-### Command-line options:
+**Key Dependencies**:
+- `csv`: Reading inventory and filter files
+- `logging`: Comprehensive logging system
+- `mimetypes`: Auto-detecting attachment file types
+- `smtplib`: SMTP email sending
+- `email.message.EmailMessage`: Modern email composition
+- `pathlib.Path`: Modern file path handling
+- `email_validator`: Third-party email validation (more robust than regex)
 
-- `--dry-run` - Sends the email only to approvers for testing
-- `--batch-size INTEGER` - Number of recipients per batch (default: 500)
-- `--delay INTEGER` - Seconds delay between batches (default: 5)
-- `--attachments-folder PATH` - Use a custom folder for attachments
-- `--max-attachment-size INTEGER` - Max size per attachment in MB (default: 10 MB)
+## Configuration and Custom Exceptions
 
-### Example commands:
+```python
+LOG_FILENAME = "notifybot.log"
 
-**Dry run:**
-```bash
-python notifybot.py --dry-run /path/to/campaign
+class MissingRequiredFilesError(Exception):
+    pass
 ```
 
-**Send with smaller batches and longer delay:**
-```bash
-python notifybot.py --batch-size 100 --delay 10 /path/to/campaign
+**Design Pattern**: Custom exception for specific error handling, making error types more explicit.
+
+## Log Management Functions
+
+### Log Rotation Function
+
+```python
+def rotate_log_file():
+    log_path = Path(LOG_FILENAME)
+    if log_path.is_file():
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        rotated_name = log_path.with_name(f"notifybot_{timestamp}.log")
+        try:
+            log_path.rename(rotated_name)
+            print(f"Rotated log file to {rotated_name.name}")
+        except Exception as exc:
+            print(f"\033[91mFailed to rotate log file: {exc}\033[0m")
 ```
 
-**Send with custom attachments folder:**
-```bash
-python notifybot.py --attachments-folder /custom/attachments /path/to/campaign
+**Key Features**:
+- **Timestamp Format**: `YYYYMMDD_HHMMSS` ensures chronological sorting
+- **Error Handling**: Gracefully handles rotation failures
+- **ANSI Colors**: `\033[91m` = red text for errors, `\033[0m` = reset color
+- **Path Operations**: Uses `pathlib` for modern file handling
+
+### Logging Setup
+
+```python
+def setup_logging():
+    logging.basicConfig(
+        filename=LOG_FILENAME,
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(funcName)s [line %(lineno)d] - %(message)s",
+    )
 ```
 
-## Email Sending Workflow
+**Format Breakdown**:
+- `%(asctime)s`: Timestamp of log entry
+- `%(levelname)s`: Log level (INFO, WARNING, ERROR)
+- `%(funcName)s`: Function name where log was called
+- `[line %(lineno)d]`: Line number for debugging
+- `%(message)s`: The actual log message
 
-1. **Validation**: Checks presence of required files and validates email addresses
-2. **Filtering**: If `inventory.csv` and `filter.txt` exist, uses filters to generate `to.txt` if missing
-3. **Recipient List**: Appends `additional_to.txt` emails and deduplicates the final recipient list
-4. **Dry-run Mode**: Sends the draft email only to approvers
-5. **Sending**: Sends emails in batches with specified batch size and delay
-6. **Attachments**: Attachments filtered by max size limit
-7. **Logging**: All operations are logged in `notifybot.log`
+## Email Validation Functions
 
-## Logs and Monitoring
+### Email Validation
 
-- **Log file**: `notifybot.log` in the working directory
-- **Logs include**:
-  - File operations and validation errors
-  - Invalid emails skipped
-  - Sending results per batch
-  - Attachment processing warnings/errors
+```python
+def is_valid_email(email: str) -> bool:
+    try:
+        validate_email(email.strip())
+        return True
+    except EmailNotValidError:
+        return False
+```
 
-Check this log file regularly for errors and summary information.
+**Why This Approach**:
+- Uses `email_validator` library instead of regex
+- More robust than simple regex patterns
+- Handles edge cases and international domains
+- Strips whitespace automatically
 
-## Common Issues & Troubleshooting
+### File Reading with Error Handling
 
-| Issue | Message Example | Resolution |
-|-------|----------------|------------|
-| Missing required files | Error: Missing: from.txt, subject.txt | Ensure all required files are present in base folder |
-| Invalid email addresses | Warning: Invalid email skipped: bad-email | Correct or remove invalid emails from files |
-| SMTP connection failure | Failed to send to [...]: Connection refused | Verify SMTP server is running and accessible |
-| Attachments too large | Skipping large-file.pdf: 15.2MB > limit | Reduce attachment size or increase max size option |
-| No recipients | No recipients. | Check that to.txt is populated or filters are correctly applied |
+```python
+def read_file(path: Path) -> str:
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            return f.read().strip()
+    except Exception as exc:
+        logging.error(f"Failed to read file {path}: {exc}")
+        return ""
+```
 
-## Best Practices
+**Design Pattern**: Fail-safe function that returns empty string on error rather than crashing.
 
-- Always start with `--dry-run` to validate content and recipients
-- Use appropriate batch sizes and delay to avoid SMTP overload
-- Validate email address lists before large campaigns
-- Keep attachments small and relevant
-- Monitor logs actively for errors and warnings
-- Backup campaign folders before sending
+### Email List Processing
 
-## Maintenance & Contribution
+```python
+def read_recipients(path: Path) -> List[str]:
+    if not path.is_file():
+        logging.warning(f"{path.name} missing, skipping.")
+        return []
 
-- The script uses Python 3 standard libraries and `email-validator`
-- Code follows PEP8 style and includes docstrings
-- To contribute: fork repo → create feature branch → test changes → submit PR
-- Review logs to detect regressions or runtime issues
+    valid_emails: List[str] = []
 
-## Support
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            for raw in f:
+                email = raw.strip()
+                if not email:
+                    continue
+                _, addr = parseaddr(email)
+                if is_valid_email(addr):
+                    valid_emails.append(email)
+                else:
+                    warning = f"Invalid email skipped: {email}"
+                    logging.warning(warning)
+                    print(f"\033[93m{warning}\033[0m")
+    except Exception as exc:
+        logging.error(f"Failed to read emails from {path}: {exc}")
 
-- Check troubleshooting section and logs first
-- Report detailed issues including logs, command used, and environment details
-- Ensure your SMTP server configuration is correct and running
+    return valid_emails
+```
+
+**Key Features**:
+- **parseaddr()**: Handles "Name <email@domain.com>" format
+- **Validation**: Each email is validated before adding to list
+- **User Feedback**: Yellow text (`\033[93m`) for warnings
+- **Graceful Degradation**: Continues processing even with invalid emails
+
+## File Writing and Deduplication
+
+### Appending Emails
+
+```python
+def write_to_txt(emails: List[str], path: Path) -> None:
+    try:
+        with path.open("a", encoding="utf-8") as f:
+            for email in emails:
+                f.write(email + "\n")
+        logging.info(f"Appended {len(emails)} emails to {path.name}")
+    except Exception as exc:
+        logging.error(f"Failed to write to {path}: {exc}")
+```
+
+**Design Choice**: Uses append mode (`"a"`) to add new emails without overwriting existing ones.
+
+### Deduplication with Backup
+
+```python
+def deduplicate_file(path: Path) -> None:
+    if not path.is_file():
+        return
+
+    backup = path.with_name(
+        f"{path.stem}_{datetime.now():%Y%m%d_%H%M%S}{path.suffix}"
+    )
+    shutil.copy2(path, backup)
+    logging.info(f"Backup created: {backup.name}")
+
+    seen: set = set()
+    uniq: List[str] = []
+
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            for line in f:
+                cleaned = line.strip()
+                if cleaned and cleaned not in seen:
+                    seen.add(cleaned)
+                    uniq.append(cleaned)
+
+        with path.open("w", encoding="utf-8") as f:
+            for line in uniq:
+                f.write(line + "\n")
+        logging.info(f"Deduplicated {path.name}")
+    except Exception as exc:
+        logging.error(f"Error deduplicating {path}: {exc}")
+```
+
+**Algorithm**:
+1. **Backup First**: Creates timestamped backup before modifying
+2. **Set for Tracking**: Uses set for O(1) duplicate detection
+3. **List for Order**: Maintains original order of first occurrence
+4. **Atomic Write**: Overwrites file only after successful processing
+
+## Configuration and Filtering
+
+### Filter File Parsing
+
+```python
+def parse_filter_file(filter_path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
+    try:
+        with filter_path.open(newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+            headers = reader.fieldnames or []
+
+        for row in rows:
+            row.setdefault("mode", "exact")
+
+        return headers, rows
+    except Exception as exc:
+        logging.error(f"Failed to parse filter {filter_path}: {exc}")
+        return [], []
+```
+
+**CSV Processing**:
+- **DictReader**: Converts CSV rows to dictionaries
+- **Default Mode**: Sets "exact" as default matching mode
+- **Error Handling**: Returns empty lists on failure
+
+### Flexible Matching Function
+
+```python
+def match_condition(actual: str, expected: str, mode: str = "exact") -> bool:
+    actual = actual.strip()
+    expected = expected.strip()
+    mode = mode.strip().lower()
+
+    if mode == "exact":
+        return actual.lower() == expected.lower()
+    elif mode == "contains":
+        return expected.lower() in actual.lower()
+    elif mode == "regex":
+        try:
+            return re.search(expected, actual) is not None
+        except re.error as e:
+            logging.warning(f"Invalid regex '{expected}': {e}")
+            return False
+    else:
+        logging.warning(f"Unknown match mode '{mode}', defaulting to exact.")
+        return actual.lower() == expected.lower()
+```
+
+**Matching Modes**:
+- **Exact**: Case-insensitive equality
+- **Contains**: Substring matching
+- **Regex**: Pattern matching with error handling
+- **Fallback**: Defaults to exact matching for unknown modes
+
+## Inventory Processing
+
+### Email Filtering from Inventory
+
+```python
+def get_filtered_emailids(base: Path) -> List[str]:
+    inv = base / "inventory.csv"
+    flt = base / "filter.txt"
+
+    if not inv.is_file() or not flt.is_file():
+        logging.warning("inventory.csv or filter.txt missing.")
+        return []
+
+    _, conds = parse_filter_file(flt)
+    found: set = set()
+
+    try:
+        with inv.open("r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                match = all(
+                    match_condition(
+                        actual=row.get(cond.get("field", ""), ""),
+                        expected=cond.get("value", ""),
+                        mode=cond.get("mode", "exact")
+                    )
+                    for cond in conds
+                )
+                if match:
+                    emails = row.get("emailids", "")
+                    for e in re.split(r"[;,]", emails):
+                        if e.strip():
+                            found.add(e.strip())
+    except Exception as exc:
+        logging.error(f"Error reading {inv}: {exc}")
+
+    existing = set(read_recipients(base / "to.txt"))
+    valid: List[str] = []
+
+    for raw in sorted(found - existing):
+        _, addr = parseaddr(raw)
+        if is_valid_email(addr):
+            valid.append(raw)
+        else:
+            warning = f"Invalid filtered email: {raw}"
+            logging.warning(warning)
+            print(f"\033[93m{warning}\033[0m")
+
+    return valid
+```
+
+**Advanced Logic**:
+- **all()**: Requires ALL filter conditions to match
+- **Set Operations**: `found - existing` removes duplicates efficiently
+- **Email Parsing**: Splits multiple emails by semicolon or comma
+- **Validation**: Final validation before returning results
+
+## Email Sending Function
+
+### Main Email Sending Logic
+
+```python
+def send_email(
+    from_email: str,
+    subject: str,
+    body_html: str,
+    recipients: List[str],
+    cc: List[str],
+    bcc: List[str],
+    attachments: Optional[List[Path]] = None,
+    max_attachment_size_mb: int = 10,
+    log_sent: bool = False,
+) -> None:
+```
+
+**Function Parameters**:
+- **Type Hints**: Uses modern Python typing for clarity
+- **Optional Parameters**: Default values for flexibility
+- **Size Limits**: Configurable attachment size limits
+
+### Email Composition
+
+```python
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = from_email
+    msg["To"] = ", ".join(recipients)
+
+    if cc:
+        msg["Cc"] = ", ".join(cc)
+
+    msg.set_content("This is a plain-text fallback version.")
+    msg.add_alternative(body_html, subtype="html")
+```
+
+**Multi-part Email**:
+- **Plain Text**: Fallback for clients that don't support HTML
+- **HTML Alternative**: Rich formatting for modern clients
+- **Header Management**: Proper email headers for delivery
+
+### Attachment Processing
+
+```python
+    for path in attachments or []:
+        size_mb = path.stat().st_size / (1024**2)
+        if size_mb > max_attachment_size_mb:
+            logging.warning(f"Skipping {path.name}: {size_mb:.1f}MB > limit")
+            continue
+
+        ctype, encoding = mimetypes.guess_type(path.name)
+        ctype = ctype or "application/octet-stream"
+        maintype, subtype = ctype.split("/", 1)
+
+        try:
+            with path.open("rb") as fp:
+                msg.add_attachment(
+                    fp.read(),
+                    maintype=maintype,
+                    subtype=subtype,
+                    filename=path.name
+                )
+            logging.info(f"Attached: {path.name}")
+        except Exception as exc:
+            logging.error(f"Error attaching {path.name}: {exc}")
+            print(f"\033[91mAttachment failed: {path.name}\033[0m")
+            return
+```
+
+**Attachment Features**:
+- **Size Validation**: Prevents oversized attachments
+- **MIME Detection**: Automatic content type detection
+- **Fallback Type**: Uses generic binary type if detection fails
+- **Error Handling**: Fails gracefully on attachment errors
+
+### SMTP Delivery
+
+```python
+    all_recipients = list(dict.fromkeys(recipients + cc + bcc))
+
+    try:
+        with smtplib.SMTP("localhost") as server:
+            server.send_message(msg, from_addr=from_email, to_addrs=all_recipients)
+        print(f"Sent to {len(recipients)} recipients.")
+        if log_sent:
+            logging.info(f"Sent to: {', '.join(recipients)}")
+    except Exception as exc:
+        error = f"Failed to send to {recipients}: {exc}"
+        logging.error(error)
+        print(f"\033[91m{error}\033[0m")
+```
+
+**SMTP Logic**:
+- **Deduplication**: `dict.fromkeys()` removes duplicate recipients
+- **Context Manager**: `with` statement ensures connection cleanup
+- **All Recipients**: Includes To, Cc, and Bcc in SMTP envelope
+- **Conditional Logging**: Only logs recipients if requested
+
+## Workflow Management
+
+### Recipient Preparation
+
+```python
+def prepare_to_txt(base: Path) -> None:
+    to_path = base / "to.txt"
+
+    # If to.txt exists, skip filtering from inventory.csv + filter.txt
+    if not to_path.is_file():
+        new_ids = get_filtered_emailids(base)
+        if new_ids:
+            write_to_txt(new_ids, to_path)
+            print(f"Added {len(new_ids)} filtered addresses.")
+
+    # Always add additional_to.txt content
+    addl = read_recipients(base / "additional_to.txt")
+    if addl:
+        write_to_txt(addl, to_path)
+        print(f"Added {len(addl)} additional addresses.")
+
+    deduplicate_file(to_path)
+```
+
+**Smart Logic**:
+- **Conditional Filtering**: Only processes inventory if to.txt doesn't exist
+- **Always Add Additional**: Respects additional_to.txt regardless
+- **Final Deduplication**: Ensures no duplicates in final list
+
+## Main Execution Function
+
+### Core Processing Logic
+
+```python
+def send_email_from_folder(
+    base_folder: str,
+    dry_run: bool = False,
+    batch_size: int = 500,
+    delay: int = 5,
+    attachments_folder: Optional[str] = None,
+    max_attachment_size_mb: int = 10,
+) -> None:
+```
+
+**Default Values**:
+- **Batch Size**: 500 recipients per batch (reasonable for most SMTP servers)
+- **Delay**: 5 seconds between batches (prevents server overload)
+- **Max Attachment**: 10MB limit (email server friendly)
+
+### Initialization Sequence
+
+```python
+    base = Path(base_folder)
+
+    # Rotate log file before configuring logging
+    rotate_log_file()
+
+    # Setup fresh logging after rotation
+    setup_logging()
+
+    attach_path = Path(attachments_folder) if attachments_folder else base / "attachments"
+    logging.info(f"Start sending from {base_folder}")
+    start = datetime.now()
+```
+
+**Execution Order**:
+1. **Log Rotation**: Preserves previous logs
+2. **Fresh Logging**: Creates new log configuration
+3. **Path Setup**: Determines attachment folder
+4. **Timing**: Records start time for performance metrics
+
+### File Validation
+
+```python
+    required = ["from.txt", "subject.txt", "body.html", "approver.txt"]
+    try:
+        check_required_files(base, required)
+    except MissingRequiredFilesError as exc:
+        print(f"\033[91m{exc}\033[0m")
+        sys.exit(1)
+```
+
+**Error Handling Pattern**:
+- **Custom Exception**: Specific error type for missing files
+- **Early Exit**: Prevents execution with incomplete setup
+- **User Feedback**: Clear error message with color coding
+
+### Dry Run Mode
+
+```python
+    if dry_run:
+        print("DRY-RUN: sending draft to approvers only.")
+        send_email(
+            from_email,
+            "[DRAFT] " + subject,
+            body_html,
+            approvers,
+            [],
+            [],
+            attachments=[],
+            log_sent=False,
+            max_attachment_size_mb=max_attachment_size_mb,
+        )
+        logging.info("Dry-run complete.")
+        return
+```
+
+**Dry Run Features**:
+- **Subject Prefix**: Adds "[DRAFT]" to distinguish test emails
+- **Approvers Only**: Sends only to designated approvers
+- **No Attachments**: Skips attachment processing for faster testing
+- **Early Return**: Exits after test email
+
+### Batch Processing Loop
+
+```python
+    sent, errors = 0, 0
+    for i in range(0, len(to_list), batch_size):
+        batch = to_list[i:i + batch_size]
+        try:
+            send_email(
+                from_email,
+                subject,
+                body_html,
+                batch,
+                cc_list,
+                bcc_list,
+                attachments=attachments,
+                max_attachment_size_mb=max_attachment_size_mb,
+                log_sent=True,
+            )
+            sent += len(batch)
+        except Exception as exc:
+            errors += 1
+            logging.error(f"Batch error {i}: {exc}")
+
+        if i + batch_size < len(to_list):
+            print(f"Waiting {delay} seconds...")
+            time.sleep(delay)
+```
+
+**Batch Processing Features**:
+- **Slice Processing**: `to_list[i:i + batch_size]` creates batches
+- **Error Isolation**: Batch failures don't stop entire process
+- **Progress Tracking**: Counts sent emails and errors
+- **Delay Management**: Waits between batches (but not after last batch)
+
+### Final Reporting
+
+```python
+    duration = (datetime.now() - start).total_seconds()
+    summary = f"Summary — Sent: {sent}, Errors: {errors}, Time: {duration:.2f}s"
+    print(summary)
+    logging.info(summary)
+```
+
+**Performance Metrics**:
+- **Duration Calculation**: Total execution time
+- **Comprehensive Stats**: Sent count, error count, timing
+- **Dual Output**: Both console and log file
+
+## Command Line Interface
+
+### Argument Parser Setup
+
+```python
+def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="NotifyBot Email Sender CLI")
+    parser.add_argument("base_folder", help="Directory with email source files")
+    parser.add_argument("--dry-run", action="store_true", help="Send to approvers only")
+    parser.add_argument("--batch-size", type=int, default=500, help="Number of recipients per batch")
+    parser.add_argument("--delay", type=int, default=5, help="Seconds delay between batches")
+    parser.add_argument("--attachments-folder", type=str, help="Alternate folder for attachments")
+    parser.add_argument("--max-attachment-size", type=int, default=10, help="Max MB per attachment")
+```
+
+**CLI Design**:
+- **Positional Argument**: Required base folder
+- **Optional Flags**: All configuration options have defaults
+- **Type Conversion**: Automatic int conversion for numeric arguments
+- **Help Text**: Descriptive help for each option
+
+## Code Quality Features
+
+### Type Hints Throughout
+
+```python
+def read_recipients(path: Path) -> List[str]:
+def parse_filter_file(filter_path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
+def match_condition(actual: str, expected: str, mode: str = "exact") -> bool:
+```
+
+**Benefits**:
+- **IDE Support**: Better autocomplete and error detection
+- **Documentation**: Types serve as inline documentation
+- **Debugging**: Easier to trace type-related issues
+
+### Consistent Error Handling
+
+```python
+try:
+    # operation
+except Exception as exc:
+    logging.error(f"Error description: {exc}")
+    # appropriate fallback
+```
+
+**Pattern**:
+- **Specific Error Context**: Each error message includes context
+- **Logging**: All errors are logged for debugging
+- **Graceful Degradation**: Functions continue or fail safely
+
+### Modern Python Features
+
+- **f-strings**: Modern string formatting
+- **pathlib**: Modern path handling
+- **Context managers**: Proper resource management
+- **List comprehensions**: Concise data processing
+- **Set operations**: Efficient deduplication
+
+This code demonstrates professional Python development practices with robust error handling, comprehensive logging, and user-friendly interfaces.
