@@ -13,7 +13,7 @@ from datetime import datetime
 from email.message import EmailMessage
 from email.utils import parseaddr
 from pathlib import Path
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict
 from email_validator import validate_email, EmailNotValidError
 import string
 
@@ -25,9 +25,11 @@ class MissingRequiredFilesError(Exception):
     pass
 
 
-def rotate_log_file():
+def rotate_log_file() -> None:
     """
     Rotate the current log file by renaming it with a timestamp suffix.
+    
+    If the log file exists, rename it to 'notifybot_YYYYMMDD_HHMMSS.log'.
     """
     log_path = Path(LOG_FILENAME)
     if log_path.is_file():
@@ -40,9 +42,9 @@ def rotate_log_file():
             print(f"\033[91mFailed to rotate log file: {exc}\033[0m")
 
 
-def setup_logging():
+def setup_logging() -> None:
     """
-    Setup logging configuration to log INFO level messages with timestamps and line info.
+    Configure logging to output INFO level messages with timestamp and line info.
     """
     logging.basicConfig(
         filename=LOG_FILENAME,
@@ -51,13 +53,13 @@ def setup_logging():
     )
 
 
-def log_and_print(level: str, message: str):
+def log_and_print(level: str, message: str) -> None:
     """
-    Helper to log a message and print it with colored terminal output.
+    Log a message and print it with colored terminal output.
 
     Args:
-        level: Logging level as string ('info', 'warning', 'error')
-        message: The message to log and print
+        level: Logging level as string ('info', 'warning', 'error').
+        message: The message to log and print.
     """
     level = level.lower()
     color_codes = {
@@ -67,7 +69,6 @@ def log_and_print(level: str, message: str):
     }
     color = color_codes.get(level, "\033[0m")
 
-    # Log
     if level == 'info':
         logging.info(message)
     elif level == 'warning':
@@ -77,7 +78,6 @@ def log_and_print(level: str, message: str):
     else:
         logging.info(message)
 
-    # Print colored
     print(f"{color}{message}\033[0m")
 
 
@@ -100,13 +100,13 @@ def is_valid_email(email: str) -> bool:
 
 def read_file(path: Path) -> str:
     """
-    Read the content of a file and return it as a stripped string.
+    Read and return the content of a file, stripping whitespace.
 
     Args:
         path: Path object to the file.
 
     Returns:
-        File content as a string, or empty string on error.
+        File content as a stripped string, or empty string on error.
     """
     try:
         with path.open("r", encoding="utf-8") as f:
@@ -135,7 +135,7 @@ def extract_emails(raw: str, delimiters: str = ";") -> List[str]:
 
 def read_recipients(path: Path, delimiters: str = ";") -> List[str]:
     """
-    Read recipient emails from a file, validate them, and return a list.
+    Read recipient emails from a file, validate them, and return a list of valid emails.
 
     Args:
         path: Path to the recipient file.
@@ -166,9 +166,9 @@ def read_recipients(path: Path, delimiters: str = ";") -> List[str]:
     return valid_emails
 
 
-def write_to_txt(emails: List[str], path: Path):
+def write_to_txt(emails: List[str], path: Path) -> None:
     """
-    Append a list of emails to a file.
+    Append a list of emails to a text file.
 
     Args:
         emails: List of email strings.
@@ -183,7 +183,7 @@ def write_to_txt(emails: List[str], path: Path):
         log_and_print("error", f"Failed to write to {path}: {exc}")
 
 
-def deduplicate_file(path: Path):
+def deduplicate_file(path: Path) -> None:
     """
     Remove duplicate lines from a file, creating a timestamped backup first.
 
@@ -216,7 +216,7 @@ def deduplicate_file(path: Path):
         log_and_print("error", f"Error deduplicating {path}: {exc}")
 
 
-def check_required_files(base: Path, required: List[str]):
+def check_required_files(base: Path, required: List[str]) -> None:
     """
     Verify that all required files exist in the base folder.
 
@@ -236,13 +236,13 @@ def check_required_files(base: Path, required: List[str]):
 
 def parse_filter_file(filter_path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
     """
-    Parse the filter.txt CSV file.
+    Parse the filter.txt CSV file to extract headers and rows with defaults.
 
     Args:
         filter_path: Path to filter.txt.
 
     Returns:
-        Tuple of (headers list, list of rows as dictionaries).
+        Tuple containing list of headers and list of row dictionaries.
     """
     try:
         with filter_path.open(newline="", encoding="utf-8") as f:
@@ -251,9 +251,7 @@ def parse_filter_file(filter_path: Path) -> Tuple[List[str], List[Dict[str, str]
             headers = reader.fieldnames or []
 
         for row in rows:
-            # Default mode to exact if not present
             row.setdefault("mode", "exact")
-            # Default regex_flags for regex mode, empty or 'IGNORECASE'
             row.setdefault("regex_flags", "")
 
         return headers, rows
@@ -262,7 +260,12 @@ def parse_filter_file(filter_path: Path) -> Tuple[List[str], List[Dict[str, str]
         return [], []
 
 
-def match_condition(actual: str, expected: str, mode: str = "exact", regex_flags: str = "") -> bool:
+def match_condition(
+    actual: str,
+    expected: str,
+    mode: str = "exact",
+    regex_flags: str = "",
+) -> bool:
     """
     Compare actual and expected strings based on matching mode.
 
@@ -285,7 +288,6 @@ def match_condition(actual: str, expected: str, mode: str = "exact", regex_flags
         return expected.lower() in actual.lower()
     if mode == "regex":
         flags = 0
-        # Support multiple flags separated by |
         for flag_part in regex_flags.upper().split("|"):
             if flag_part == "IGNORECASE":
                 flags |= re.IGNORECASE
@@ -293,7 +295,6 @@ def match_condition(actual: str, expected: str, mode: str = "exact", regex_flags
                 flags |= re.MULTILINE
             elif flag_part == "DOTALL":
                 flags |= re.DOTALL
-            # Add more flags here if needed
 
         try:
             return re.search(expected, actual, flags=flags) is not None
@@ -307,7 +308,7 @@ def match_condition(actual: str, expected: str, mode: str = "exact", regex_flags
 
 def get_filtered_emailids(base: Path, delimiters: str = ";") -> List[str]:
     """
-    Retrieve filtered email IDs based on inventory.csv and filter.txt.
+    Retrieve filtered email IDs based on inventory.csv and filter.txt files.
 
     Args:
         base: Path to base folder.
@@ -370,15 +371,12 @@ def sanitize_filename(filename: str) -> str:
     Returns:
         Sanitized ASCII-only filename.
     """
-    # Normalize to NFKD form and encode ASCII ignoring errors
     nfkd_form = unicodedata.normalize('NFKD', filename)
     ascii_bytes = nfkd_form.encode('ASCII', 'ignore')
     ascii_str = ascii_bytes.decode('ASCII')
 
-    # Replace any remaining unsafe characters with underscore
     sanitized = re.sub(r'[^\w\.-]', '_', ascii_str)
 
-    # Ensure it’s not empty after sanitization
     return sanitized or "attachment"
 
 
@@ -389,7 +387,7 @@ def send_email(
     attachments: List[Path],
     smtp_server: str = "localhost",
     dry_run: bool = False,
-):
+) -> None:
     """
     Send an email with optional attachments.
 
@@ -399,7 +397,7 @@ def send_email(
         body: Email body content.
         attachments: List of file Paths to attach.
         smtp_server: SMTP server address.
-        dry_run: If True, don't actually send emails.
+        dry_run: If True, do not actually send emails.
     """
     msg = EmailMessage()
     msg["Subject"] = subject
@@ -456,20 +454,19 @@ def send_email_from_folder(
     batch_size: int = 10,
     retries: int = 3,
     delay: int = 3,
-):
+) -> None:
     """
-    Main routine to read inputs from base folder and send emails in batches.
+    Main routine to read inputs from a base folder and send emails in batches.
 
     Args:
-        base_folder: Folder containing input files.
-        dry_run: If True, don't actually send emails.
+        base_folder: Folder containing email inputs.
+        dry_run: If True, do not actually send emails.
         batch_size: Number of recipients per email batch.
         retries: Number of retries on failure.
         delay: Delay in seconds between retries.
     """
     base = Path(base_folder)
 
-    # Rotate logs before setting up logging
     rotate_log_file()
     setup_logging()
 
@@ -493,67 +490,37 @@ def send_email_from_folder(
         to_emails.extend(filtered_emails)
         to_emails = list(dict.fromkeys(to_emails))  # Deduplicate in memory
 
-    attachments = []
-    for path in base.glob("attachments/*"):
-        if path.is_file():
-            attachments.append(path)
+    attachments = [p for p in base.glob("attachments/*") if p.is_file()]
 
     total = len(to_emails)
     if total == 0:
         log_and_print("warning", "No recipients to send emails to.")
         return
 
-    # Batch sending
     for i in range(0, total, batch_size):
         batch = to_emails[i : i + batch_size]
-        log_and_print("info", f"Sending batch {i // batch_size + 1} to {len(batch)} recipients.")
+        log_and_print("info", f"Sending email batch {i//batch_size + 1} with {len(batch)} recipients.")
 
-        # Personalization: substitute ${email} with all batch emails joined
-        try:
-            body_template = string.Template(body_template_raw)
-            body = body_template.safe_substitute(email=", ".join(batch))
-        except Exception as exc:
-            log_and_print("error", f"Failed to substitute template: {exc}")
-            body = body_template_raw
-
-        attempts = 0
-        while attempts < retries:
+        attempt = 0
+        while attempt <= retries:
             try:
-                send_email(batch, subject, body, attachments, dry_run=dry_run)
+                send_email(
+                    recipients=batch,
+                    subject=subject,
+                    body=body_template_raw,
+                    attachments=attachments,
+                    dry_run=dry_run,
+                )
                 break
             except Exception as exc:
-                attempts += 1
-                log_and_print("error", f"Send attempt {attempts} failed: {exc}")
-                if attempts == retries:
-                    log_and_print("error", "Max retries reached, aborting batch.")
-                    raise
+                attempt += 1
+                log_and_print("error", f"Attempt {attempt} failed: {exc}")
+                if attempt > retries:
+                    log_and_print("error", "Max retries reached, aborting.")
+                    break
                 time.sleep(delay)
 
 
-def main():
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Bulk Email Sender")
-    parser.add_argument("folder", help="Folder containing email inputs")
-    parser.add_argument("--dry-run", action="store_true", help="Dry run mode, do not send emails")
-    parser.add_argument("--batch-size", type=int, default=10, help="Number of emails per batch")
-    parser.add_argument("--retries", type=int, default=3, help="Retry count for sending emails")
-    parser.add_argument("--delay", type=int, default=3, help="Delay between retries in seconds")
-
-    args = parser.parse_args()
-
-    try:
-        send_email_from_folder(
-            base_folder=args.folder,
-            dry_run=args.dry_run,
-            batch_size=args.batch_size,
-            retries=args.retries,
-            delay=args.delay,
-        )
-    except Exception as exc:
-        log_and_print("error", f"Fatal error: {exc}")
-        sys.exit(1)
-
-
 if __name__ == "__main__":
-    main()
+    # You can adjust parameters here or pass them in some way
+    send_email_from_folder("email", dry_run=True, batch_size=5)
