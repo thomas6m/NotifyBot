@@ -1,29 +1,26 @@
-# NotifyBot Email Sender
+# NotifyBot
 
-A powerful, RFC-compliant email sending tool designed for bulk email campaigns with advanced filtering, attachment handling, and comprehensive logging capabilities.
+**NotifyBot** is an automated email batch sender with filtering, logging, and dry-run support. It allows you to send HTML emails with attachments to multiple recipients in batches, with optional filtering based on CSV inventory data.
 
 ## Features
 
-- **RFC-compliant email validation** using `email-validator` library
-- **Bulk email sending** with configurable batch sizes and delays
-- **Advanced filtering** based on CSV inventory data
-- **Attachment handling** with size filtering
-- **Comprehensive logging** with detailed error tracking
-- **Dry-run mode** for testing before actual sending
-- **Email deduplication** to prevent duplicate sends
-- **Multi-recipient support** (To, CC, BCC)
-- **HTML email support** with plain-text fallback
+- **Batch Email Sending**: Send emails in configurable batches with delays
+- **HTML Email Support**: Send rich HTML emails with attachments
+- **Email Filtering**: Filter recipients based on CSV inventory data using flexible conditions
+- **Dry Run Mode**: Test your email configuration without actually sending emails
+- **Email Validation**: Automatic validation of email addresses
+- **Attachment Support**: Add multiple file attachments (up to 15MB per file)
+- **Logging**: Comprehensive logging with automatic log rotation
+- **Deduplication**: Automatic removal of duplicate email addresses
 
 ## Installation
 
 ### Prerequisites
 
-- Python 3.6+
-- SMTP server (configured on localhost by default)
+- Python 3.6 or higher
+- `email-validator` library
 
-### Dependencies
-
-Install the required Python packages:
+### Install Dependencies
 
 ```bash
 pip install email-validator
@@ -31,205 +28,218 @@ pip install email-validator
 
 ## Project Structure
 
-Your project folder should contain the following files:
-
-### Required Files
-
-- `from.txt` - Sender email address
-- `subject.txt` - Email subject line
-- `body.html` - HTML email body content
-- `approver.txt` - List of approver email addresses (one per line)
-
-### Optional Files
-
-- `to.txt` - Primary recipient list (auto-generated if not present)
-- `cc.txt` - CC recipient list
-- `bcc.txt` - BCC recipient list
-- `additional_to.txt` - Additional recipients to append
-- `inventory.csv` - CSV data for filtering recipients
-- `filter.txt` - CSV filter conditions
-- `attachments/` - Directory containing email attachments
+```
+project/
+├── notifybot.py           # Main script
+└── base/                  # Required base directory
+    ├── body.html         # Email body (HTML format) - REQUIRED
+    ├── subject.txt       # Email subject line - REQUIRED
+    ├── to.txt            # Recipient email addresses (optional)
+    ├── inventory.csv     # CSV data for filtering (optional)
+    ├── filter.txt        # Filter conditions (optional)
+    └── attachment/       # Folder containing attachments (optional)
+```
 
 ## Usage
 
 ### Basic Usage
 
 ```bash
-python notifybot.py /path/to/email/folder
+# Dry run (simulate sending without actual SMTP)
+python notifybot.py --dry-run
+
+# Send emails with default settings
+python notifybot.py
+
+# Custom attachment folder
+python notifybot.py --attachment-folder attachments
+
+# Custom batch size and delay
+python notifybot.py --batch-size 50 --delay 2.0
 ```
 
 ### Command Line Options
 
-```bash
-python notifybot.py [OPTIONS] BASE_FOLDER
-```
-
-#### Options
-
-- `--dry-run` - Send test email to approvers only
-- `--batch-size INTEGER` - Number of recipients per batch (default: 500)
-- `--delay INTEGER` - Seconds to wait between batches (default: 5)
-- `--attachments-folder PATH` - Custom attachments folder path
-- `--max-attachment-size INTEGER` - Maximum attachment size in MB (default: 10)
-
-### Examples
-
-#### Dry Run (Testing)
-```bash
-python notifybot.py --dry-run /path/to/campaign
-```
-
-#### Custom Batch Settings
-```bash
-python notifybot.py --batch-size 100 --delay 10 /path/to/campaign
-```
-
-#### With Custom Attachments Folder
-```bash
-python notifybot.py --attachments-folder /custom/attachments /path/to/campaign
-```
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--dry-run` | Simulate sending emails without actual SMTP send | False |
+| `--attachment-folder` | Subfolder name containing attachments | "attachment" |
+| `--batch-size` | Number of emails to send per batch | 30 |
+| `--delay` | Delay in seconds between batches | 1.0 |
 
 ## File Formats
 
-### Email Address Files
-All email files should contain one email address per line:
-```
-user1@example.com
-user2@example.com
-User Name <user3@example.com>
-```
+### Required Files
 
-### inventory.csv
-CSV file containing contact data with an `emailids` column:
-```csv
-name,department,emailids,status
-John Doe,IT,john@example.com;jane@example.com,active
-Jane Smith,HR,jane.smith@example.com,active
-```
+#### `body.html`
+HTML content for the email body.
 
-### filter.txt
-CSV file defining filter conditions:
-```csv
-department,status
-IT,active
-HR,active
-```
-
-### HTML Email Body
-The `body.html` file should contain valid HTML:
 ```html
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Newsletter</title>
+    <title>Your Email</title>
 </head>
 <body>
-    <h1>Welcome!</h1>
-    <p>This is your newsletter content.</p>
+    <h1>Hello!</h1>
+    <p>This is your email content.</p>
 </body>
 </html>
 ```
 
-## How It Works
+#### `subject.txt`
+Plain text file containing the email subject line.
 
-1. **Validation**: Checks for required files and validates email addresses
-2. **Filtering**: If `inventory.csv` and `filter.txt` exist, generates filtered recipient list
-3. **Recipient Management**: 
-   - Creates `to.txt` with filtered emails (if it doesn't exist)
-   - Appends emails from `additional_to.txt`
-   - Deduplicates all recipients
-4. **Sending**: Sends emails in batches with specified delays
-5. **Logging**: Records all activities in `notifybot.log`
+```
+Your Email Subject Here
+```
+
+### Optional Files
+
+#### `to.txt`
+Email addresses separated by semicolons, newlines, or both.
+
+```
+user1@example.com; user2@example.com
+user3@example.com
+```
+
+#### `inventory.csv`
+CSV file containing data for filtering recipients. Must include an `emailids` column.
+
+```csv
+name,department,emailids
+John Doe,Engineering,john@example.com
+Jane Smith,Marketing,jane@example.com; jane.smith@company.com
+```
+
+#### `filter.txt`
+CSV file defining filter conditions for the inventory data.
+
+```csv
+field,value,mode,regex_flags
+department,Engineering,exact,
+name,John,contains,
+```
+
+**Filter Modes:**
+- `exact`: Exact match (case-insensitive)
+- `contains`: Value contains the specified string (case-insensitive)
+- `regex`: Regular expression match
+
+**Regex Flags:**
+- `I`: Case-insensitive
+- `M`: Multiline
+- `S`: Dotall
+- Multiple flags can be combined with `|` (e.g., `I|M`)
+
+## Email Filtering
+
+When both `inventory.csv` and `filter.txt` are present, NotifyBot will:
+
+1. Apply all filter conditions to the inventory data
+2. Extract email addresses from matching rows
+3. Validate all email addresses
+4. Exclude emails already present in `to.txt`
+5. Append new filtered emails to `to.txt`
+6. Deduplicate the `to.txt` file
 
 ## Logging
 
-All activities are logged to `notifybot.log` with timestamps and detailed information:
+NotifyBot creates detailed logs in `notifybot.log` with:
 
-- Email validation results
-- File operations
-- Send attempts and results
-- Error messages and warnings
+- Timestamp and log level
+- Function name and line number
+- Detailed error messages and warnings
+- Email sending status
+
+Log files are automatically rotated on each run with timestamp suffixes.
+
+## Email Configuration
+
+NotifyBot uses localhost SMTP server by default. The sender email is set to `notifybot@example.com`.
+
+To use a different SMTP configuration, modify the `send_email` function in the code.
+
+## File Size Limits
+
+- Maximum attachment size: 15MB per file
+- Files exceeding this limit will be skipped with a warning
 
 ## Error Handling
 
-The script includes comprehensive error handling for:
+NotifyBot includes comprehensive error handling for:
 
-- Missing or invalid files
+- Missing required files
 - Invalid email addresses
 - SMTP connection issues
+- File reading errors
 - Attachment processing errors
-- CSV parsing errors
 
-## Security Features
+## Examples
 
-- **Email validation** prevents invalid addresses
-- **Attachment size limits** prevent oversized files
-- **Dry-run mode** for safe testing
-- **Comprehensive logging** for audit trails
+### Basic Email Campaign
 
-## Best Practices
+1. Create the base directory structure:
+```
+base/
+├── body.html
+├── subject.txt
+└── to.txt
+```
 
-1. **Always test first** using `--dry-run`
-2. **Use appropriate batch sizes** to avoid overwhelming SMTP servers
-3. **Monitor logs** for any issues during sending
-4. **Validate email lists** before large campaigns
-5. **Keep attachments small** and relevant
+2. Run with dry-run first:
+```bash
+python notifybot.py --dry-run
+```
+
+3. Send emails:
+```bash
+python notifybot.py
+```
+
+### Filtered Email Campaign
+
+1. Create the complete directory structure:
+```
+base/
+├── body.html
+├── subject.txt
+├── inventory.csv
+├── filter.txt
+└── attachment/
+    └── document.pdf
+```
+
+2. Run to generate filtered recipients:
+```bash
+python notifybot.py --dry-run
+```
+
+3. Send emails to filtered recipients:
+```bash
+python notifybot.py --batch-size 20 --delay 2.0
+```
+
+## Security Notes
+
+- Always test with `--dry-run` first
+- Validate your recipient lists before sending
+- Be mindful of email sending limits and spam policies
+- Consider using authentication for production SMTP servers
 
 ## Troubleshooting
 
 ### Common Issues
 
-**Missing Required Files**
-```
-Error: Missing: from.txt, subject.txt
-```
-Ensure all required files are present in your base folder.
+1. **"Missing required files"**: Ensure `body.html` and `subject.txt` exist in the `base/` directory
+2. **"No recipients found"**: Check that `to.txt` contains valid email addresses or that filtering is working correctly
+3. **SMTP errors**: Verify your SMTP server configuration and network connectivity
+4. **Large attachments skipped**: Files over 15MB are automatically skipped
 
-**Invalid Email Addresses**
-```
-Warning: Invalid email skipped: bad-email
-```
-Check and correct email addresses in your recipient files.
+### Debug Steps
 
-**SMTP Connection Issues**
-```
-Error: Failed to send to [...]: Connection refused
-```
-Verify your SMTP server is running and accessible.
-
-**Attachment Too Large**
-```
-Warning: Skipping large-file.pdf: 15.2MB > limit
-```
-Reduce attachment size or increase the limit with `--max-attachment-size`.
-
-### Log Analysis
-
-Check `notifybot.log` for detailed information about:
-- Which emails were sent successfully
-- Which emails failed and why
-- File processing activities
-- Validation results
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## License
-
-This project is open source. Please check the license file for details.
-
-## Support
-
-For issues and questions:
-1. Check the troubleshooting section
-2. Review the log files
-3. Open an issue with detailed information about your problem
-
----
-
-**Note**: This tool is designed for legitimate email campaigns. Please ensure compliance with anti-spam laws and regulations in your jurisdiction.
+1. Check the log file `notifybot.log` for detailed error messages
+2. Use `--dry-run` to test configuration without sending emails
+3. Verify file encodings are UTF-8
+4. Ensure email addresses are properly formatted
