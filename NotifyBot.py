@@ -405,15 +405,17 @@ def send_email_from_folder(
 
     emails = set()
 
+    # Read existing to.txt emails if present
     if to_txt_path.is_file():
         emails.update(read_recipients(to_txt_path))
         deduplicate_file(to_txt_path)
 
+    # If filter and inventory files exist, get filtered emails
     if filter_path.is_file() and inventory_path.is_file():
         filtered_emails = get_filtered_emailids(base)
         emails.update(filtered_emails)
 
-        # Update to.txt with filtered emails regardless of dry-run
+        # Always update to.txt with filtered emails regardless of dry-run
         if filtered_emails:
             with to_txt_path.open("a", encoding="utf-8") as f:
                 for email in filtered_emails:
@@ -425,7 +427,8 @@ def send_email_from_folder(
             )
 
         if dry_run:
-            return  # Don't send emails in dry-run mode
+            # Skip actual sending in dry-run mode after updating to.txt
+            return
 
     if not emails:
         raise Exception("No recipients to send email to.")
