@@ -1,275 +1,329 @@
-# NotifyBot Step-by-Step Documentation
-
-## 1. Log File Management
-
-### `rotate_log_file()`
-**Purpose:** Prevents the main log file from growing too large by renaming it with a timestamp.
-
-**Input:** None
-
-**Process:**
-- Checks if `notifybot.log` exists
-- If yes, renames it to `notifybot_YYYYMMDD_HHMMSS.log` using current datetime
-- Logs or prints success/failure message
-
-**Output:** Log file renamed if it exists, else no action
-
-### `setup_logging()`
-**Purpose:** Sets up the logging system for the script.
-
-**Input:** None
-
-**Process:**
-- Configures logging to write INFO and above level messages to `notifybot.log`
-- Format includes timestamp, log level, function name, line number, and message
-
-**Output:** Logging ready for script-wide use
-
-## 2. Logging & Console Output
-
-### `log_and_print(level: str, message: str)`
-**Purpose:** Logs a message at a specified level and prints it on the console with color for visibility.
-
-**Input:**
-- `level`: One of "info", "warning", "error"
-- `message`: The text message to log and print
-
-**Process:**
-- Uses color codes for terminal output based on level
-- Logs message using Python's logging module at appropriate level
-- Prints colored message on terminal
-
-**Output:** Colored console output and logged message
-
-## 3. Email Validation
-
-### `is_valid_email(email: str) -> bool`
-**Purpose:** Validates the syntax of an email address.
-
-**Input:**
-- `email`: String email address to validate
-
-**Process:**
-- Uses `email_validator` package to validate email
-- Catches and returns False if invalid
-
-**Output:** Boolean: True if valid, False otherwise
-
-## 4. File Reading
-
-### `read_file(path: Path) -> str`
-**Purpose:** Reads entire content of a file safely.
-
-**Input:**
-- `path`: Path object pointing to the file
-
-**Process:**
-- Opens file with UTF-8 encoding
-- Reads all text and strips whitespace
-- Logs error and returns empty string on failure
-
-**Output:** Content of the file as a string or empty string on error
-
-## 5. Email Extraction & Processing
-
-### `extract_emails(raw: str, delimiters: str = ";") -> List[str]`
-**Purpose:** Extract multiple emails from a string using delimiters.
-
-**Input:**
-- `raw`: String containing multiple emails separated by delimiters
-- `delimiters`: Delimiter characters (default `;`)
-
-**Process:**
-- Uses regex splitting on delimiters
-- Strips and filters out empty parts
-
-**Output:** List of email strings
-
-### `read_recipients(path: Path, delimiters: str = ";") -> List[str]`
-**Purpose:** Reads recipient emails from a file and validates them.
-
-**Input:**
-- `path`: Path to recipients file
-- `delimiters`: Delimiters separating emails in file
-
-**Process:**
-- Checks if file exists
-- Reads line by line
-- Extracts emails using `extract_emails()`
-- Validates each using `is_valid_email()`
-- Logs warnings for invalid emails
-
-**Output:** List of validated email strings
-
-### `write_to_txt(emails: List[str], path: Path) -> None`
-**Purpose:** Appends emails to a text file.
-
-**Input:**
-- `emails`: List of emails to append
-- `path`: Path to the file
-
-**Process:**
-- Opens file in append mode with UTF-8 encoding
-- Writes each email on a new line
-- Logs success or failure
-
-**Output:** Appended emails to file
-
-### `deduplicate_file(path: Path) -> None`
-**Purpose:** Removes duplicate lines from a file safely.
-
-**Input:**
-- `path`: Path to the file
-
-**Process:**
-- Creates timestamped backup copy of the original file
-- Reads all lines, removes duplicates preserving order
-- Writes back unique lines to the original file
-- Logs success or errors
-
-**Output:** File updated with unique lines only
-
-## 6. File Existence Validation
-
-### `check_required_files(base: Path, required: List[str]) -> None`
-**Purpose:** Ensures required files exist before proceeding.
-
-**Input:**
-- `base`: Base folder Path
-- `required`: List of required filenames
-
-**Process:**
-- Checks existence of each file inside base
-- Collects missing files
-- Logs error and raises `MissingRequiredFilesError` if any are missing
-
-**Output:** None, but raises exception if missing files found
-
-## 7. Filter File Parsing
-
-### `parse_filter_file(filter_path: Path) -> Tuple[List[str], List[Dict[str, str]]]`
-**Purpose:** Reads filter rules from a CSV file.
-
-**Input:**
-- `filter_path`: Path to `filter.txt`
-
-**Process:**
-- Reads CSV as dictionaries
-- Returns headers and list of row dicts
-- Adds default values for missing keys like "mode" and "regex_flags"
-
-**Output:** Tuple: (headers_list, rows_list_of_dicts)
-
-## 8. Matching Conditions
-
-### `match_condition(actual: str, expected: str, mode: str = "exact", regex_flags: str = "") -> bool`
-**Purpose:** Matches a value against a condition with multiple modes.
-
-**Input:**
-- `actual`: The value to test
-- `expected`: The expected pattern/value
-- `mode`: One of "exact", "contains", or "regex"
-- `regex_flags`: Optional regex flags like "IGNORECASE"
-
-**Process:**
-- For "exact", compares case-insensitively
-- For "contains", checks substring ignoring case
-- For "regex", applies regex with flags, logs invalid regex errors
-
-**Output:** Boolean indicating if actual matches expected
-
-## 9. Filtered Emails Retrieval
-
-### `get_filtered_emailids(base: Path, delimiters: str = ";") -> List[str]`
-**Purpose:** Extracts emails from inventory filtered by conditions in `filter.txt`.
-
-**Input:**
-- `base`: Base folder containing `inventory.csv` and `filter.txt`
-- `delimiters`: Delimiters used to separate emails
-
-**Process:**
-- Parses filters from `filter.txt`
-- Reads `inventory.csv` row-by-row
-- Applies all filter conditions using `match_condition()`
-- Collects emails from matching rows
-- Removes those already in `to.txt`
-- Validates emails before returning
-
-**Output:** List of new filtered valid emails
-
-## 10. Filename Sanitization
-
-### `sanitize_filename(filename: str) -> str`
-**Purpose:** Converts filenames to safe ASCII-only strings for attachments.
-
-**Input:**
-- `filename`: Original filename string
-
-**Process:**
-- Normalizes Unicode to ASCII (removes accents)
-- Replaces unsafe characters with underscores
-- Defaults to "attachment" if result empty
-
-**Output:** Sanitized filename string
-
-## 11. Email Sending
-
-### `send_email(recipients: List[str], subject: str, body: str, attachments: List[Path], smtp_server: str = "localhost", dry_run: bool = False) -> None`
-**Purpose:** Sends an email with subject, body, and attachments.
-
-**Input:**
-- `recipients`: List of email addresses
-- `subject`: Email subject line
-- `body`: Email body content
-- `attachments`: List of file paths to attach
-- `smtp_server`: SMTP server address (default localhost)
-- `dry_run`: If True, do not actually send the email
-
-**Process:**
-- Constructs an `EmailMessage`
-- Attaches files smaller than 15MB
-- Sanitizes attachment filenames
-- Sends email through SMTP unless dry_run is True
-- Logs actions and warnings
-
-**Output:** Email sent or dry-run simulated
-
-## 12. Main Orchestrator
-
-### `send_email_from_folder(base_folder: str, dry_run: bool = False, batch_size: int = 10, retries: int = 3, delay: int = 3) -> None`
-**Purpose:** Coordinates all steps to send emails based on folder contents.
-
-**Input:**
-- `base_folder`: Folder with `body.txt`, `subject.txt`, `to.txt`, attachments, etc.
-- `dry_run`: Do not actually send emails (default False)
-- `batch_size`: Number of recipients per batch email (default 10)
-- `retries`: Number of retries if sending fails (default 3)
-- `delay`: Seconds to wait between retries (default 3)
-
-**Process:**
-- Rotates logs and sets up logging
-- Validates required files exist
-- Reads subject and body content
-- Reads recipients from `to.txt`
-- Fetches filtered emails from inventory and filter files, updates `to.txt`
-- Loads attachments
-- Sends emails in batches, retrying on failure with delays
-- Logs progress and errors
-
-**Output:** Emails sent in batches, or simulated in dry-run mode
-
-## Summary
-
-This documentation breaks down the NotifyBot workflow into these key components:
-
-1. **Log rotation & setup** - Manages log files and configures logging
-2. **Logging and console output** - Provides colored terminal output and file logging
-3. **Email validation & extraction** - Validates email syntax and extracts from strings
-4. **File reading/writing & deduplication** - Handles file operations safely
-5. **Filter parsing & matching** - Processes filter rules and applies conditions
-6. **Building recipient lists** - Dynamically creates email recipient lists
-7. **Sanitizing filenames for attachments** - Ensures safe attachment handling
-8. **Sending emails with retry and batch support** - Delivers emails reliably
-9. **Orchestration of all steps** - Coordinates the entire process from folder-based inputs
-
-The system is designed to be modular, reliable, and easy to debug through comprehensive logging and error handling.
+# NotifyBot: Complete Code Explanation
+
+## Overview
+NotifyBot is an automated email batch sender with advanced features like filtering, logging, dry-run support, and attachment handling. It's designed to send emails to multiple recipients efficiently while providing safety mechanisms.
+
+## Key Features
+- **Batch Processing**: Sends emails in configurable batches with delays
+- **Filtering System**: Uses CSV inventory with filter conditions
+- **Dry Run Mode**: Test without actually sending emails
+- **Attachment Support**: Handles multiple file attachments with size limits
+- **Email Validation**: Validates email addresses before sending
+- **Logging**: Comprehensive logging with rotation
+- **Deduplication**: Removes duplicate email addresses
+
+## Directory Structure
+```
+base/
+├── body.html          # Email body content (HTML format)
+├── subject.txt        # Email subject line
+├── to.txt            # Recipient email addresses
+├── inventory.csv     # Optional: Database of contacts with metadata
+├── filter.txt        # Optional: Filter conditions in CSV format
+└── attachment/       # Folder containing files to attach
+```
+
+## Step-by-Step Code Explanation
+
+### 1. Imports and Setup
+```python
+import argparse, csv, logging, mimetypes, re, shutil, smtplib, sys, time, unicodedata
+from datetime import datetime
+from email.message import EmailMessage
+from pathlib import Path
+from typing import List, Tuple, Dict
+from email_validator import validate_email, EmailNotValidError
+```
+
+**Purpose**: Imports all necessary libraries for email handling, file operations, logging, and validation.
+
+### 2. Custom Exception Class
+```python
+class MissingRequiredFilesError(Exception):
+    """Exception raised when required input files are missing."""
+```
+
+**Purpose**: Custom exception for handling missing required files scenario.
+
+### 3. Log File Management
+
+#### `rotate_log_file()`
+```python
+def rotate_log_file() -> None:
+    log_path = Path(LOG_FILENAME)
+    if log_path.is_file():
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        rotated_name = log_path.with_name(f"notifybot_{timestamp}.log")
+        log_path.rename(rotated_name)
+```
+
+**Steps**:
+1. Checks if existing log file exists
+2. Creates timestamp-based filename
+3. Renames old log file to prevent overwriting
+4. Allows fresh logging for each run
+
+#### `setup_logging()`
+```python
+def setup_logging() -> None:
+    logging.basicConfig(
+        filename=LOG_FILENAME,
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(funcName)s [line %(lineno)d] - %(message)s",
+    )
+```
+
+**Steps**:
+1. Configures Python's logging system
+2. Sets log level to INFO and above
+3. Creates detailed format with timestamp, level, function name, and line number
+4. Outputs to file for persistent logging
+
+#### `log_and_print()`
+```python
+def log_and_print(level: str, message: str) -> None:
+    level = level.lower()
+    colors = {"info": "\033[94m", "warning": "\033[93m", "error": "\033[91m"}
+    color = colors.get(level, "\033[0m")
+    getattr(logging, level, logging.info)(message)
+    print(f"{color}{message}\033[0m")
+```
+
+**Steps**:
+1. Accepts log level and message
+2. Defines color codes for different log levels
+3. Logs message to file using appropriate logging level
+4. Prints colored message to console for immediate feedback
+
+### 4. Email Validation
+
+#### `is_valid_email()`
+```python
+def is_valid_email(email: str) -> bool:
+    try:
+        validate_email(email.strip())
+        return True
+    except EmailNotValidError:
+        return False
+```
+
+**Steps**:
+1. Strips whitespace from email
+2. Uses `email_validator` library for RFC-compliant validation
+3. Returns True for valid emails, False for invalid ones
+4. Handles validation errors gracefully
+
+### 5. File Operations
+
+#### `read_file()`
+```python
+def read_file(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except Exception as exc:
+        log_and_print("error", f"Failed to read file {path}: {exc}")
+        return ""
+```
+
+**Steps**:
+1. Attempts to read file with UTF-8 encoding
+2. Strips whitespace from content
+3. Handles file reading errors gracefully
+4. Returns empty string on failure
+
+#### `extract_emails()`
+```python
+def extract_emails(raw: str, delimiters: str = ";") -> List[str]:
+    if not raw:
+        return []
+    return [e.strip() for e in re.split(f"[{re.escape(delimiters)}]", raw) if e.strip()]
+```
+
+**Steps**:
+1. Checks if input string is empty
+2. Uses regex to split on specified delimiters (default: semicolon)
+3. Strips whitespace from each email
+4. Filters out empty strings
+5. Returns list of clean email addresses
+
+#### `read_recipients()`
+```python
+def read_recipients(path: Path, delimiters: str = ";") -> List[str]:
+    if not path.is_file():
+        log_and_print("warning", f"{path.name} missing, skipping.")
+        return []
+    
+    valid_emails = []
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            for email in extract_emails(line.strip(), delimiters):
+                if is_valid_email(email):
+                    valid_emails.append(email)
+                else:
+                    log_and_print("warning", f"Invalid email skipped: {email}")
+    return valid_emails
+```
+
+**Steps**:
+1. Checks if file exists
+2. Opens file and reads line by line
+3. Extracts emails from each line using delimiters
+4. Validates each email address
+5. Collects only valid emails
+6. Logs warnings for invalid emails
+
+### 6. Deduplication
+
+#### `deduplicate_file()`
+```python
+def deduplicate_file(path: Path) -> None:
+    if not path.is_file():
+        return
+    
+    backup = path.with_name(f"{path.stem}_{datetime.now():%Y%m%d_%H%M%S}{path.suffix}")
+    shutil.copy2(path, backup)
+    
+    seen = set()
+    uniq = []
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            cleaned = line.strip()
+            if cleaned and cleaned not in seen:
+                seen.add(cleaned)
+                uniq.append(cleaned)
+    
+    with path.open("w", encoding="utf-8") as f:
+        f.writelines(line + "\n" for line in uniq)
+```
+
+**Steps**:
+1. Checks if file exists
+2. Creates timestamped backup of original file
+3. Reads all lines and tracks seen lines in a set
+4. Keeps only unique, non-empty lines
+5. Overwrites original file with deduplicated content
+6. Preserves original file order
+
+### 7. File Validation
+
+#### `check_required_files()`
+```python
+def check_required_files(base: Path, required: List[str]) -> None:
+    missing = [f for f in required if not (base / f).is_file()]
+    if missing:
+        raise MissingRequiredFilesError(f"Missing: {', '.join(missing)}")
+```
+
+**Steps**:
+1. Checks each required file in the base directory
+2. Creates list of missing files
+3. Raises custom exception if any files are missing
+4. Provides clear error message listing missing files
+
+### 8. Filtering System
+
+#### `parse_filter_file()`
+```python
+def parse_filter_file(path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
+    try:
+        with path.open("r", encoding="utf-8", newline="") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+            for row in rows:
+                row.setdefault("mode", "exact")
+                row.setdefault("regex_flags", "")
+            return reader.fieldnames or [], rows
+    except Exception as exc:
+        log_and_print("error", f"Failed to parse filter file: {exc}")
+        return [], []
+```
+
+**Steps**:
+1. Opens filter file as CSV
+2. Reads all rows into dictionary format
+3. Sets default values for optional fields (mode, regex_flags)
+4. Returns column headers and row data
+5. Handles parsing errors gracefully
+
+#### `match_condition()`
+```python
+def match_condition(actual: str, expected: str, mode: str, regex_flags: str = "") -> bool:
+    actual = actual.strip()
+    expected = expected.strip()
+    if mode == "exact":
+        return actual.lower() == expected.lower()
+    if mode == "contains":
+        return expected.lower() in actual.lower()
+    if mode == "regex":
+        flags = 0
+        for flag in regex_flags.upper().split("|"):
+            flags |= getattr(re, flag, 0)
+        try:
+            return re.search(expected, actual, flags=flags) is not None
+        except re.error as e:
+            log_and_print("warning", f"Regex error: {e}")
+            return False
+    return actual.lower() == expected.lower()
+```
+
+**Steps**:
+1. Strips whitespace from both strings
+2. **Exact mode**: Case-insensitive exact match
+3. **Contains mode**: Case-insensitive substring search
+4. **Regex mode**: 
+   - Parses regex flags (e.g., "IGNORECASE|MULTILINE")
+   - Applies flags to regex search
+   - Handles regex syntax errors
+5. Falls back to exact match for unknown modes
+
+#### `get_filtered_emailids()`
+```python
+def get_filtered_emailids(base: Path, delimiters: str = ";") -> List[str]:
+    inv = base / "inventory.csv"
+    flt = base / "filter.txt"
+    if not inv.is_file() or not flt.is_file():
+        return []
+    
+    _, filters = parse_filter_file(flt)
+    found = set()
+    
+    with inv.open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if all(
+                match_condition(
+                    row.get(f["field"], ""),
+                    f["value"],
+                    f["mode"],
+                    f.get("regex_flags", ""),
+                )
+                for f in filters
+            ):
+                for e in extract_emails(row.get("emailids", ""), delimiters):
+                    if e.strip():
+                        found.add(e.strip())
+    
+    existing = set(read_recipients(base / "to.txt", delimiters))
+    return [e for e in sorted(found - existing) if is_valid_email(e)]
+```
+
+**Steps**:
+1. Checks if both inventory.csv and filter.txt exist
+2. Parses filter conditions from filter.txt
+3. Reads inventory.csv row by row
+4. For each row, tests ALL filter conditions (AND logic)
+5. If all conditions match, extracts emails from that row
+6. Collects unique emails in a set
+7. Reads existing recipients from to.txt
+8. Returns only new emails (not already in to.txt)
+9. Validates and sorts final email list
+
+### 9. Attachment Handling
+
+#### `sanitize_filename()`
+```python
+def sanitize_filename(filename: str) -> str:
+    normalized = (
+        unicodedata.normalize("NFKD", filename)
+        .encode("ASCII", "ignore")
+        .decode
