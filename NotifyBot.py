@@ -5,13 +5,24 @@ NotifyBot: Automated email batch sender with filtering, logging, and dry-run sup
 Usage:
     python notifybot.py --base-folder ./emails --dry-run
     python notifybot.py --base-folder ./emails --attachment-folder attachments
+    python notifybot.py --base-folder ./emails --force
 
 CLI Options:
     --base-folder         Base directory containing email input files [REQUIRED].
+                          Required files inside base folder:
+                            - subject.txt       (email subject)
+                            - body.html         (email body HTML)
+                            - from.txt          (email From address)
+                            - approver.txt      (approver emails for dry-run)
+                          Optional files:
+                            - to.txt            (recipient emails list)
+                            - filter.txt        (filters for inventory.csv)
+                            - inventory.csv     (contact inventory)
     --dry-run             Simulate sending emails without actual SMTP send.
     --attachment-folder   Subfolder containing attachments (default: "attachment").
     --batch-size          Number of emails to send per batch (default: 30).
     --delay               Delay in seconds between batches (default: 1.0).
+    --force               Skip confirmation prompt (for automation).
 """
 
 import argparse
@@ -23,6 +34,7 @@ import shutil
 import smtplib
 import sys
 import time
+import traceback
 import unicodedata
 from datetime import datetime
 from email.message import EmailMessage
@@ -32,6 +44,7 @@ from typing import List, Tuple, Dict
 from email_validator import validate_email, EmailNotValidError
 
 LOG_FILENAME = "notifybot.log"
+
 
 class MissingRequiredFilesError(Exception):
     """Exception raised when required input files are missing."""
@@ -58,10 +71,10 @@ def setup_logging() -> None:
 
 
 def log_and_print(level: str, message: str) -> None:
-    level = level.lower()
+    level_lower = level.lower()
     colors = {"info": "\033[94m", "warning": "\033[93m", "error": "\033[91m"}
-    color = colors.get(level, "\033[0m")
-    getattr(logging, level, logging.info)(message)
+    color = colors.get(level_lower, "\033[0m")
+    getattr(logging, level_lower, logging.info)(message)
     print(f"{color}{message}\033[0m")
 
 
@@ -128,7 +141,7 @@ def deduplicate_file(path: Path) -> None:
 def check_required_files(base: Path, required: List[str]) -> None:
     missing = [f for f in required if not (base / f).is_file()]
     if missing:
-        raise MissingRequiredFilesError(f"Missing: {', '.join(missing)}")
+        raise MissingRequiredFilesError(f"Missing required files: {', '.join(missing)}")
 
 
 def parse_filter_file(path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
@@ -207,11 +220,12 @@ def send_email(
     subject: str,
     body_html: str,
     attachments: List[Path],
+    from_address: str,
     dry_run: bool = False,
 ) -> None:
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = "notifybot@example.com"
+    msg["From"] = from_address
     msg["To"] = ", ".join(recipients)
     msg.add_alternative(body_html, subtype="html")
 
@@ -255,8 +269,36 @@ def send_email_from_folder(
     dry_run: bool,
     batch_size: int = 30,
     delay: float = 1.0,
+    force: bool = False,
 ) -> None:
-    check_required_files(base, ["body.html", "subject.txt", "from.txt", "approver.txt"])
+    # Required input files
+    required_files = ["body.html", "subject.txt", "from.txt", "approver.txt"]
+    check_required_files(base, required_files)
+
+    from_address = read_file(base / "from.txt")
+    if not from_address or not is_valid_email(from_address):
+        raise MissingRequiredFilesError(f"Invalid or missing From address in from.txt")
+
+    if dry_run:
+        approver_emails = read_recipients(base / "approver.txt")
+        if not approver_emails:
+            log_and_print("warning", "No approvers found for dry-run mode.")
+            return
+
+        subject = read_file(base / "subject.txt")
+        body_html = read_file(base / "body.html")
+        attachments = (
+            list((base / attachment_subfolder).glob("*"))
+            if (base / attachment_subfolder).is_dir()
+            else []
+        )
+
+        log_and_print(
+            "info",
+            f"[DRY RUN] Sending test email to approvers: {', '.join(approver_emails)}",
+        )
+        send_email(approver_emails, subject, body_html, attachments, from_address, dry_run=True)
+        return
 
     to_txt_path = base / "to.txt"
     filter_path = base / "filter.txt"
@@ -264,42 +306,47 @@ def send_email_from_folder(
 
     emails = set()
 
+    # Read to.txt if exists
     if to_txt_path.is_file():
         emails.update(read_recipients(to_txt_path))
         deduplicate_file(to_txt_path)
 
+    # Apply filter if files exist
     if filter_path.is_file() and inventory_path.is_file():
         filtered_emails = get_filtered_emailids(base)
         emails.update(filtered_emails)
 
         if filtered_emails:
+            # Append filtered emails to to.txt, then deduplicate
             with to_txt_path.open("a", encoding="utf-8") as f:
                 for email in filtered_emails:
                     f.write(email + "\n")
             deduplicate_file(to_txt_path)
             log_and_print("info", f"to.txt updated with {len(filtered_emails)} filtered emails.")
 
-        if dry_run:
-            return
-
     emails = sorted(emails)
-    if not dry_run:
+    if not emails:
+        raise Exception("No recipients to send email to.")
+
+    # Ask for confirmation unless forced
+    if not force:
         confirm = input(f"Send emails to {len(emails)} users? (yes/no): ").strip().lower()
         if confirm != "yes":
             log_and_print("info", "Operation aborted by user.")
             return
 
-    if not emails:
-        raise Exception("No recipients to send email to.")
-
     subject = read_file(base / "subject.txt")
     body_html = read_file(base / "body.html")
-    attachments = list((base / attachment_subfolder).glob("*")) if (base / attachment_subfolder).is_dir() else []
+    attachments = (
+        list((base / attachment_subfolder).glob("*"))
+        if (base / attachment_subfolder).is_dir()
+        else []
+    )
 
     for i in range(0, len(emails), batch_size):
         batch = emails[i : i + batch_size]
         log_and_print("info", f"Sending batch {i // batch_size + 1} with {len(batch)} recipients...")
-        send_email(batch, subject, body_html, attachments, dry_run=dry_run)
+        send_email(batch, subject, body_html, attachments, from_address, dry_run=False)
         time.sleep(delay)
 
 
@@ -308,11 +355,26 @@ def main() -> int:
     setup_logging()
 
     parser = argparse.ArgumentParser(description="NotifyBot - Email Batch Sender")
-    parser.add_argument("--base-folder", type=str, required=True, help="Base directory containing email input files.")
-    parser.add_argument("--dry-run", action="store_true", help="Simulate sending emails without SMTP.")
-    parser.add_argument("--attachment-folder", type=str, default="attachment", help="Folder name for attachments.")
-    parser.add_argument("--batch-size", type=int, default=30, help="Number of emails to send per batch.")
-    parser.add_argument("--delay", type=float, default=1.0, help="Delay in seconds between batches.")
+    parser.add_argument(
+        "--base-folder", type=str, required=True, help="Base directory containing email input files."
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Simulate sending emails without SMTP."
+    )
+    parser.add_argument(
+        "--attachment-folder", type=str, default="attachment", help="Folder name for attachments."
+    )
+    parser.add_argument(
+        "--batch-size", type=int, default=30, help="Number of emails to send per batch."
+    )
+    parser.add_argument(
+        "--delay", type=float, default=1.0, help="Delay in seconds between batches."
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Skip confirmation prompt (useful for automation).",
+    )
     args = parser.parse_args()
 
     base_folder = Path(args.base_folder)
@@ -327,6 +389,7 @@ def main() -> int:
             args.dry_run,
             batch_size=args.batch_size,
             delay=args.delay,
+            force=args.force,
         )
         return 0
     except MissingRequiredFilesError as exc:
@@ -334,6 +397,7 @@ def main() -> int:
         return 1
     except Exception as e:
         log_and_print("error", f"Unhandled error: {e}")
+        log_and_print("error", traceback.format_exc())
         return 1
 
 
