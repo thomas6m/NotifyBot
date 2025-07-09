@@ -1,87 +1,74 @@
 flowchart TD
     A[Start NotifyBot] --> B[Parse CLI Arguments]
-    B --> C{Check Required Files}
-    C -->|Missing| D[Exit with Error]
-    C -->|OK| E[Read Core Components]
+    B --> C[Setup Logging & Rotate Log Files]
+    C --> D[Validate Base Folder]
+    D --> E{Base Folder Valid?}
+    E -->|No| F[Log Error & Exit]
+    E -->|Yes| G[Check Required Files]
+    G --> H{Required Files Present?}
+    H -->|No| I[Throw MissingRequiredFilesError]
+    H -->|Yes| J[Validate From Address]
+    J --> K{From Address Valid?}
+    K -->|No| L[Throw Invalid From Address Error]
+    K -->|Yes| M{Dry Run Mode?}
     
-    E --> F[Read from.txt]
-    E --> G[Read subject.txt] 
-    E --> H[Read body.html]
-    E --> I[Read approver.txt]
+    M -->|Yes| N[Load Approver Emails]
+    N --> O{Approvers Found?}
+    O -->|No| P[Log Warning & Exit]
+    O -->|Yes| Q[Load Subject & Body]
+    Q --> R[Load Attachments]
+    R --> S[Send Test Email to Approvers]
+    S --> T[Log Dry Run Complete]
+    T --> U[Exit Success]
     
-    F --> J{Validate Core Components}
-    G --> J
-    H --> J
-    I --> J
+    M -->|No| V[Load Recipients from to.txt]
+    V --> W[Deduplicate to.txt]
+    W --> X{Filter File & Inventory Exist?}
+    X -->|Yes| Y[Parse Filter Conditions]
+    Y --> Z[Read Inventory CSV]
+    Z --> AA[Apply Filters to Inventory]
+    AA --> BB[Extract Filtered Email IDs]
+    BB --> CC[Append to to.txt]
+    CC --> DD[Deduplicate to.txt Again]
+    X -->|No| EE[Continue with Existing Recipients]
+    DD --> EE
     
-    J -->|Invalid| K[Exit with Error]
-    J -->|Valid| L[Prepare Recipients]
+    EE --> FF[Compile Final Recipient List]
+    FF --> GG{Recipients Found?}
+    GG -->|No| HH[Throw No Recipients Error]
+    GG -->|Yes| II{Force Mode?}
+    II -->|No| JJ[Prompt User Confirmation]
+    JJ --> KK{User Confirms?}
+    KK -->|No| LL[Log Abort & Exit]
+    KK -->|Yes| MM[Load Email Content]
+    II -->|Yes| MM
     
-    L --> M{to.txt exists?}
-    M -->|No| N[Get Filtered Email IDs]
-    M -->|Yes| O[Skip Filtering]
+    MM --> NN[Load Subject & Body HTML]
+    NN --> OO[Load Attachments from Subfolder]
+    OO --> PP[Start Batch Processing]
+    PP --> QQ[Create Email Batch]
+    QQ --> RR[Validate Attachments]
+    RR --> SS{Attachment Size OK?}
+    SS -->|No| TT[Log Warning & Skip]
+    SS -->|Yes| UU[Add Attachment to Email]
+    TT --> VV
+    UU --> VV[Send Email Batch via SMTP]
+    VV --> WW{More Batches?}
+    WW -->|Yes| XX[Wait Delay Period]
+    XX --> QQ
+    WW -->|No| YY[Log Completion]
+    YY --> ZZ[Exit Success]
     
-    N --> N1[Read inventory.csv]
-    N1 --> N2[Read filter.txt]
-    N2 --> N3[Apply Filter Conditions]
-    N3 --> N4[Validate Emails]
-    N4 --> N5[Write to to.txt]
-    
-    N5 --> P[Read additional_to.txt]
-    O --> P
-    P --> Q[Append Additional Emails]
-    Q --> R[Deduplicate to.txt]
-    
-    R --> S{Dry Run Mode?}
-    S -->|Yes| T[Send Draft to Approvers]
-    T --> U[Log Dry Run Complete]
-    U --> V[End]
-    
-    S -->|No| W[Read Final Recipients]
-    W --> X[Read to.txt]
-    W --> Y[Read cc.txt]
-    W --> Z[Read bcc.txt]
-    
-    X --> AA[Prepare Attachments]
-    Y --> AA
-    Z --> AA
-    
-    AA --> BB{Recipients exist?}
-    BB -->|No| CC[Exit - No Recipients]
-    BB -->|Yes| DD[Process Batches]
-    
-    DD --> EE[Create Email Batch]
-    EE --> FF[Create EmailMessage]
-    FF --> GG[Set Headers]
-    GG --> HH[Add HTML Body]
-    HH --> II[Add Attachments]
-    
-    II --> JJ{Check Attachment Size}
-    JJ -->|Too Large| KK[Skip Attachment]
-    JJ -->|OK| LL[Attach File]
-    
-    KK --> MM[Send Email Batch]
-    LL --> MM
-    
-    MM --> NN{Send Success?}
-    NN -->|Yes| OO[Log Success]
-    NN -->|No| PP[Log Error]
-    
-    OO --> QQ{More Batches?}
-    PP --> QQ
-    QQ -->|Yes| RR[Wait Delay]
-    RR --> EE
-    QQ -->|No| SS[Generate Summary]
-    
-    SS --> TT[Calculate Stats]
-    TT --> UU[Log Final Summary]
-    UU --> V
+    F --> AAA[Exit with Error Code 1]
+    I --> AAA
+    L --> AAA
+    HH --> AAA
+    LL --> U
     
     style A fill:#e1f5fe
-    style V fill:#c8e6c9
-    style D fill:#ffcdd2
-    style K fill:#ffcdd2
-    style CC fill:#ffcdd2
-    style T fill:#fff3e0
-    style MM fill:#f3e5f5
-    style SS fill:#e8f5e8
+    style M fill:#fff3e0
+    style S fill:#f3e5f5
+    style VV fill:#e8f5e8
+    style AAA fill:#ffebee
+    style U fill:#e8f5e8
+    style ZZ fill:#e8f5e8
