@@ -1,65 +1,65 @@
 flowchart TD
-    A["Start NotifyBot"] --> B["Parse CLI Arguments"]
-    B --> C["Setup Logging & Rotate Log Files"]
-    C --> D["Validate Base Folder"]
+    A["Start NotifyBot Process"] --> B["Parse CLI Arguments     "]
+    B --> C["Setup Logging & Rotate  "]
+    C --> D["Validate Base Folder    "]
     D --> E{"Base Folder Valid?"}
-    E -->|No| F["Log Error & Exit"]
-    E -->|Yes| G["Check Required Files"]
+    E -->|No| F["Log Error & Exit      "]
+    E -->|Yes| G["Check Required Files   "]
     G --> H{"Required Files Present?"}
-    H -->|No| I["Throw MissingRequiredFilesError"]
-    H -->|Yes| J["Validate From Address"]
+    H -->|No| I["Throw Missing Files Err"]
+    H -->|Yes| J["Validate From Address  "]
     J --> K{"From Address Valid?"}
-    K -->|No| L["Throw Invalid From Address Error"]
+    K -->|No| L["Throw Invalid Addr Err "]
     K -->|Yes| M{"Dry Run Mode?"}
     
-    M -->|Yes| N["Load Approver Emails"]
+    M -->|Yes| N["Load Approver Emails   "]
     N --> O{"Approvers Found?"}
-    O -->|No| P["Log Warning & Exit"]
-    O -->|Yes| Q["Load Subject & Body"]
-    Q --> R["Load Attachments"]
-    R --> S["Send Test Email to Approvers"]
-    S --> T["Log Dry Run Complete"]
-    T --> U["Exit Success"]
+    O -->|No| P["Log Warning & Exit     "]
+    O -->|Yes| Q["Load Subject & Body    "]
+    Q --> R["Load Attachments Files  "]
+    R --> S["Send Test Email to Users"]
+    S --> T["Log Dry Run Complete   "]
+    T --> U["Exit Success Status    "]
     
-    M -->|No| V["Load Recipients from to.txt"]
-    V --> W["Deduplicate to.txt"]
+    M -->|No| V["Load Recipients from   "]
+    V --> W["Deduplicate to.txt File "]
     W --> X{"Filter File & Inventory Exist?"}
     X -->|Yes| Y["Parse Filter Conditions"]
-    Y --> Z["Read Inventory CSV"]
-    Z --> AA["Apply Filters to Inventory"]
-    AA --> BB["Extract Filtered Email IDs"]
-    BB --> CC["Append to to.txt"]
-    CC --> DD["Deduplicate to.txt Again"]
-    X -->|No| EE["Continue with Existing Recipients"]
+    Y --> Z["Read Inventory CSV File "]
+    Z --> AA["Apply Filters to Data  "]
+    AA --> BB["Extract Filtered Emails"]
+    BB --> CC["Append to to.txt File  "]
+    CC --> DD["Deduplicate Again      "]
+    X -->|No| EE["Continue with Existing "]
     DD --> EE
     
-    EE --> FF["Compile Final Recipient List"]
+    EE --> FF["Compile Final List     "]
     FF --> GG{"Recipients Found?"}
-    GG -->|No| HH["Throw No Recipients Error"]
+    GG -->|No| HH["Throw No Recipients   "]
     GG -->|Yes| II{"Force Mode?"}
-    II -->|No| JJ["Prompt User Confirmation"]
+    II -->|No| JJ["Prompt User Confirm   "]
     JJ --> KK{"User Confirms?"}
-    KK -->|No| LL["Log Abort & Exit"]
-    KK -->|Yes| MM["Load Email Content"]
+    KK -->|No| LL["Log Abort & Exit      "]
+    KK -->|Yes| MM["Load Email Content    "]
     II -->|Yes| MM
     
-    MM --> NN["Load Subject & Body HTML"]
-    NN --> OO["Load Attachments from Subfolder"]
-    OO --> PP["Start Batch Processing"]
-    PP --> QQ["Create Email Batch"]
-    QQ --> RR["Validate Attachments"]
+    MM --> NN["Load Subject & Body    "]
+    NN --> OO["Load Attachments       "]
+    OO --> PP["Start Batch Processing "]
+    PP --> QQ["Create Email Batch     "]
+    QQ --> RR["Validate Attachments   "]
     RR --> SS{"Attachment Size OK?"}
-    SS -->|No| TT["Log Warning & Skip"]
-    SS -->|Yes| UU["Add Attachment to Email"]
+    SS -->|No| TT["Log Warning & Skip    "]
+    SS -->|Yes| UU["Add Attachment to Msg "]
     TT --> VV
-    UU --> VV["Send Email Batch via SMTP"]
+    UU --> VV["Send Email Batch SMTP  "]
     VV --> WW{"More Batches?"}
-    WW -->|Yes| XX["Wait Delay Period"]
+    WW -->|Yes| XX["Wait Delay Period     "]
     XX --> QQ
-    WW -->|No| YY["Log Completion"]
-    YY --> ZZ["Exit Success"]
+    WW -->|No| YY["Log Completion Status "]
+    YY --> ZZ["Exit Success Status    "]
     
-    F --> AAA["Exit with Error Code 1"]
+    F --> AAA["Exit with Error Code   "]
     I --> AAA
     L --> AAA
     HH --> AAA
