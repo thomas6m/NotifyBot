@@ -20,8 +20,8 @@ CLI Options:
                             - inventory.csv     (contact inventory)
     --dry-run             Simulate sending emails without actual SMTP send.
     --attachment-folder   Subfolder containing attachments (default: "attachment").
-    --batch-size          Number of emails to send per batch (default: 30).
-    --delay               Delay in seconds between batches (default: 1.0).
+    --batch-size          Number of emails to send per batch (default: 500).
+    --delay               Delay in seconds between batches (default: 5.0).
     --force               Skip confirmation prompt (for automation).
 """
 
@@ -395,8 +395,8 @@ def send_email_from_folder(
     base: Path,
     attachment_subfolder: str,
     dry_run: bool,
-    batch_size: int = 30,
-    delay: float = 1.0,
+    batch_size: int = 500,
+    delay: float = 5.0,
     force: bool = False,
 ) -> None:
     """
@@ -511,10 +511,10 @@ def main() -> int:
         "--attachment-folder", type=str, default="attachment", help="Folder name for attachments."
     )
     parser.add_argument(
-        "--batch-size", type=int, default=30, help="Number of emails to send per batch."
+        "--batch-size", type=int, default=500, help="Number of emails to send per batch."
     )
     parser.add_argument(
-        "--delay", type=float, default=1.0, help="Delay in seconds between batches."
+        "--delay", type=float, default=5.0, help="Delay in seconds between batches."
     )
     parser.add_argument(
         "--force",
