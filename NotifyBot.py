@@ -96,16 +96,16 @@ def log_and_print(level: str, message: str) -> None:
 
 def is_valid_email(email: str) -> bool:
     """
-    Validate an email address format using email_validator.
+    Validate an email address format using email_validator (syntax-only check).
 
     Args:
         email: Email address string to validate.
 
     Returns:
-        True if valid, False otherwise.
+        True if syntactically valid, False otherwise.
     """
     try:
-        validate_email(email.strip())
+        validate_email(email.strip(), check_deliverability=False)
         return True
     except EmailNotValidError:
         return False
