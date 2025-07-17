@@ -1,0 +1,22 @@
+How NotifyBot Works
+Checks required files exist in the base folder.
+
+Reads the sender address, subject, and body.
+
+Determines recipient list from either:
+
+to.txt (direct email list), or
+
+Filtered emails extracted from inventory.csv using filter.txt.
+
+Deduplicates recipients and backs up to.txt.
+
+Loads attachments from the specified folder.
+
+In dry-run mode, sends a test email only to approver emails.
+
+In live mode, prompts user confirmation (unless forced).
+
+Sends emails in batches, respecting batch size and delay.
+
+Logs all actions, warnings, and errors with timestamped rotating logs.
