@@ -12,7 +12,7 @@ CLI Options:
                           The directory should be inside /notifybot/basefolder.
                           Required files inside base folder:
                             - subject.txt       (email subject)
-                            - body.html         (email body HTML)
+                            - body.html         (email body)
                             - from.txt          (email From address)
                             - approver.txt      (approver emails for dry-run)
                           Recipient source (at least one required for real email mode):
@@ -46,6 +46,7 @@ from email_validator import validate_email, EmailNotValidError
 # Path configurations
 NOTIFYBOT_ROOT = Path("/notifybot")  # Root directory
 LOG_FILENAME = NOTIFYBOT_ROOT / "logs" / "notifybot.log"  # Log file location
+INVENTORY_PATH = NOTIFYBOT_ROOT / "inventory" / "inventory.csv"  # New location of inventory.csv
 
 class MissingRequiredFilesError(Exception):
     """Exception raised when required input files are missing."""
@@ -146,7 +147,7 @@ def check_required_files(base: Path, required: List[str], dry_run: bool = True) 
         raise MissingRequiredFilesError(f"Missing required files: {', '.join(missing)}")
     if not dry_run:
         has_to = (base / "to.txt").is_file()
-        has_filters = (base / "filter.txt").is_file() and (base / "inventory.csv").is_file()
+        has_filters = (base / "filter.txt").is_file() and INVENTORY_PATH.is_file()
         if not (has_to or has_filters):
             raise MissingRequiredFilesError(
                 "Missing recipient source: Provide either 'to.txt' or both 'filter.txt' and 'inventory.csv'."
