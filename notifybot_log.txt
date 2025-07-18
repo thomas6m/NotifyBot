@@ -1,0 +1,91 @@
+# NotifyBot Setup Runbook
+
+## Directory & File Setup
+
+mkdir -p /notifybot
+mkdir -p /notifybot/logs
+mkdir -p /notifybot/scripts/
+touch /notifybot/scripts/notifybot.py
+mkdir -p /notifybot/basefolder/
+
+Creates all required directories and script file placeholder.
+
+## Permissions & Ownership
+
+chown root:readonly /notifybot
+chmod 755 /notifybot
+chown root:readonly /notifybot/scripts
+chmod 755 /notifybot/scripts
+chown root:root /notifybot/scripts/notifybot.py
+chmod 755 /notifybot/scripts/notifybot.py
+
+notifybot.py is only modifiable by root, executable by all.
+
+chown root:readonly /notifybot/logs
+chmod 775 /notifybot/logs
+
+Users in readonly group can write to the log directory.
+
+touch /notifybot/logs/notifybot.log
+chown root:readonly /notifybot/logs/notifybot.log
+chmod 666 /notifybot/logs/notifybot.log
+chattr +a /notifybot/logs/notifybot.log
+
+File is:
+- Writable by all (666)
+- Append-only, thanks to +a (can't be deleted or truncated, only added to)
+- Owned by root:readonly (group control)
+
+## Logrotate Configuration: /etc/logrotate.d/notifybot
+
+/notifybot/logs/notifybot.log {
+    daily
+    rotate 7
+    compress
+    missingok
+    notifempty
+    copytruncate
+    create 666 root readonly
+    prerotate
+        /bin/chattr -a /notifybot/logs/notifybot.log
+    endscript
+    postrotate
+        /bin/chattr +a /notifybot/logs/notifybot.log
+    endscript
+}
+
+Safe rotation with copytruncate
+- Temporarily removes +a
+- Rotates the file
+- Re-applies +a
+- Keeps 7 compressed backups
+
+## Dry Run and Force Test
+
+logrotate -d /etc/logrotate.d/notifybot   # Dry run
+logrotate -f /etc/logrotate.d/notifybot   # Force actual run
+
+Use these to test and verify the setup.
+
+## Cron Job (Daily Rotation)
+
+0 0 * * * /usr/sbin/logrotate /etc/logrotate.d/notifybot
+
+Runs the log rotation every night at midnight.
+
+## Optional Validation
+
+After a day or two of runtime, verify:
+
+ls -l /notifybot/logs
+
+You should see:
+- notifybot.log (live log)
+- notifybot.log.1.gz, .2.gz, ... (rotated logs)
+
+## Summary: Your Setup Is Now
+
+- Secure: +a log file cannot be deleted or overwritten
+- Rotating: Logrotate safely rotates logs even while in use
+- Clean: Keeps only 7 days of logs, compressed
+- Automated: Runs via cron daily
