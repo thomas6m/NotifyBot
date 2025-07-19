@@ -52,7 +52,6 @@ INVENTORY_PATH = NOTIFYBOT_ROOT / "inventory" / "inventory.csv"  # New location 
 class MissingRequiredFilesError(Exception):
     """Exception raised when required input files are missing."""
 
-
 def csv_log_entry(message: str) -> str:
     """Generate log entry in CSV format."""
     timestamp_epoch = int(time.time())  # Epoch timestamp
@@ -63,28 +62,24 @@ def setup_logging() -> None:
     """Configure logging to INFO+ level in LOG_FILENAME with structured CSV format."""
     def log_and_print(level: str, message: str) -> None:
         """Log and color-print a message at INFO/WARNING/ERROR levels in CSV format."""
-        # Define emojis for different log levels and events
-        emoji_map = {
-            "info": "ℹ️",          # Information
-            "warning": "⚠️",       # Warning
-            "error": "❌",          # Error
-            "success": "✅",        # Success
-            "processing": "⏳",     # Processing
-            "backup": "💾",         # File backup
-            "file": "📂",           # File handling
-            "confirmation": "✋"    # User confirmation
+        # Emoji mappings for log levels
+        emoji_mapping = {
+            "info": "ℹ️",
+            "warning": "⚠️",
+            "error": "❌",
+            "success": "✅",
+            "processing": "⏳",
+            "backup": "💾",
+            "file": "📂",
+            "confirmation": "✋"
         }
 
-        # Generate the log entry in CSV format
-        csv_log = csv_log_entry(message)
-        
-        # Log the entry to the file in plain format
+        # Get emoji for level
+        emoji = emoji_mapping.get(level.lower(), "")
+        csv_log = csv_log_entry(f"{emoji} {message}")
         log_func = getattr(logging, level.lower(), logging.info)
         log_func(csv_log)
-        
-        # Print the log to the console with an emoji (only for console output, not in the log file)
-        emoji = emoji_map.get(level.lower(), "ℹ️")  # Default to "ℹ️" if level is unknown
-        print(f"{emoji} {csv_log}")  # Print with emoji in console
+        print(f"{csv_log}")  # Print to the console as well
 
     globals()['log_and_print'] = log_and_print
 
@@ -96,7 +91,7 @@ def rotate_log_file() -> None:
         rotated = log_path.with_name(f"notifybot_{timestamp}.log")
         try:
             log_path.rename(rotated)
-            log_and_print("info", f"Rotated log file to {rotated.name}")
+            log_and_print("info", f"Log file rotated: {rotated.name}")
         except Exception as exc:
             log_and_print("error", f"Failed to rotate log file: {exc}")
 
@@ -148,7 +143,7 @@ def deduplicate_file(path: Path) -> None:
     try:
         backup = path.with_name(f"{path.stem}_{datetime.now():%Y%m%d_%H%M%S}{path.suffix}")
         shutil.copy2(path, backup)
-        log_and_print("backup", f"Backup created: {backup.name}")
+        log_and_print("backup", f"💾 Backup created: {backup.name}")
         
         unique, seen = [], set()
         for line in path.read_text(encoding="utf-8").splitlines():
@@ -174,6 +169,10 @@ def check_required_files(base: Path, required: List[str], dry_run: bool = True) 
             raise MissingRequiredFilesError(
                 "Missing recipient source: Provide either 'to.txt' or both 'filter.txt' and 'inventory.csv'."
             )
+
+def sanitize_filename(filename: str) -> str:
+    """Sanitize the filename to prevent issues with special characters."""
+    return re.sub(r"[^\w\s.-]", "", filename)
 
 def send_email(recipients: List[str], subject: str, body_html: str, attachments: List[Path], from_address: str, dry_run: bool = False) -> None:
     """Compose and send email via localhost SMTP or simulate if dry_run."""
@@ -202,9 +201,10 @@ def send_email(recipients: List[str], subject: str, body_html: str, attachments:
         return
     
     try:
+        log_and_print("processing", f"⏳ Sending email to {msg['To']}...")  # Processing message
         with smtplib.SMTP("localhost") as server:
             server.send_message(msg)
-        log_and_print("success", f"Email sent to {msg['To']}")
+        log_and_print("success", f"✅ Email sent to {msg['To']}")  # Success message
     except Exception as exc:
         log_and_print("error", f"SMTP error while sending email: {exc}")
 
@@ -232,14 +232,15 @@ def send_email_from_folder(base: Path, attachment_subfolder: str, dry_run: bool,
         raise MissingRequiredFilesError("No recipients found! Please check input files.")
     
     if not force:
-        log_and_print("confirmation", "Ready to send emails. Press Enter to confirm or Ctrl+C to abort...")
+        log_and_print("confirmation", "✋ Ready to send emails. Press Enter to confirm or Ctrl+C to abort...")
         input()
 
     # Split into batches to prevent spamming
     batches = [recipients[i:i + batch_size] for i in range(0, len(recipients), batch_size)]
     for batch in batches:
+        log_and_print("processing", f"⏳ Sending batch of {len(batch)} emails...")  # Processing message for batch
         send_email(batch, subject, body_html, attachments, from_address, dry_run=dry_run)
-        log_and_print("info", f"Batch of {len(batch)} emails sent. Sleeping for {delay} seconds...")
+        log_and_print("success", f"✅ Batch of {len(batch)} emails sent. Sleeping for {delay} seconds...")  # Success message
         time.sleep(delay)
 
 # Command-line arguments parsing
@@ -260,7 +261,7 @@ def main():
     
     # Ensure the provided folder is inside /notifybot/basefolder
     if not base_folder.exists() or not base_folder.is_dir():
-        log_and_print("error", f"Invalid base folder: {base_folder}. Folder does not exist or is not a directory.")
+        log_and_print("error", f"❌ Invalid base folder: {base_folder}. Folder does not exist or is not a directory.")
         sys.exit(1)
 
     attachment_folder = args.attachment_folder
@@ -272,10 +273,10 @@ def main():
     try:
         send_email_from_folder(base_folder, attachment_folder, dry_run, batch_size, delay, force)
     except MissingRequiredFilesError as e:
-        log_and_print("error", str(e))
+        log_and_print("error", f"❌ {e}")
         sys.exit(1)
     except Exception as e:
-        log_and_print("error", f"Unexpected error: {e}\n{traceback.format_exc()}")
+        log_and_print("error", f"❌ Unexpected error: {e}\n{traceback.format_exc()}")
         sys.exit(1)
 
 if __name__ == "__main__":
