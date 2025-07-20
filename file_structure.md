@@ -9,6 +9,8 @@
 │   ├── from.txt               # Sender (From) address
 │   ├── approver.txt           # Approver emails (for dry-run mode)
 │   ├── to.txt                 # List of recipient emails (required for real email mode)
+│   ├── bcc.txt                # List of BCC (Blind Carbon Copy) recipient emails
+│   ├── cc.txt                 # List of CC (Carbon Copy) recipient emails
 │   ├── filter.txt             # Optional filter file for filtering recipients
 │   ├── additional_to.txt      # Optional file for additional recipients
 │   ├── inventory.csv          # Inventory CSV file for filtering (used with filter.txt)
@@ -29,6 +31,7 @@
 │
 ├── requirements.txt           
 └── README.md                  
+           
 ```
 
 ## Directory Descriptions
