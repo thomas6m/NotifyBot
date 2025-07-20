@@ -4,8 +4,8 @@ NotifyBot: Automated email batch sender with filtering, logging, and dry-run sup
 
 Usage:
     python notifybot.py --base-folder emails --dry-run
-    python notifybot.py --base-folder emails --attachment-folder attachments
     python notifybot.py --base-folder emails --force
+    python notifybot.py --base-folder emails --batch-size 500 --delay 5.0
 
 CLI Options:
     --base-folder         Base directory containing email input files [REQUIRED]. 
@@ -19,7 +19,6 @@ CLI Options:
                             - to.txt                    List of recipient emails
                             - filter.txt + inventory.csv   Filter-based recipient extraction
     --dry-run             Simulate sending emails without SMTP.
-    --attachment-folder   Subfolder containing attachments (default: "attachment").
     --batch-size          Number of emails to send per batch (default: 500).
     --delay               Delay in seconds between batches (default: 5.0).
     --force               Skip confirmation prompt (for automation).
@@ -48,6 +47,9 @@ NOTIFYBOT_ROOT = Path("/notifybot")  # Root directory
 BASEFOLDER_PATH = NOTIFYBOT_ROOT / "basefolder"  # Enforced base folder location
 LOG_FILENAME = NOTIFYBOT_ROOT / "logs" / "notifybot.log"  # Log file location
 INVENTORY_PATH = NOTIFYBOT_ROOT / "inventory" / "inventory.csv"  # New location of inventory.csv
+
+# Hardcode attachment folder to 'attachment'
+ATTACHMENT_FOLDER = BASEFOLDER_PATH / "attachment"  # This is now the fixed attachment folder
 
 class MissingRequiredFilesError(Exception):
     """Exception raised when required input files are missing."""
@@ -185,15 +187,26 @@ def sanitize_filename(filename: str) -> str:
     """Sanitize the filename to prevent issues with special characters."""
     return re.sub(r"[^\w\s.-]", "", filename)
 
-def send_email(recipients: List[str], subject: str, body_html: str, attachments: List[Path], from_address: str, dry_run: bool = False) -> None:
+def send_email_batch(recipients: List[str], subject: str, body_html: str, from_address: str, batch_size: int, dry_run: bool = False) -> None:
+    """Send emails in batches with a delay between batches."""
+    total_recipients = len(recipients)
+    for i in range(0, total_recipients, batch_size):
+        batch = recipients[i:i + batch_size]
+        send_email(batch, subject, body_html, from_address, dry_run)
+
+        if not dry_run:
+            log_and_print("info", f"Batch {i // batch_size + 1} sent to {len(batch)} recipients.")
+            time.sleep(5)  # Delay between batches (default: 5 seconds)
+
+def send_email(recipients: List[str], subject: str, body_html: str, from_address: str, dry_run: bool = False) -> None:
     """Compose and send email via sendmail or simulate if dry_run."""
     msg = EmailMessage()
     msg["Subject"], msg["From"], msg["To"] = subject, from_address, ", ".join(recipients)
     msg.add_alternative(body_html, subtype="html")
     
-    # Add attachments (same logic as before)
+    # Add attachments (from fixed attachment folder)
     max_size = 15 * 1024 * 1024  # 15MB max attachment size
-    for path in attachments:
+    for path in ATTACHMENT_FOLDER.glob("*"):  # Process all files in attachment folder
         if not path.is_file():
             continue
         try:
@@ -224,52 +237,38 @@ def send_email(recipients: List[str], subject: str, body_html: str, attachments:
             log_and_print("error", f"Failed to send email: {exc}")
             traceback.print_exc()
 
-def read_additional_recipients(base_folder: Path) -> List[str]:
-    """Reads and validates emails from additional_to.txt."""
-    additional_to_path = base_folder / "additional_to.txt"
-    return read_recipients(additional_to_path)
-
-def filter_additional_emails(additional_emails: List[str], filter_file: Path, inventory_file: Path) -> List[str]:
-    """Filter the emails using filter.csv and inventory.csv."""
-    filtered_emails = []
+# Main execution
+def main():
+    parser = argparse.ArgumentParser(description="Send batch emails with attachments.")
+    parser.add_argument("--base-folder", required=True, help="Base folder name inside /notifybot/basefolder.")
+    parser.add_argument("--dry-run", action="store_true", help="Simulate sending emails.")
+    parser.add_argument("--force", action="store_true", help="Skip confirmation prompt.")
+    parser.add_argument("--batch-size", type=int, default=500, help="Number of emails per batch (default: 500).")
+    parser.add_argument("--delay", type=float, default=5.0, help="Delay in seconds between batches (default: 5.0).")
     
-    # Assuming filter.csv has some logic to filter emails based on criteria
+    args = parser.parse_args()
+    
+    setup_logging()
+    
+    base_folder = validate_base_folder(args.base_folder)
     try:
-        with open(filter_file, "r") as f:
-            filter_reader = csv.reader(f)
-            filters = {row[0]: row[1] for row in filter_reader}  # Just an example of filtering condition
+        check_required_files(base_folder, ["subject.txt", "body.html", "from.txt", "approver.txt"])
+        subject = read_file(base_folder / "subject.txt")
+        body_html = read_file(base_folder / "body.html")
+        from_address = read_file(base_folder / "from.txt")
+        approver_emails = read_recipients(base_folder / "approver.txt")
+        
+        # Read recipient emails (either 'to.txt' or filter-based)
+        if (base_folder / "to.txt").is_file():
+            recipients = read_recipients(base_folder / "to.txt")
+        else:
+            recipients = []  # Fallback to empty if no recipient file found
 
-        # Assuming inventory.csv contains some validation of whether an email is valid or not
-        with open(inventory_file, "r") as f:
-            inventory_reader = csv.reader(f)
-            inventory = {row[0]: row[1] for row in inventory_reader}  # Just an example of filtering condition
-            
-        # Filter emails based on some condition in both filter and inventory
-        for email in additional_emails:
-            if email in filters and email in inventory:
-                filtered_emails.append(email)
-            else:
-                log_and_print("warning", f"Email {email} does not pass the filter or inventory check.")
-                
-    except Exception as exc:
-        log_and_print("error", f"Error during filtering: {exc}")
-    
-    return filtered_emails
+        # Ensure attachments are processed and the emails are sent in batches
+        send_email_batch(recipients, subject, body_html, from_address, args.batch_size, dry_run=args.dry_run)
+    except MissingRequiredFilesError as e:
+        log_and_print("error", str(e))
+        sys.exit(1)
 
-def append_to_to_file(base_folder: Path, filtered_emails: List[str]) -> None:
-    """Append the filtered emails to to.txt, avoiding duplicates."""
-    to_file_path = base_folder / "to.txt"
-    
-    # Read existing emails in to.txt and append only unique filtered emails
-    existing_emails = read_recipients(to_file_path)
-    
-    # Append the filtered emails that are not already in the list
-    new_emails = [email for email in filtered_emails if email not in existing_emails]
-    
-    if new_emails:
-        try:
-            with open(to_file_path, "a", encoding="utf-8") as f:
-                f.write("\n" + "\n".join(new_emails) + "\n")
-            log_and_print("info", f"Appended {len(new_emails)} new emails to {to_file_path.name}.")
-        except Exception as exc:
-            log_and_print("error", f"Error appending emails to {to_file_path.name}: {exc}")
+if __name__ == "__main__":
+    main()
