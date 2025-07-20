@@ -1,3 +1,21 @@
+/notifybot  -- separate filesystem
+mkdir /notifybot
+mkdir /notifybot/scripts/
+mkdir /notifybot/logs
+mkdir /notifybot/basefolder
+mkdir /notifybot/inventory
+touch /notifybot/logs/notifybot.log
+touch /notifybot/scripts/notifybot.py
+touch /notifybot/inventory/inventory.csv
+chown -R  notifyuser:notifyuser /notifybot
+chmod 444 /notifybot/inventory/inventory.csv
+chmod 666 /notifybot/logs/notifybot.log
+chmod 555 /notifybot/scripts/notifybot.py
+chmod 1777 /notifybot/basefolder
+chattr +a /notifybot/logs/notifybot.log
+chattr +i /notifybot/inventory/inventory.csv
+
+
 How NotifyBot Works
 Checks required files exist in the base folder.
 
