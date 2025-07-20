@@ -3,7 +3,7 @@
 ```
 /notifybot
 │
-├── /basefolder                # Base folder containing input files for emails
+├── /basefolder                
 │   ├── subject.txt            # Email subject text file
 │   ├── body.html              # HTML body of the email
 │   ├── from.txt               # Sender (From) address
@@ -12,20 +12,23 @@
 │   ├── filter.txt             # Optional filter file for filtering recipients
 │   ├── additional_to.txt      # Optional file for additional recipients
 │   ├── inventory.csv          # Inventory CSV file for filtering (used with filter.txt)
-│   └── attachment             # Folder for attachments (default subfolder for attachments)
+│   ├── attachment             # Folder for attachments
+│   │   ├── report1.pdf        # Example attachment (PDF)
+│   │   ├── image1.jpg         # Example attachment (JPEG image)
+│   │   ├── document.txt       # Example attachment (text document)
+│   │   └── invoice.xlsx       # Example attachment (Excel spreadsheet)
 │
-├── /inventory                 # Folder for inventory files
-│   └── inventory.csv          # CSV file containing email inventory (required for filtering)
+├── /inventory                 
+│   └── inventory.csv          
 │
-├── /logs                      # Logs folder for storing execution logs
-│   └── notifybot.log          # Log file for NotifyBot operations
+├── /logs                      
+│   └── notifybot.log          
 │
-├── /scripts                   # Folder for all scripts
-│   └── notifybot.py           # Main Python script to run the NotifyBot
+├── /scripts                   
+│   └── notifybot.py           
 │
-├── requirements.txt           # Python dependencies for the project (e.g., email_validator, etc.)
-└── README.md                  # Documentation for the project
-
+├── requirements.txt           
+└── README.md                  
 ```
 
 ## Directory Descriptions
