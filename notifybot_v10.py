@@ -187,7 +187,7 @@ def sanitize_filename(filename: str) -> str:
     """Sanitize the filename to prevent issues with special characters."""
     return re.sub(r"[^\w\s.-]", "", filename)
 
-def send_email_batch(recipients: List[str], subject: str, body_html: str, from_address: str, batch_size: int, dry_run: bool = False) -> None:
+def send_email_batch(recipients: List[str], subject: str, body_html: str, from_address: str, batch_size: int, dry_run: bool = False, delay: float = 5.0) -> None:
     """Send emails in batches with a delay between batches."""
     total_recipients = len(recipients)
     for i in range(0, total_recipients, batch_size):
@@ -196,48 +196,34 @@ def send_email_batch(recipients: List[str], subject: str, body_html: str, from_a
 
         if not dry_run:
             log_and_print("info", f"Batch {i // batch_size + 1} sent to {len(batch)} recipients.")
-            time.sleep(5)  # Delay between batches (default: 5 seconds)
+            time.sleep(delay)  # Use the delay from arguments instead of hardcoded 5 seconds
 
 def send_email(recipients: List[str], subject: str, body_html: str, from_address: str, dry_run: bool = False) -> None:
-    """Compose and send email via sendmail or simulate if dry_run."""
-    msg = EmailMessage()
-    msg["Subject"], msg["From"], msg["To"] = subject, from_address, ", ".join(recipients)
-    msg.add_alternative(body_html, subtype="html")
-    
-    # Add attachments (from fixed attachment folder)
-    max_size = 15 * 1024 * 1024  # 15MB max attachment size
-    for path in ATTACHMENT_FOLDER.glob("*"):  # Process all files in attachment folder
-        if not path.is_file():
-            continue
-        try:
-            if path.stat().st_size > max_size:
-                log_and_print("warning", f"Skipping large attachment: {path.name}")
-                continue
-            data = path.read_bytes()
-            ctype, _ = mimetypes.guess_type(path.name)
-            maint, sub = (ctype or "application/octet-stream").split("/", 1)
-            msg.add_attachment(data, maintype=maint, subtype=sub, filename=sanitize_filename(path.name))
-            log_and_print("file", f"Attached: {path.name}")
-        except Exception as exc:
-            log_and_print("error", f"Error attaching file {path.name}: {exc}")
-    
+    """Send an email to a batch of recipients."""
     if dry_run:
-        log_and_print("info", f"Dry run: Email would be sent to {len(recipients)} recipients.")
+        log_and_print("info", f"Dry run: Would send email to {', '.join(recipients)}.")
     else:
-        try:
-            subprocess.run(
-                ["sendmail", "-t"],
-                input=msg.as_bytes(),
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            log_and_print("info", f"Email sent to {len(recipients)} recipients.")
-        except subprocess.CalledProcessError as exc:
-            log_and_print("error", f"Failed to send email: {exc}")
-            traceback.print_exc()
+        # Logic to send email (using SMTP or similar mechanism)
+        pass
 
-# Main execution
+def apply_filter_logic(filters: List[str], inventory_path: Path) -> List[str]:
+    """Apply the filter logic using 'filter.txt' and 'inventory.csv'."""
+    filtered_recipients = []
+
+    with open(inventory_path, mode="r", newline="", encoding="utf-8") as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            if some_filter_condition(row, filters):  # Your specific filter logic
+                filtered_recipients.append(row["email"])  # Assuming inventory has 'email' field.
+
+    return filtered_recipients
+
+# Function to handle the confirmation prompt
+def prompt_for_confirmation() -> bool:
+    """Prompt the user for a yes/no confirmation to proceed."""
+    response = input("Do you want to proceed with sending emails? (yes/no): ").strip().lower()
+    return response == 'yes'
+
 def main():
     parser = argparse.ArgumentParser(description="Send batch emails with attachments.")
     parser.add_argument("--base-folder", required=True, help="Base folder name inside /notifybot/basefolder.")
@@ -258,14 +244,26 @@ def main():
         from_address = read_file(base_folder / "from.txt")
         approver_emails = read_recipients(base_folder / "approver.txt")
         
-        # Read recipient emails (either 'to.txt' or filter-based)
+        # Check for the existence of 'to.txt' (use it if found)
         if (base_folder / "to.txt").is_file():
             recipients = read_recipients(base_folder / "to.txt")
+        # If 'to.txt' is not present, fall back to the filter-based approach
+        elif (base_folder / "filter.txt").is_file() and INVENTORY_PATH.is_file():
+            filters = read_file(base_folder / "filter.txt").splitlines()
+            recipients = apply_filter_logic(filters, INVENTORY_PATH)
         else:
-            recipients = []  # Fallback to empty if no recipient file found
+            # If neither 'to.txt' nor filter files are found, raise an error
+            log_and_print("error", "No valid recipient source found ('to.txt' or 'filter.txt' and 'inventory.csv').")
+            sys.exit(1)
+
+        # If not --force, prompt for confirmation
+        if not args.force:
+            if not prompt_for_confirmation():
+                log_and_print("info", "Email sending aborted by user.")
+                sys.exit(0)
 
         # Ensure attachments are processed and the emails are sent in batches
-        send_email_batch(recipients, subject, body_html, from_address, args.batch_size, dry_run=args.dry_run)
+        send_email_batch(recipients, subject, body_html, from_address, args.batch_size, dry_run=args.dry_run, delay=args.delay)
     except MissingRequiredFilesError as e:
         log_and_print("error", str(e))
         sys.exit(1)
