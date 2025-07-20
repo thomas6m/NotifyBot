@@ -1,24 +1,31 @@
 # NotifyBot Directory Structure
 
 ```
-/notifybot/                    # Root directory for NotifyBot
-    ├── logs/                  # Log folder for NotifyBot
-    │   └── notifybot.log      # Main log file for NotifyBot (log rotation will create new files like notifybot_YYYYMMDD_HHMMSS.log)
-    ├── scripts/               # Folder for all scripts
-    │   └── notifybot.py       # The main script to send emails (NotifyBot)
-    ├── basefolder/            # The base folder for user-specific email configurations
-    │   └── emails/            # Example user-specific folder for email configurations
-    │       ├── subject.txt    # Email subject (plain text)
-    │       ├── body.html      # HTML content for the email body
-    │       ├── from.txt       # Sender's email address (e.g., sender@example.com)
-    │       ├── approver.txt   # Email addresses for approvers in dry-run mode (semicolon separated list)
-    │       ├── to.txt         # Recipient list (semicolon separated list or one email per line)
-    │       ├── filter.txt     # Filter criteria for recipient selection
-    │       └── attachments/    # Folder for any attachments to be included in the email
-    │           ├── file1.pdf  # Example attachment file
-    │           └── image.png  # Example attachment file
-    ├── inventory/             # Folder for the inventory.csv file
-    │   └── inventory.csv     # Full list of potential recipients
+/notifybot
+│
+├── /basefolder                # Base folder containing input files for emails
+│   ├── subject.txt            # Email subject text file
+│   ├── body.html              # HTML body of the email
+│   ├── from.txt               # Sender (From) address
+│   ├── approver.txt           # Approver emails (for dry-run mode)
+│   ├── to.txt                 # List of recipient emails (required for real email mode)
+│   ├── filter.txt             # Optional filter file for filtering recipients
+│   ├── additional_to.txt      # Optional file for additional recipients
+│   ├── inventory.csv          # Inventory CSV file for filtering (used with filter.txt)
+│   └── attachment             # Folder for attachments (default subfolder for attachments)
+│
+├── /inventory                 # Folder for inventory files
+│   └── inventory.csv          # CSV file containing email inventory (required for filtering)
+│
+├── /logs                      # Logs folder for storing execution logs
+│   └── notifybot.log          # Log file for NotifyBot operations
+│
+├── /scripts                   # Folder for all scripts
+│   └── notifybot.py           # Main Python script to run the NotifyBot
+│
+├── requirements.txt           # Python dependencies for the project (e.g., email_validator, etc.)
+└── README.md                  # Documentation for the project
+
 ```
 
 ## Directory Descriptions
