@@ -818,7 +818,7 @@ def main():
             dry_run=args.dry_run, 
             delay=args.delay,
             attachment_folder=attachment_folder,
-            original_recipients_count=original_recipients_count
+            original_recipients_count=original_recipients_count,
             base_folder=base_folder
         )
         
