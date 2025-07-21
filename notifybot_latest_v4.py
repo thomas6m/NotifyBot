@@ -32,7 +32,6 @@ import re
 import argparse
 import csv
 import logging
-import mimetypes
 import shutil
 import sys
 import time
