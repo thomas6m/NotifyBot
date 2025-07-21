@@ -33,7 +33,6 @@ import argparse
 import csv
 import logging
 import mimetypes
-import re
 import shutil
 import sys
 import time
