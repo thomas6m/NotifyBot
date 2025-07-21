@@ -754,3 +754,6 @@ def main():
         log_and_print("error", f"Unexpected error: {e}")
         log_and_print("error", f"Traceback: {traceback.format_exc()}")
         sys.exit(1)
+
+if __name__ == "__main__":
+    main()
