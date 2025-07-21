@@ -69,7 +69,7 @@ def validate_base_folder(base_folder: str) -> Path:
 
 def csv_log_entry(message: str) -> str:
     """Generate log entry in CSV format."""
-    timestamp_epoch = int(time.time())  # Epoch timestamp
+    timestamp_epoch = time.time_ns() // 1_000_000  # Nanoseconds to milliseconds
     try:
         username = os.getlogin()  # Get the username of the executor
     except OSError:
