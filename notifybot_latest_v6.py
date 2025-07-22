@@ -19,6 +19,9 @@ CLI Options:
                             - to.txt                    List of recipient emails
                             - filter.txt + inventory.csv   Filter-based recipient extraction
                             - additional_to.txt         Additional emails (merged with filter results)
+                          Optional recipient files:
+                            - cc.txt                    CC recipient emails
+                            - bcc.txt                   BCC recipient emails
     --dry-run             Simulate sending emails without SMTP. Sends only to approvers with DRAFT prefix.
     --batch-size          Number of emails to send per batch (default: 500).
     --delay               Delay in seconds between batches (default: 5.0).
@@ -270,10 +273,12 @@ def check_required_files(base: Path, required: List[str], dry_run: bool = True) 
         has_to = (base / "to.txt").is_file()
         has_filters = (base / "filter.txt").is_file() and INVENTORY_PATH.is_file()
         has_additional = (base / "additional_to.txt").is_file()
+        has_cc = (base / "cc.txt").is_file()
+        has_bcc = (base / "bcc.txt").is_file()
         
-        if not (has_to or has_filters or has_additional):
+        if not (has_to or has_filters or has_additional or has_cc or has_bcc):
             raise MissingRequiredFilesError(
-                "Missing recipient source: Provide at least one of 'to.txt', 'filter.txt + inventory.csv', or 'additional_to.txt'."
+                "Missing recipient source: Provide at least one of 'to.txt', 'filter.txt + inventory.csv', 'additional_to.txt', 'cc.txt', or 'bcc.txt'."
             )
 
 def sanitize_filename(filename: str) -> str:
@@ -317,6 +322,7 @@ def create_email_message(recipients: List[str], subject: str, body_html: str,
     """Create a properly formatted email message with embedded images and attachments."""
     cc_recipients = cc_recipients or []
     bcc_recipients = bcc_recipients or []
+    
     # Embed images if base_folder is provided
     embedded_images = []
     if base_folder:
@@ -331,11 +337,12 @@ def create_email_message(recipients: List[str], subject: str, body_html: str,
     msg['From'] = from_address
     msg['To'] = ', '.join(recipients)
     if cc_recipients:
-       msg['Cc'] = ', '.join(cc_recipients)
-       log_and_print("info", f"CC: {len(cc_recipients)} recipient(s)")
+        msg['Cc'] = ', '.join(cc_recipients)
+        log_and_print("info", f"CC: {len(cc_recipients)} recipient(s)")
        
+    # Note: BCC headers are intentionally NOT added to prevent recipients from seeing BCC list
     if bcc_recipients:
-       log_and_print("info", f"BCC: {len(bcc_recipients)} recipient(s)")
+        log_and_print("info", f"BCC: {len(bcc_recipients)} recipient(s)")
        
     msg['Subject'] = subject
     
@@ -489,13 +496,13 @@ def send_via_sendmail(recipients: List[str], subject: str, body_html: str,
                      from_address: str, attachment_folder: Path = None, 
                      dry_run: bool = False, original_recipients_count: int = 0,
                      base_folder: Path = None, cc_recipients: List[str] = None,
-                     bcc_recipients: List[str] = None) -> bool:  # ADD base_folder parameter
+                     bcc_recipients: List[str] = None,
+                     original_cc_count: int = 0, original_bcc_count: int = 0) -> bool:
     """Send email using sendmail command. In dry-run mode, sends only to approvers with DRAFT prefix."""
     
-    # ... keep all your existing code until the try block ...
-    # [All the existing subject preparation and logging code stays the same]
     cc_recipients = cc_recipients or []
     bcc_recipients = bcc_recipients or []
+    
     # Prepare subject for dry-run mode
     final_subject = subject
     if dry_run:
@@ -545,11 +552,9 @@ def send_via_sendmail(recipients: List[str], subject: str, body_html: str,
                 log_and_print("info", f"Attachments: {', '.join(attachments[:3])}{'...' if len(attachments) > 3 else ''}")
     
     try:
-        # MODIFIED: Create the email message with base_folder for image embedding
+        # Create the email message with base_folder for image embedding
         msg = create_email_message(recipients, final_subject, body_html, from_address, 
                                  attachment_folder, base_folder, cc_recipients, bcc_recipients)
-        
-        # ... keep all the rest of your existing sendmail code unchanged ...
         
         # Convert message to string
         email_content = msg.as_string()
@@ -557,6 +562,7 @@ def send_via_sendmail(recipients: List[str], subject: str, body_html: str,
         # Find sendmail path
         sendmail_path = find_sendmail_path()
         
+        # CRITICAL FIX: All recipients (TO, CC, BCC) must be provided to sendmail for delivery
         all_recipients_for_delivery = recipients + cc_recipients + bcc_recipients
         
         # Call sendmail with proper arguments
@@ -576,7 +582,7 @@ def send_via_sendmail(recipients: List[str], subject: str, body_html: str,
             if dry_run:
                 log_and_print("success", f"DRAFT email sent successfully to {len(recipients)} approver(s)")
             else:
-                log_and_print("success", f"Email sent successfully to {len(recipients)} recipients")
+                log_and_print("success", f"Email sent successfully to {len(all_recipients_for_delivery)} total recipients")
             return True
         else:
             log_and_print("error", f"Sendmail failed with return code {process.returncode}")
@@ -598,7 +604,8 @@ def send_email_batch(recipients: List[str], subject: str, body_html: str,
                     from_address: str, batch_size: int, dry_run: bool = False, 
                     delay: float = 5.0, attachment_folder: Path = None,
                     cc_recipients: List[str] = None, bcc_recipients: List[str] = None,
-                    original_recipients_count: int = 0, base_folder: Path = None) -> None:  # ADD base_folder
+                    original_recipients_count: int = 0, base_folder: Path = None,
+                    original_cc_count: int = 0, original_bcc_count: int = 0) -> None:
     """Send emails in batches with a delay between batches."""
     
     cc_recipients = cc_recipients or []
@@ -628,10 +635,10 @@ def send_email_batch(recipients: List[str], subject: str, body_html: str,
             batch_total = len(batch) + len(cc_recipients) + len(bcc_recipients)
             log_and_print("processing", f"Processing batch {batch_num}/{total_batches} ({batch_total} total recipients)")
         
-        # MODIFIED: Send current batch with base_folder
+        # Send current batch with all parameters
         if send_via_sendmail(batch, subject, body_html, from_address, attachment_folder, 
-                           dry_run, cc_recipients, bcc_recipients, 
-                           original_recipients_count, base_folder):  # ADD base_folder
+                           dry_run, original_recipients_count, base_folder, 
+                           cc_recipients, bcc_recipients, original_cc_count, original_bcc_count):
             successful_batches += 1
             if dry_run:
                 log_and_print("success", f"DRAFT batch {batch_num} completed successfully")
@@ -662,7 +669,8 @@ def send_email(recipients: List[str], subject: str, body_html: str,
     attachment_folder = None  # Will be set properly in the main function
     original_count = len(recipients) if not dry_run else 0
     send_via_sendmail(recipients, subject, body_html, from_address, attachment_folder, dry_run, original_count)
-	
+        
+        
 def main():
     """Updated main function with CC/BCC support"""
     parser = argparse.ArgumentParser(description="Send batch emails with attachments, CC, and BCC.")
@@ -826,7 +834,7 @@ def main():
                     sys.exit(1)
                 else:
                     log_and_print("info", "No TO recipients found, but CC/BCC recipients available")
-                    recipients = [])
+                    recipients = []
             
             final_recipients = recipients
             original_recipients_count = len(recipients)
@@ -900,7 +908,6 @@ def main():
         log_and_print("error", f"Unexpected error: {e}")
         log_and_print("error", f"Traceback: {traceback.format_exc()}")
         sys.exit(1)
-
 
 def embed_images_in_html(html_content: str, base_folder: Path) -> Tuple[str, List[MIMEImage]]:
     """
