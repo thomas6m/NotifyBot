@@ -622,3 +622,387 @@ def deduplicate_file(path: Path) -> None:
 
 ---
 
+## 13. check_required_files
+
+```python
+def check_required_files(base: Path, required: List[str], dry_run: bool = True) -> None:
+    """Ensure required files exist. In real mode, ensure valid recipient source."""
+    missing = [f for f in required if not (base / f).is_file()]
+    if missing:
+        raise MissingRequiredFilesError(f"Missing required files: {', '.join(missing)}")
+    
+    if not dry_run:
+        has_to = (base / "to.txt").is_file()
+        has_filters = (base / "filter.txt").is_file() and INVENTORY_PATH.is_file()
+        has_additional = (base / "additional_to.txt").is_file()
+        has_cc = (base / "cc.txt").is_file()
+        has_bcc = (base / "bcc.txt").is_file()
+        
+        if not (has_to or has_filters or has_additional or has_cc or has_bcc):
+            raise MissingRequiredFilesError(
+                "Missing recipient source: Provide at least one of 'to.txt', 'filter.txt + inventory.csv', 'additional_to.txt', 'cc.txt', or 'bcc.txt'."
+            )
+```
+
+**Line-by-line explanation:**
+- **Line 1**: Function signature taking base Path, list of required files, and optional dry_run boolean
+- **Line 2**: Docstring explaining the function validates required files and recipient sources
+- **Line 3**: Creates list of missing files by checking if each required file exists in the base directory
+- **Line 4**: Checks if any files are missing
+- **Line 5**: Raises custom exception with comma-separated list of missing files
+- **Line 6**: Empty line for readability
+- **Line 7**: Only performs recipient validation if not in dry-run mode
+- **Line 8**: Checks if "to.txt" file exists (direct recipient list)
+- **Line 9**: Checks if both "filter.txt" and inventory.csv exist (filtered recipients)
+- **Line 10**: Checks if "additional_to.txt" exists (supplementary recipients)
+- **Line 11**: Checks if "cc.txt" exists (carbon copy recipients)
+- **Line 12**: Checks if "bcc.txt" exists (blind carbon copy recipients)
+- **Line 13**: Empty line for readability
+- **Line 14**: Validates at least one recipient source exists
+- **Lines 15-17**: Raises exception with detailed message about valid recipient sources
+
+---
+
+## 14. sanitize_filename
+
+```python
+def sanitize_filename(filename: str) -> str:
+    """Sanitize the filename to prevent issues with special characters."""
+    return re.sub(r"[^\w\s.-]", "", filename)
+```
+
+**Line-by-line explanation:**
+- **Line 1**: Function signature taking filename string and returning sanitized string
+- **Line 2**: Docstring explaining the function removes problematic characters
+- **Line 3**: Uses regex substitution to remove all characters except:
+  - `\w`: Word characters (letters, digits, underscore)
+  - `\s`: Whitespace characters
+  - `.`: Periods
+  - `-`: Hyphens
+  - All other characters are replaced with empty string
+
+---
+
+## 15. add_attachments
+
+```python
+def add_attachments(msg: MIMEMultipart, attachment_folder: Path) -> None:
+    """Add all files from attachment folder to the email message."""
+    if not attachment_folder or not attachment_folder.exists():
+        return
+        
+    try:
+        for file_path in attachment_folder.iterdir():
+            if file_path.is_file():
+                # Get MIME type
+                ctype, encoding = mimetypes.guess_type(str(file_path))
+                if ctype is None or encoding is not None:
+                    ctype = 'application/octet-stream'
+                
+                maintype, subtype = ctype.split('/', 1)
+                
+                with open(file_path, 'rb') as fp:
+                    attachment = MIMEBase(maintype, subtype)
+                    attachment.set_payload(fp.read())
+                    encoders.encode_base64(attachment)
+                    attachment.add_header(
+                        'Content-Disposition',
+                        f'attachment; filename="{sanitize_filename(file_path.name)}"'
+                    )
+                    msg.attach(attachment)
+                
+                log_and_print("info", f"Attached file: {file_path.name}")
+                
+    except Exception as exc:
+        log_and_print("error", f"Error adding attachments: {exc}")
+```
+
+**Line-by-line explanation:**
+- **Line 1**: Function signature taking MIMEMultipart message and attachment folder Path
+- **Line 2**: Docstring explaining the function adds all files from folder as attachments
+- **Line 3**: Checks if folder exists and is not None
+- **Line 4**: Returns early if no valid attachment folder
+- **Line 5**: Empty line for readability
+- **Line 6**: Begins try block to handle potential file access errors
+- **Line 7**: Iterates through all items in the attachment folder
+- **Line 8**: Checks if current item is a file (not directory)
+- **Line 9**: Comment explaining MIME type detection
+- **Line 10**: Guesses MIME type and encoding based on file extension
+- **Line 11**: If MIME type can't be determined or file is encoded, use generic binary type
+- **Line 12**: Sets fallback MIME type for unknown file types
+- **Line 13**: Empty line for readability
+- **Line 14**: Splits MIME type into main type and subtype (e.g., "image/jpeg" → "image", "jpeg")
+- **Line 15**: Empty line for readability
+- **Line 16**: Opens file in binary read mode
+- **Line 17**: Creates MIMEBase object with detected MIME type
+- **Line 18**: Sets the attachment payload to file contents
+- **Line 19**: Encodes attachment data in base64 format for email transmission
+- **Line 20-23**: Adds Content-Disposition header marking as attachment with sanitized filename
+- **Line 24**: Attaches the prepared attachment to the email message
+- **Line 25**: Empty line for readability
+- **Line 26**: Logs successful attachment addition
+- **Line 27**: Empty line for readability
+- **Line 28**: Catches any exceptions during attachment processing
+- **Line 29**: Logs error if attachment processing fails
+
+---
+
+## 16. create_email_message
+
+```python
+def create_email_message(recipients: List[str], subject: str, body_html: str, 
+                        from_address: str, attachment_folder: Path = None,
+                        base_folder: Path = None, cc_recipients: List[str] = None,
+                        bcc_recipients: List[str] = None) -> MIMEMultipart:
+    """Create a properly formatted email message with embedded images and attachments."""
+    cc_recipients = cc_recipients or []
+    bcc_recipients = bcc_recipients or []
+    
+    # Embed images if base_folder is provided
+    embedded_images = []
+    if base_folder:
+        body_html, embedded_images = embed_images_in_html(body_html, base_folder)
+    
+    # Create multipart message - CHANGED from 'mixed' to 'related' for embedded images
+    if embedded_images:
+        msg = MIMEMultipart('related')  # Use 'related' when we have embedded images
+    else:
+        msg = MIMEMultipart('mixed')    # Use 'mixed' for attachments only
+    
+    msg['From'] = from_address
+    msg['To'] = ', '.join(recipients)
+    if cc_recipients:
+        msg['Cc'] = ', '.join(cc_recipients)
+        log_and_print("info", f"CC: {len(cc_recipients)} recipient(s)")
+       
+    # Note: BCC headers are intentionally NOT added to prevent recipients from seeing BCC list
+    if bcc_recipients:
+        log_and_print("info", f"BCC: {len(bcc_recipients)} recipient(s)")
+       
+    msg['Subject'] = subject
+    
+    # Create multipart alternative for HTML content if we have embedded images
+    if embedded_images:
+        msg_alternative = MIMEMultipart('alternative')
+        msg.attach(msg_alternative)
+        
+        # Add HTML body to alternative
+        html_part = MIMEText(body_html, 'html', 'utf-8')
+        msg_alternative.attach(html_part)
+        
+        # Add embedded images to main message
+        for img in embedded_images:
+            msg.attach(img)
+    else:
+        # No embedded images, add HTML directly
+        html_part = MIMEText(body_html, 'html', 'utf-8')
+        msg.attach(html_part)
+    
+    # Add attachments if folder exists
+    if attachment_folder:
+        add_attachments(msg, attachment_folder)
+    
+    return msg
+```
+
+**Line-by-line explanation:**
+- **Lines 1-3**: Function signature with multiple parameters for email components
+- **Line 4**: Docstring explaining comprehensive email creation functionality
+- **Line 5**: Ensures cc_recipients is empty list if None provided
+- **Line 6**: Ensures bcc_recipients is empty list if None provided
+- **Line 7**: Empty line for readability
+- **Line 8**: Comment about image embedding functionality
+- **Line 9**: Initializes empty list for embedded images
+- **Line 10**: Checks if base folder is provided for image embedding
+- **Line 11**: Calls function to embed images and get modified HTML and image objects
+- **Line 12**: Empty line for readability
+- **Line 13**: Comment explaining MIME multipart type selection
+- **Line 14**: Checks if there are embedded images
+- **Line 15**: Uses 'related' multipart type for embedded images (allows cid: references)
+- **Line 16**: Uses 'mixed' multipart type for attachments only
+- **Line 17**: Empty line for readability
+- **Line 18**: Sets From header
+- **Line 19**: Sets To header with comma-separated recipients
+- **Line 20**: Checks if CC recipients exist
+- **Line 21**: Sets CC header with comma-separated CC recipients
+- **Line 22**: Logs CC recipient count
+- **Line 23**: Empty line for readability
+- **Line 24**: Comment explaining why BCC headers are omitted (security)
+- **Line 25**: Checks if BCC recipients exist
+- **Line 26**: Logs BCC recipient count (but doesn't add to headers)
+- **Line 27**: Empty line for readability
+- **Line 28**: Sets Subject header
+- **Line 29**: Empty line for readability
+- **Line 30**: Comment about handling embedded images
+- **Line 31**: Checks if embedded images exist
+- **Line 32**: Creates alternative multipart container for HTML content
+- **Line 33**: Attaches alternative container to main message
+- **Line 34**: Empty line for readability
+- **Line 35**: Comment about adding HTML body
+- **Line 36**: Creates HTML part with UTF-8 encoding
+- **Line 37**: Attaches HTML part to alternative container
+- **Line 38**: Empty line for readability
+- **Line 39**: Comment about adding embedded images
+- **Line 40**: Iterates through embedded images
+- **Line 41**: Attaches each image to main message
+- **Line 42**: Handles case with no embedded images
+- **Line 43**: Comment explaining direct HTML attachment
+- **Line 44**: Creates HTML part with UTF-8 encoding
+- **Line 45**: Attaches HTML directly to main message
+- **Line 46**: Empty line for readability
+- **Line 47**: Comment about adding attachments
+- **Line 48**: Checks if attachment folder exists
+- **Line 49**: Calls function to add all attachments
+- **Line 50**: Empty line for readability
+- **Line 51**: Returns completed email message
+
+---
+
+## 17. matches_filter_conditions
+
+```python
+def matches_filter_conditions(row: Dict, filters: List[str]) -> bool:
+    """
+    Check if a row matches the filter conditions with wildcard support.
+    Each line in filters represents an OR condition.
+    Within each line, comma-separated conditions are AND conditions.
+    
+    Supports wildcards:
+    - * matches any sequence of characters
+    - ? matches any single character
+    - [seq] matches any character in seq
+    - [!seq] matches any character not in seq
+    
+    Example filter:
+        department=sales*,status=active
+        department=marketing,region=west*
+        role=*manager*
+        email=*@company.com
+    
+    Logic: (sales* AND active) OR (marketing AND west*) OR (*manager*) OR (*@company.com)
+    """
+    if not filters:
+        return True  # No filters means include all
+    
+    def matches_pattern(text: str, pattern: str) -> bool:
+        """Check if text matches pattern with wildcard support."""
+        # Convert both to lowercase for case-insensitive matching
+        text = str(text).lower()
+        pattern = pattern.lower()
+        
+        # Use fnmatch for Unix shell-style wildcards
+        return fnmatch.fnmatch(text, pattern)
+    
+    # Process each line as a separate OR condition
+    for filter_line in filters:
+        filter_line = filter_line.strip()
+        
+        # Skip empty lines and comments
+        if not filter_line or filter_line.startswith('#'):
+            continue
+        
+        # Split the line into individual AND conditions
+        and_conditions = [condition.strip() for condition in filter_line.split(',')]
+        
+        # Check if ALL conditions in this line match (AND logic)
+        line_matches = True
+        for condition in and_conditions:
+            if not condition:
+                continue
+                
+            if '=' in condition:
+                # Key=value format with wildcard support
+                key, value = condition.split('=', 1)
+                key, value = key.strip(), value.strip()
+                
+                if key not in row:
+                    line_matches = False
+                    break  # Key doesn't exist, condition fails
+                
+                # Use wildcard matching instead of exact matching
+                if not matches_pattern(row[key], value):
+                    line_matches = False
+                    break  # This AND condition failed
+            else:
+                # Simple wildcard search in all values
+                condition_matched = False
+                for row_value in row.values():
+                    if matches_pattern(row_value, condition):
+                        condition_matched = True
+                        break
+                
+                if not condition_matched:
+                    line_matches = False
+                    break  # This AND condition failed
+        
+        # If this line matched completely (all AND conditions), return True (OR logic)
+        if line_matches:
+            return True
+    
+    # None of the OR conditions matched
+    return False
+```
+
+**Line-by-line explanation:**
+- **Line 1**: Function signature taking dictionary row and list of filter strings
+- **Lines 2-16**: Comprehensive docstring explaining filter logic with examples
+- **Line 17**: Checks if filters list is empty
+- **Line 18**: Returns True if no filters (include all rows)
+- **Line 19**: Empty line for readability
+- **Line 20**: Defines inner function for pattern matching
+- **Line 21**: Docstring for pattern matching function
+- **Line 22**: Comment about case-insensitive matching
+- **Line 23**: Converts text to lowercase string
+- **Line 24**: Converts pattern to lowercase
+- **Line 25**: Empty line for readability
+- **Line 26**: Uses fnmatch module for Unix shell-style wildcard matching
+- **Line 27**: Empty line for readability
+- **Line 28**: Comment explaining OR condition processing
+- **Line 29**: Iterates through each filter line
+- **Line 30**: Strips whitespace from filter line
+- **Line 31**: Empty line for readability
+- **Line 32**: Comment about skipping empty/comment lines
+- **Line 33**: Checks for empty lines or lines starting with #
+- **Line 34**: Skips to next iteration if line should be ignored
+- **Line 35**: Empty line for readability
+- **Line 36**: Comment about splitting into AND conditions
+- **Line 37**: Splits line by commas and strips whitespace from each condition
+- **Line 38**: Empty line for readability
+- **Line 39**: Comment explaining AND logic within line
+- **Line 40**: Assumes line matches initially
+- **Line 41**: Iterates through each AND condition in the line
+- **Line 42**: Skips empty conditions
+- **Line 43**: Continues to next condition if current is empty
+- **Line 44**: Empty line for readability
+- **Line 45**: Checks if condition contains equals sign (key=value format)
+- **Line 46**: Comment explaining key=value format
+- **Line 47**: Splits condition into key and value parts
+- **Line 48**: Strips whitespace from both key and value
+- **Line 49**: Empty line for readability
+- **Line 50**: Checks if key exists in the row
+- **Line 51**: Sets line_matches to False if key missing
+- **Line 52**: Breaks out of condition loop (this line fails)
+- **Line 53**: Empty line for readability
+- **Line 54**: Comment about wildcard matching
+- **Line 55**: Checks if row value matches pattern using wildcards
+- **Line 56**: Sets line_matches to False if pattern doesn't match
+- **Line 57**: Breaks out of condition loop (this AND condition fails)
+- **Line 58**: Handles conditions without equals sign
+- **Line 59**: Comment explaining search across all values
+- **Line 60**: Assumes condition doesn't match initially
+- **Line 61**: Iterates through all values in the row
+- **Line 62**: Checks if any value matches the pattern
+- **Line 63**: Sets condition_matched to True if match found
+- **Line 64**: Breaks out of value loop (match found)
+- **Line 65**: Empty line for readability
+- **Line 66**: Checks if condition matched any value
+- **Line 67**: Sets line_matches to False if no values matched
+- **Line 68**: Breaks out of condition loop (this AND condition fails)
+- **Line 69**: Empty line for readability
+- **Line 70**: Comment explaining OR logic between lines
+- **Line 71**: Checks if all AND conditions in this line matched
+- **Line 72**: Returns True immediately if any line matches (OR logic)
+- **Line 73**: Empty line for readability
+- **Line 74**: Comment explaining final result
+- **Line 75**: Returns False if no filter lines matched
+
