@@ -1136,8 +1136,13 @@ def prompt_for_confirmation() -> bool:
 **Default to Safe**: Any input other than "yes" results in cancellation, following the principle of failing safely.
 
 ---
-20. send_via_sendmail
-pythondef send_via_sendmail(recipients: List[str], subject: str, body_html: str, 
+
+---
+
+## 20. send_via_sendmail
+
+```python
+def send_via_sendmail(recipients: List[str], subject: str, body_html: str, 
                      from_address: str, attachment_folder: Path = None, 
                      dry_run: bool = False, original_recipients_count: int = 0,
                      base_folder: Path = None, cc_recipients: List[str] = None,
@@ -1244,171 +1249,213 @@ pythondef send_via_sendmail(recipients: List[str], subject: str, body_html: str,
     except Exception as exc:
         log_and_print("error", f"Error sending email via sendmail: {exc}")
         return False
-Line-by-line explanation:
-Function Definition and Parameter Setup
+```
 
-Lines 1-6: Function signature with extensive parameters:
+**Line-by-line explanation:**
 
-recipients: List of TO recipients
-subject: Email subject line
-body_html: HTML email body content
-from_address: Sender's email address
-attachment_folder: Optional path to attachments
-dry_run: Boolean flag for test mode
-original_recipients_count: Count for dry-run display
-base_folder: Path for embedded images
-cc_recipients: Carbon copy recipients
-bcc_recipients: Blind carbon copy recipients
-original_cc_count & original_bcc_count: Counts for dry-run display
+### Function Definition and Parameter Setup
+- **Lines 1-6**: Function signature with extensive parameters:
+  - `recipients`: List of TO recipients
+  - `subject`: Email subject line
+  - `body_html`: HTML email body content
+  - `from_address`: Sender's email address
+  - `attachment_folder`: Optional path to attachments
+  - `dry_run`: Boolean flag for test mode
+  - `original_recipients_count`: Count for dry-run display
+  - `base_folder`: Path for embedded images
+  - `cc_recipients`: Carbon copy recipients
+  - `bcc_recipients`: Blind carbon copy recipients
+  - `original_cc_count` & `original_bcc_count`: Counts for dry-run display
+- **Line 7**: Docstring explaining the function's dual mode operation
+- **Line 8**: Empty line for readability
 
+### Initialize Optional Parameters
+- **Line 9**: Set `cc_recipients` to empty list if None provided
+- **Line 10**: Set `bcc_recipients` to empty list if None provided
+- **Line 11**: Empty line for readability
 
-Line 7: Docstring explaining the function's dual mode operation
-Line 8: Empty line for readability
+### Dry-Run Mode Processing
+- **Line 12**: Comment explaining subject preparation
+- **Line 13**: Initialize final subject with original subject
+- **Line 14**: Check if in dry-run mode
+- **Line 15**: Comment about adding DRAFT prefix
+- **Line 16**: Check if subject doesn't already start with "DRAFT"
+- **Line 17**: Add "DRAFT - " prefix to subject
+- **Line 18**: Empty line for readability
+- **Line 19**: Comment about adding recipient count info
 
-Initialize Optional Parameters
+### Draft Information HTML Generation
+- **Lines 21-29**: Create HTML div with styled draft information:
+  - Blue border and background for visibility
+  - Header indicating this is a draft for review
+  - Status explanation
+  - Original recipient counts for TO, CC, BCC
+  - Total recipient count calculation
+  - Professional styling with specific colors and spacing
+- **Line 30**: Add horizontal rule separator
+- **Line 31**: Prepend draft info to original email body
 
-Line 9: Set cc_recipients to empty list if None provided
-Line 10: Set bcc_recipients to empty list if None provided
-Line 11: Empty line for readability
+### Dry-Run Logging
+- **Line 33**: Calculate total original recipients
+- **Line 34**: Log draft mode status with recipient counts
+- **Line 35**: Log breakdown of original recipients by type
+- **Line 36**: Log the draft subject line
+- **Line 37**: Log approver list (first 3 recipients with ellipsis if more)
+- **Line 38**: Empty line for readability
+- **Line 39**: Check if attachments exist
+- **Line 40**: Get list of attachment filenames
+- **Line 41**: Check if any attachments found
+- **Line 42**: Log attachment list (first 3 with ellipsis if more)
 
-Dry-Run Mode Processing
+### Live Mode Processing
+- **Line 43**: Handle non-dry-run (live) mode
+- **Line 44**: Calculate total live recipients
+- **Line 45**: Log live mode status with total count
+- **Line 46**: Log breakdown by recipient type
+- **Line 47**: Log subject line
+- **Line 48**: Log TO recipients (first 3 with ellipsis)
+- **Line 49**: Check if CC recipients exist
+- **Line 50**: Log CC recipients (first 3 with ellipsis)
+- **Line 51**: Check if BCC recipients exist
+- **Line 52**: Log BCC recipients (first 3 with ellipsis)
+- **Line 53**: Empty line for readability
+- **Line 54**: Check if attachments exist
+- **Line 55**: Get list of attachment filenames
+- **Line 56**: Check if any attachments found
+- **Line 57**: Log attachment list (first 3 with ellipsis)
+- **Line 58**: Empty line for readability
 
-Line 12: Comment explaining subject preparation
-Line 13: Initialize final subject with original subject
-Line 14: Check if in dry-run mode
-Line 15: Comment about adding DRAFT prefix
-Line 16: Check if subject doesn't already start with "DRAFT"
-Line 17: Add "DRAFT - " prefix to subject
-Line 18: Empty line for readability
-Line 19: Comment about adding recipient count info
+### Email Message Creation and Sending
+- **Line 59**: Begin try block for email sending process
+- **Line 60**: Comment about creating email message
+- **Line 61-62**: Call `create_email_message()` with all parameters to build MIME message
+- **Line 63**: Empty line for readability
+- **Line 64**: Comment about message conversion
+- **Line 65**: Convert MIME message to string format for sendmail
+- **Line 66**: Empty line for readability
+- **Line 67**: Comment about finding sendmail
+- **Line 68**: Call `find_sendmail_path()` to locate sendmail executable
+- **Line 69**: Empty line for readability
+- **Line 70**: Critical comment about recipient handling
+- **Line 71**: Combine all recipient types for sendmail delivery (TO + CC + BCC)
+- **Line 72**: Empty line for readability
+- **Line 73**: Comment about sendmail command construction
+- **Line 74**: Build sendmail command array:
+  - `sendmail_path`: Path to sendmail executable
+  - `-f from_address`: Set envelope sender
+  - `+ all_recipients_for_delivery`: All recipients for delivery
+- **Line 75**: Empty line for readability
 
-Draft Information HTML Generation
+### Subprocess Execution
+- **Lines 76-81**: Create subprocess with `Popen`:
+  - `sendmail_cmd`: Command to execute
+  - `stdin=PIPE`: Allow input to be sent to process
+  - `stdout=PIPE`: Capture standard output
+  - `stderr=PIPE`: Capture error output
+  - `text=True`: Handle input/output as text strings
+- **Line 82**: Empty line for readability
+- **Line 83**: Execute process and wait for completion:
+  - `input=email_content`: Send email content to sendmail's stdin
+  - `timeout=60`: Kill process if it takes longer than 60 seconds
+- **Line 84**: Empty line for readability
 
-Lines 21-29: Create HTML div with styled draft information:
+### Process Result Handling
+- **Line 85**: Check if sendmail completed successfully (return code 0)
+- **Line 86**: Check if in dry-run mode
+- **Line 87**: Log success message for draft mode
+- **Line 88**: Handle live mode
+- **Line 89**: Log success message for live mode
+- **Line 90**: Return True indicating successful sending
+- **Line 91**: Handle sendmail failure
+- **Line 92**: Log error with return code
+- **Line 93**: Check if stderr has error information
+- **Line 94**: Log stderr content if available
+- **Line 95**: Return False indicating failure
+- **Line 96**: Empty line for readability
 
-Blue border and background for visibility
-Header indicating this is a draft for review
-Status explanation
-Original recipient counts for TO, CC, BCC
-Total recipient count calculation
-Professional styling with specific colors and spacing
+### Exception Handling
+- **Line 97**: Handle case where sendmail executable not found
+- **Line 98**: Log specific error about missing sendmail
+- **Line 99**: Return False for missing sendmail
+- **Line 100**: Handle subprocess timeout
+- **Line 101**: Log timeout error message
+- **Line 102**: Return False for timeout
+- **Line 103**: Handle any other unexpected exceptions
+- **Line 104**: Log general error with exception details
+- **Line 105**: Return False for general errors
 
+## Key Features of send_via_sendmail:
 
-Line 30: Add horizontal rule separator
-Line 31: Prepend draft info to original email body
+1. **Dual Mode Operation**: Handles both dry-run (draft) and live sending modes
+2. **Comprehensive Logging**: Detailed logging for debugging and audit trails
+3. **Draft Enhancement**: Adds informative header to draft emails for reviewer context
+4. **Complete Recipient Handling**: Properly handles TO, CC, and BCC recipients
+5. **Robust Error Handling**: Multiple exception types with specific error messages
+6. **Security**: Uses subprocess with timeout to prevent hanging
+7. **MIME Support**: Full support for attachments and embedded images
 
-Dry-Run Logging
+    # Ensure log directory exists
+    LOG_FILENAME.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Configure logging
+    logging.basicConfig(
+        filename=LOG_FILENAME,
+        level=logging.INFO,
+        format='%(message)s',
+        filemode='a'
+    )
+    
+    def log_and_print(level: str, message: str) -> None:
+        """Log and color-print a message at INFO/WARNING/ERROR levels in CSV format."""
+        # Emoji mappings for log levels
+        emoji_mapping = {
+            "info": "ℹ️",
+            "warning": "⚠️",
+            "error": "❌",
+            "success": "✅",
+            "processing": "⏳",
+            "backup": "💾",
+            "file": "📂",
+            "confirmation": "✋",
+            "draft": "📝"
+        }
 
-Line 33: Calculate total original recipients
-Line 34: Log draft mode status with recipient counts
-Line 35: Log breakdown of original recipients by type
-Line 36: Log the draft subject line
-Line 37: Log approver list (first 3 recipients with ellipsis if more)
-Line 38: Empty line for readability
-Line 39: Check if attachments exist
-Line 40: Get list of attachment filenames
-Line 41: Check if any attachments found
-Line 42: Log attachment list (first 3 with ellipsis if more)
+        # Get emoji for level
+        emoji = emoji_mapping.get(level.lower(), "")
+        csv_log = csv_log_entry(f"{emoji} {message}")
+        log_func = getattr(logging, level.lower(), logging.info)
+        log_func(csv_log)
+        print(f"{csv_log}")  # Print to the console as well
 
-Live Mode Processing
+    globals()['log_and_print'] = log_and_print
+```
 
-Line 43: Handle non-dry-run (live) mode
-Line 44: Calculate total live recipients
-Line 45: Log live mode status with total count
-Line 46: Log breakdown by recipient type
-Line 47: Log subject line
-Line 48: Log TO recipients (first 3 with ellipsis)
-Line 49: Check if CC recipients exist
-Line 50: Log CC recipients (first 3 with ellipsis)
-Line 51: Check if BCC recipients exist
-Line 52: Log BCC recipients (first 3 with ellipsis)
-Line 53: Empty line for readability
-Line 54: Check if attachments exist
-Line 55: Get list of attachment filenames
-Line 56: Check if any attachments found
-Line 57: Log attachment list (first 3 with ellipsis)
-Line 58: Empty line for readability
-
-Email Message Creation and Sending
-
-Line 59: Begin try block for email sending process
-Line 60: Comment about creating email message
-Line 61-62: Call create_email_message() with all parameters to build MIME message
-Line 63: Empty line for readability
-Line 64: Comment about message conversion
-Line 65: Convert MIME message to string format for sendmail
-Line 66: Empty line for readability
-Line 67: Comment about finding sendmail
-Line 68: Call find_sendmail_path() to locate sendmail executable
-Line 69: Empty line for readability
-Line 70: Critical comment about recipient handling
-Line 71: Combine all recipient types for sendmail delivery (TO + CC + BCC)
-Line 72: Empty line for readability
-Line 73: Comment about sendmail command construction
-Line 74: Build sendmail command array:
-
-sendmail_path: Path to sendmail executable
--f from_address: Set envelope sender
-+ all_recipients_for_delivery: All recipients for delivery
-
-
-Line 75: Empty line for readability
-
-Subprocess Execution
-
-Lines 76-81: Create subprocess with Popen:
-
-sendmail_cmd: Command to execute
-stdin=PIPE: Allow input to be sent to process
-stdout=PIPE: Capture standard output
-stderr=PIPE: Capture error output
-text=True: Handle input/output as text strings
-
-
-Line 82: Empty line for readability
-Line 83: Execute process and wait for completion:
-
-input=email_content: Send email content to sendmail's stdin
-timeout=60: Kill process if it takes longer than 60 seconds
-
-
-Line 84: Empty line for readability
-
-Process Result Handling
-
-Line 85: Check if sendmail completed successfully (return code 0)
-Line 86: Check if in dry-run mode
-Line 87: Log success message for draft mode
-Line 88: Handle live mode
-Line 89: Log success message for live mode
-Line 90: Return True indicating successful sending
-Line 91: Handle sendmail failure
-Line 92: Log error with return code
-Line 93: Check if stderr has error information
-Line 94: Log stderr content if available
-Line 95: Return False indicating failure
-Line 96: Empty line for readability
-
-Exception Handling
-
-Line 97: Handle case where sendmail executable not found
-Line 98: Log specific error about missing sendmail
-Line 99: Return False for missing sendmail
-Line 100: Handle subprocess timeout
-Line 101: Log timeout error message
-Line 102: Return False for timeout
-Line 103: Handle any other unexpected exceptions
-Line 104: Log general error with exception details
-Line 105: Return False for general errors
-
-Key Features of send_via_sendmail:
-
-Dual Mode Operation: Handles both dry-run (draft) and live sending modes
-Comprehensive Logging: Detailed logging for debugging and audit trails
-Draft Enhancement: Adds informative header to draft emails for reviewer context
-Complete Recipient Handling: Properly handles TO, CC, and BCC recipients
-Robust Error Handling: Multiple exception types with specific error messages
-Security: Uses subprocess with timeout to prevent hanging
-MIME Support: Full support for attachments and embedded images
+**Line-by-line explanation:**
+- **Line 1**: Function signature with no parameters and no return value
+- **Line 2**: Docstring explaining the logging configuration purpose
+- **Line 3**: Comment about ensuring log directory exists
+- **Line 4**: Creates the parent directory of the log file if it doesn't exist (`parents=True` creates intermediate directories, `exist_ok=True` doesn't raise error if directory exists)
+- **Line 5**: Empty line for readability
+- **Line 6**: Comment about configuring logging
+- **Lines 7-11**: Configures Python's logging system with:
+  - `filename`: Specifies the log file path
+  - `level`: Sets minimum logging level to INFO
+  - `format`: Uses only the message (no timestamp/level prefixes since CSV format handles this)
+  - `filemode`: Appends to existing log file rather than overwriting
+- **Line 12**: Empty line for readability
+- **Line 13**: Defines an inner function for enhanced logging functionality
+- **Line 14**: Docstring for the inner function
+- **Line 15**: Comment about emoji mappings
+- **Lines 16-26**: Dictionary mapping log levels to corresponding emojis for visual identification
+- **Line 27**: Empty line for readability
+- **Line 28**: Comment about getting emoji
+- **Line 29**: Retrieves emoji for the given level, defaults to empty string if level not found
+- **Line 30**: Creates CSV log entry by combining emoji and message
+- **Line 31**: Gets the appropriate logging function (info, warning, error, etc.) using `getattr`, defaults to `logging.info`
+- **Line 32**: Calls the logging function with the CSV-formatted message
+- **Line 33**: Also prints the message to console for immediate feedback
+- **Line 34**: Empty line for readability
+- **Line 35**: Makes the inner function available globally so other parts of the program can use it
 
 ---
+
