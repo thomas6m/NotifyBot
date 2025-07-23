@@ -187,7 +187,7 @@ def find_sendmail_path() -> str:
 - **Line 21**: Empty line for readability
 - **Line 22**: Logs a warning that sendmail wasn't found in expected locations
 - **Line 23**: Returns a default fallback path (most common location) even if not verified to exist
-#######################################################################################
+---
 
 ## 6. `is_valid_email(email: str) -> bool`
 
@@ -1006,3 +1006,4 @@ def matches_filter_conditions(row: Dict, filters: List[str]) -> bool:
 - **Line 74**: Comment explaining final result
 - **Line 75**: Returns False if no filter lines matched
 
+---
