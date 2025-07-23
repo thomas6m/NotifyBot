@@ -1137,8 +1137,6 @@ def prompt_for_confirmation() -> bool:
 
 ---
 
----
-
 ## 20. send_via_sendmail
 
 ```python
@@ -1393,69 +1391,6 @@ def send_via_sendmail(recipients: List[str], subject: str, body_html: str,
 5. **Robust Error Handling**: Multiple exception types with specific error messages
 6. **Security**: Uses subprocess with timeout to prevent hanging
 7. **MIME Support**: Full support for attachments and embedded images
-
-    # Ensure log directory exists
-    LOG_FILENAME.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Configure logging
-    logging.basicConfig(
-        filename=LOG_FILENAME,
-        level=logging.INFO,
-        format='%(message)s',
-        filemode='a'
-    )
-    
-    def log_and_print(level: str, message: str) -> None:
-        """Log and color-print a message at INFO/WARNING/ERROR levels in CSV format."""
-        # Emoji mappings for log levels
-        emoji_mapping = {
-            "info": "ℹ️",
-            "warning": "⚠️",
-            "error": "❌",
-            "success": "✅",
-            "processing": "⏳",
-            "backup": "💾",
-            "file": "📂",
-            "confirmation": "✋",
-            "draft": "📝"
-        }
-
-        # Get emoji for level
-        emoji = emoji_mapping.get(level.lower(), "")
-        csv_log = csv_log_entry(f"{emoji} {message}")
-        log_func = getattr(logging, level.lower(), logging.info)
-        log_func(csv_log)
-        print(f"{csv_log}")  # Print to the console as well
-
-    globals()['log_and_print'] = log_and_print
-```
-
-**Line-by-line explanation:**
-- **Line 1**: Function signature with no parameters and no return value
-- **Line 2**: Docstring explaining the logging configuration purpose
-- **Line 3**: Comment about ensuring log directory exists
-- **Line 4**: Creates the parent directory of the log file if it doesn't exist (`parents=True` creates intermediate directories, `exist_ok=True` doesn't raise error if directory exists)
-- **Line 5**: Empty line for readability
-- **Line 6**: Comment about configuring logging
-- **Lines 7-11**: Configures Python's logging system with:
-  - `filename`: Specifies the log file path
-  - `level`: Sets minimum logging level to INFO
-  - `format`: Uses only the message (no timestamp/level prefixes since CSV format handles this)
-  - `filemode`: Appends to existing log file rather than overwriting
-- **Line 12**: Empty line for readability
-- **Line 13**: Defines an inner function for enhanced logging functionality
-- **Line 14**: Docstring for the inner function
-- **Line 15**: Comment about emoji mappings
-- **Lines 16-26**: Dictionary mapping log levels to corresponding emojis for visual identification
-- **Line 27**: Empty line for readability
-- **Line 28**: Comment about getting emoji
-- **Line 29**: Retrieves emoji for the given level, defaults to empty string if level not found
-- **Line 30**: Creates CSV log entry by combining emoji and message
-- **Line 31**: Gets the appropriate logging function (info, warning, error, etc.) using `getattr`, defaults to `logging.info`
-- **Line 32**: Calls the logging function with the CSV-formatted message
-- **Line 33**: Also prints the message to console for immediate feedback
-- **Line 34**: Empty line for readability
-- **Line 35**: Makes the inner function available globally so other parts of the program can use it
 
 ---
 
