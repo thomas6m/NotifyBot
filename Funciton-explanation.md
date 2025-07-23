@@ -1007,3 +1007,132 @@ def matches_filter_conditions(row: Dict, filters: List[str]) -> bool:
 - **Line 75**: Returns False if no filter lines matched
 
 ---
+## 18. apply_filter_logic
+
+```python
+def apply_filter_logic(filters: List[str], inventory_path: Path) -> List[str]:
+    """Apply the filter logic using 'filter.txt' and 'inventory.csv'."""
+    filtered_recipients = []
+    
+    if not inventory_path.exists():
+        log_and_print("error", f"Inventory file not found: {inventory_path}")
+        return filtered_recipients
+    
+    try:
+        with open(inventory_path, mode="r", newline="", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            
+            for row in reader:
+                if matches_filter_conditions(row, filters):
+                    if 'email' in row:
+                        # Extract and validate each email from semicolon-separated string
+                        email_string = row['email']
+                        individual_emails = extract_emails(email_string, ";")
+                        
+                        for email in individual_emails:
+                            if is_valid_email(email):
+                                filtered_recipients.append(email)
+                            else:
+                                log_and_print("warning", f"Invalid email skipped: {email}")
+                        
+                        if not individual_emails:
+                            log_and_print("warning", f"Row has empty email field: {row}")
+                    else:
+                        log_and_print("warning", f"Row missing email column: {row}")
+        
+        log_and_print("info", f"Filter applied: {len(filtered_recipients)} recipients selected from inventory")
+        
+    except Exception as exc:
+        log_and_print("error", f"Error applying filter logic: {exc}")
+    
+    return filtered_recipients
+```
+
+**Step-by-step explanation:**
+
+### Step 1: Function Setup and Initialization
+- **Line 1**: Function signature that takes a list of filter strings and inventory file path, returns list of email addresses
+- **Line 2**: Docstring explaining the function applies filters to inventory data
+- **Line 3**: Initialize empty list to store filtered email recipients
+
+### Step 2: Validate Inventory File Exists
+- **Line 5**: Check if the inventory CSV file exists at the specified path
+- **Line 6**: Log error message if inventory file is missing
+- **Line 7**: Return empty list if file doesn't exist (graceful failure)
+
+### Step 3: Open and Process CSV File
+- **Line 9**: Begin try block to handle file reading errors
+- **Line 10**: Open inventory file with proper encoding and CSV settings:
+  - `mode="r"`: Read-only mode
+  - `newline=""`: Prevents extra blank lines in CSV processing
+  - `encoding="utf-8"`: Handles international characters
+- **Line 11**: Create CSV DictReader to parse headers automatically and access columns by name
+
+### Step 4: Process Each Row Against Filters
+- **Line 13**: Iterate through each row in the CSV file
+- **Line 14**: Call `matches_filter_conditions()` to check if current row meets filter criteria
+- **Line 15**: Check if the row contains an 'email' column
+
+### Step 5: Extract and Validate Emails
+- **Line 16**: Comment explaining email extraction process
+- **Line 17**: Get the email field value from current row
+- **Line 18**: Use `extract_emails()` to split semicolon-separated email addresses into individual emails
+
+### Step 6: Validate Individual Emails
+- **Line 20**: Iterate through each extracted email address
+- **Line 21**: Use `is_valid_email()` to validate email format and syntax
+- **Line 22**: Add valid email to filtered recipients list
+- **Line 23**: Handle invalid emails
+- **Line 24**: Log warning for each invalid email found and skip it
+
+### Step 7: Handle Edge Cases
+- **Line 26**: Check if no emails were extracted from the email field
+- **Line 27**: Log warning if email field was empty or malformed
+- **Line 28**: Handle rows missing email column entirely
+- **Line 29**: Log warning for rows that don't have required email column
+
+### Step 8: Log Results and Handle Errors
+- **Line 31**: Log successful completion with count of filtered recipients
+- **Line 33**: Catch any exceptions during file processing
+- **Line 34**: Log detailed error information if processing fails
+
+### Step 9: Return Results
+- **Line 36**: Return list of valid email addresses that passed filter criteria
+
+---
+
+## 19. prompt_for_confirmation
+
+```python
+def prompt_for_confirmation() -> bool:
+    """Prompt the user for a yes/no confirmation to proceed."""
+    response = input("Do you want to proceed with sending emails? (yes/no): ").strip().lower()
+    return response == 'yes'
+```
+
+**Step-by-step explanation:**
+
+### Step 1: Function Definition
+- **Line 1**: Function signature with no parameters, returns boolean value
+- **Line 2**: Docstring explaining the function prompts user for confirmation
+
+### Step 2: Get User Input
+- **Line 3**: Use `input()` to display prompt and wait for user response:
+  - Displays clear question about proceeding with email sending
+  - `.strip()`: Removes leading/trailing whitespace from user input
+  - `.lower()`: Converts input to lowercase for consistent comparison
+
+### Step 3: Evaluate Response
+- **Line 4**: Return boolean result:
+  - `True` if user typed exactly "yes" (case-insensitive)
+  - `False` for any other input (including "y", "YES", "no", empty string, etc.)
+
+### Key Design Decisions:
+
+**Strict Validation**: Only accepts "yes" as confirmation, not "y" or "YES" - this prevents accidental email sending due to typos or casual responses.
+
+**Case Insensitive**: Accepts "yes", "Yes", "YES" etc. for user convenience.
+
+**Default to Safe**: Any input other than "yes" results in cancellation, following the principle of failing safely.
+
+---
