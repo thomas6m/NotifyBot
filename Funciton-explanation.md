@@ -1136,3 +1136,279 @@ def prompt_for_confirmation() -> bool:
 **Default to Safe**: Any input other than "yes" results in cancellation, following the principle of failing safely.
 
 ---
+20. send_via_sendmail
+pythondef send_via_sendmail(recipients: List[str], subject: str, body_html: str, 
+                     from_address: str, attachment_folder: Path = None, 
+                     dry_run: bool = False, original_recipients_count: int = 0,
+                     base_folder: Path = None, cc_recipients: List[str] = None,
+                     bcc_recipients: List[str] = None,
+                     original_cc_count: int = 0, original_bcc_count: int = 0) -> bool:
+    """Send email using sendmail command. In dry-run mode, sends only to approvers with DRAFT prefix."""
+    
+    cc_recipients = cc_recipients or []
+    bcc_recipients = bcc_recipients or []
+    
+    # Prepare subject for dry-run mode
+    final_subject = subject
+    if dry_run:
+        # Add DRAFT prefix if not already present
+        if not subject.upper().startswith('DRAFT'):
+            final_subject = f"DRAFT - {subject}"
+        
+        # Add recipient count info to body for dry-run
+       
+        draft_info = f"""
+        <div style="background-color: #f8f9fa; border: 2px solid #007BFF; padding: 12px; margin: 10px 0; border-radius: 6px; max-width: 500px; width: 100%; margin-left: 20px;">
+            <h3 style="color: #0056b3; margin: 0 0 8px 0; font-size: 16px;">📝 Draft Email – Internal Review 🔍</h3>
+            <p style="color: #333333; margin: 4px 0; font-size: 14px;"><strong>Status:</strong> This is a draft email shared for review and approval.</p>
+            <p style="color: #333333; margin: 4px 0; font-size: 14px;"><strong>Original Recipient Count:</strong> {original_recipients_count}</p>
+	    <p style="color: #333333; margin: 5px 0;"><strong>Original CC Recipients:</strong> {original_cc_count}</p>
+            <p style="color: #333333; margin: 5px 0;"><strong>Original BCC Recipients:</strong> {original_bcc_count}</p>
+            <p style="color: #333333; margin: 5px 0;"><strong>Once approved, this message will be delivered to all {original_recipients_count + original_cc_count + original_bcc_count} intended recipients.</strong></p>
+        </div>
+        <hr style="margin: 16px 0; border: 0; border-top: 1px solid #ddd;">
+        """
+        body_html = draft_info + body_html
+        
+        total_original = original_recipients_count + original_cc_count + original_bcc_count
+        log_and_print("draft", f"DRAFT mode: Sending to {len(recipients)} approver(s) instead of {total_original} original recipients")
+        log_and_print("draft", f"Original breakdown - TO: {original_recipients_count}, CC: {original_cc_count}, BCC: {original_bcc_count}")
+        log_and_print("draft", f"Subject: {final_subject}")
+        log_and_print("draft", f"Approvers: {', '.join(recipients[:3])}{'...' if len(recipients) > 3 else ''}")
+        
+        if attachment_folder and attachment_folder.exists():
+            attachments = [f.name for f in attachment_folder.iterdir() if f.is_file()]
+            if attachments:
+                log_and_print("draft", f"Attachments: {', '.join(attachments[:3])}{'...' if len(attachments) > 3 else ''}")
+    else:
+        total_recipients = len(recipients) + len(cc_recipients) + len(bcc_recipients)
+        log_and_print("info", f"LIVE mode: Sending to {total_recipients} total recipients")
+        log_and_print("info", f"TO: {len(recipients)}, CC: {len(cc_recipients)}, BCC: {len(bcc_recipients)}")
+        log_and_print("info", f"Subject: {final_subject}")
+        log_and_print("info", f"TO: {', '.join(recipients[:3])}{'...' if len(recipients) > 3 else ''}")
+        if cc_recipients:
+            log_and_print("info", f"CC: {', '.join(cc_recipients[:3])}{'...' if len(cc_recipients) > 3 else ''}")
+        if bcc_recipients:
+            log_and_print("info", f"BCC: {', '.join(bcc_recipients[:3])}{'...' if len(bcc_recipients) > 3 else ''}")
+            
+        if attachment_folder and attachment_folder.exists():
+            attachments = [f.name for f in attachment_folder.iterdir() if f.is_file()]
+            if attachments:
+                log_and_print("info", f"Attachments: {', '.join(attachments[:3])}{'...' if len(attachments) > 3 else ''}")
+    
+    try:
+        # Create the email message with base_folder for image embedding
+        msg = create_email_message(recipients, final_subject, body_html, from_address, 
+                                 attachment_folder, base_folder, cc_recipients, bcc_recipients)
+        
+        # Convert message to string
+        email_content = msg.as_string()
+        
+        # Find sendmail path
+        sendmail_path = find_sendmail_path()
+        
+        # CRITICAL FIX: All recipients (TO, CC, BCC) must be provided to sendmail for delivery
+        all_recipients_for_delivery = recipients + cc_recipients + bcc_recipients
+        
+        # Call sendmail with proper arguments
+        sendmail_cmd = [sendmail_path, '-f', from_address] + all_recipients_for_delivery
+        
+        process = subprocess.Popen(
+            sendmail_cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        stdout, stderr = process.communicate(input=email_content, timeout=60)
+        
+        if process.returncode == 0:
+            if dry_run:
+                log_and_print("success", f"DRAFT email sent successfully to {len(recipients)} approver(s)")
+            else:
+                log_and_print("success", f"Email sent successfully to {len(all_recipients_for_delivery)} total recipients")
+            return True
+        else:
+            log_and_print("error", f"Sendmail failed with return code {process.returncode}")
+            if stderr:
+                log_and_print("error", f"Sendmail stderr: {stderr}")
+            return False
+            
+    except FileNotFoundError:
+        log_and_print("error", f"Sendmail not found at {sendmail_path}. Please install sendmail.")
+        return False
+    except subprocess.TimeoutExpired:
+        log_and_print("error", "Sendmail timeout - operation took too long")
+        return False
+    except Exception as exc:
+        log_and_print("error", f"Error sending email via sendmail: {exc}")
+        return False
+Line-by-line explanation:
+Function Definition and Parameter Setup
+
+Lines 1-6: Function signature with extensive parameters:
+
+recipients: List of TO recipients
+subject: Email subject line
+body_html: HTML email body content
+from_address: Sender's email address
+attachment_folder: Optional path to attachments
+dry_run: Boolean flag for test mode
+original_recipients_count: Count for dry-run display
+base_folder: Path for embedded images
+cc_recipients: Carbon copy recipients
+bcc_recipients: Blind carbon copy recipients
+original_cc_count & original_bcc_count: Counts for dry-run display
+
+
+Line 7: Docstring explaining the function's dual mode operation
+Line 8: Empty line for readability
+
+Initialize Optional Parameters
+
+Line 9: Set cc_recipients to empty list if None provided
+Line 10: Set bcc_recipients to empty list if None provided
+Line 11: Empty line for readability
+
+Dry-Run Mode Processing
+
+Line 12: Comment explaining subject preparation
+Line 13: Initialize final subject with original subject
+Line 14: Check if in dry-run mode
+Line 15: Comment about adding DRAFT prefix
+Line 16: Check if subject doesn't already start with "DRAFT"
+Line 17: Add "DRAFT - " prefix to subject
+Line 18: Empty line for readability
+Line 19: Comment about adding recipient count info
+
+Draft Information HTML Generation
+
+Lines 21-29: Create HTML div with styled draft information:
+
+Blue border and background for visibility
+Header indicating this is a draft for review
+Status explanation
+Original recipient counts for TO, CC, BCC
+Total recipient count calculation
+Professional styling with specific colors and spacing
+
+
+Line 30: Add horizontal rule separator
+Line 31: Prepend draft info to original email body
+
+Dry-Run Logging
+
+Line 33: Calculate total original recipients
+Line 34: Log draft mode status with recipient counts
+Line 35: Log breakdown of original recipients by type
+Line 36: Log the draft subject line
+Line 37: Log approver list (first 3 recipients with ellipsis if more)
+Line 38: Empty line for readability
+Line 39: Check if attachments exist
+Line 40: Get list of attachment filenames
+Line 41: Check if any attachments found
+Line 42: Log attachment list (first 3 with ellipsis if more)
+
+Live Mode Processing
+
+Line 43: Handle non-dry-run (live) mode
+Line 44: Calculate total live recipients
+Line 45: Log live mode status with total count
+Line 46: Log breakdown by recipient type
+Line 47: Log subject line
+Line 48: Log TO recipients (first 3 with ellipsis)
+Line 49: Check if CC recipients exist
+Line 50: Log CC recipients (first 3 with ellipsis)
+Line 51: Check if BCC recipients exist
+Line 52: Log BCC recipients (first 3 with ellipsis)
+Line 53: Empty line for readability
+Line 54: Check if attachments exist
+Line 55: Get list of attachment filenames
+Line 56: Check if any attachments found
+Line 57: Log attachment list (first 3 with ellipsis)
+Line 58: Empty line for readability
+
+Email Message Creation and Sending
+
+Line 59: Begin try block for email sending process
+Line 60: Comment about creating email message
+Line 61-62: Call create_email_message() with all parameters to build MIME message
+Line 63: Empty line for readability
+Line 64: Comment about message conversion
+Line 65: Convert MIME message to string format for sendmail
+Line 66: Empty line for readability
+Line 67: Comment about finding sendmail
+Line 68: Call find_sendmail_path() to locate sendmail executable
+Line 69: Empty line for readability
+Line 70: Critical comment about recipient handling
+Line 71: Combine all recipient types for sendmail delivery (TO + CC + BCC)
+Line 72: Empty line for readability
+Line 73: Comment about sendmail command construction
+Line 74: Build sendmail command array:
+
+sendmail_path: Path to sendmail executable
+-f from_address: Set envelope sender
++ all_recipients_for_delivery: All recipients for delivery
+
+
+Line 75: Empty line for readability
+
+Subprocess Execution
+
+Lines 76-81: Create subprocess with Popen:
+
+sendmail_cmd: Command to execute
+stdin=PIPE: Allow input to be sent to process
+stdout=PIPE: Capture standard output
+stderr=PIPE: Capture error output
+text=True: Handle input/output as text strings
+
+
+Line 82: Empty line for readability
+Line 83: Execute process and wait for completion:
+
+input=email_content: Send email content to sendmail's stdin
+timeout=60: Kill process if it takes longer than 60 seconds
+
+
+Line 84: Empty line for readability
+
+Process Result Handling
+
+Line 85: Check if sendmail completed successfully (return code 0)
+Line 86: Check if in dry-run mode
+Line 87: Log success message for draft mode
+Line 88: Handle live mode
+Line 89: Log success message for live mode
+Line 90: Return True indicating successful sending
+Line 91: Handle sendmail failure
+Line 92: Log error with return code
+Line 93: Check if stderr has error information
+Line 94: Log stderr content if available
+Line 95: Return False indicating failure
+Line 96: Empty line for readability
+
+Exception Handling
+
+Line 97: Handle case where sendmail executable not found
+Line 98: Log specific error about missing sendmail
+Line 99: Return False for missing sendmail
+Line 100: Handle subprocess timeout
+Line 101: Log timeout error message
+Line 102: Return False for timeout
+Line 103: Handle any other unexpected exceptions
+Line 104: Log general error with exception details
+Line 105: Return False for general errors
+
+Key Features of send_via_sendmail:
+
+Dual Mode Operation: Handles both dry-run (draft) and live sending modes
+Comprehensive Logging: Detailed logging for debugging and audit trails
+Draft Enhancement: Adds informative header to draft emails for reviewer context
+Complete Recipient Handling: Properly handles TO, CC, and BCC recipients
+Robust Error Handling: Multiple exception types with specific error messages
+Security: Uses subprocess with timeout to prevent hanging
+MIME Support: Full support for attachments and embedded images
+
+---
