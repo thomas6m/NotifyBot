@@ -1394,3 +1394,537 @@ def send_via_sendmail(recipients: List[str], subject: str, body_html: str,
 
 ---
 
+## 21. `send_email_batch` Function
+
+This function handles sending emails in batches with support for CC, BCC, and dry-run mode.
+
+```python
+def send_email_batch(recipients: List[str], subject: str, body_html: str, 
+                    from_address: str, batch_size: int, dry_run: bool = False, 
+                    delay: float = 5.0, attachment_folder: Path = None,
+                    cc_recipients: List[str] = None, bcc_recipients: List[str] = None,
+                    original_recipients_count: int = 0, base_folder: Path = None,
+                    original_cc_count: int = 0, original_bcc_count: int = 0) -> None:
+```
+**Function signature defining parameters for batch email sending**
+
+```python
+cc_recipients = cc_recipients or []
+bcc_recipients = bcc_recipients or []
+```
+**Initialize CC and BCC lists to empty lists if None to prevent errors**
+
+```python
+total_recipients = len(recipients)
+total_batches = (total_recipients + batch_size - 1) // batch_size if total_recipients > 0 else 0
+successful_batches = 0
+failed_batches = 0
+```
+**Calculate total recipients, number of batches needed, and initialize success/failure counters**
+
+```python
+if total_recipients == 0 and (cc_recipients or bcc_recipients):
+    log_and_print("info", "No TO recipients, sending single email with CC/BCC only")
+```
+**Handle edge case where there are no TO recipients but CC/BCC recipients exist**
+
+```python
+    if dry_run:
+        log_and_print("processing", f"Processing DRAFT email (CC/BCC only to approvers)")
+    else:
+        batch_total = len(cc_recipients) + len(bcc_recipients)
+        log_and_print("processing", f"Processing email with {batch_total} CC/BCC recipients only")
+```
+**Log different messages depending on whether it's dry-run or live mode**
+
+```python
+    if send_via_sendmail([], subject, body_html, from_address, attachment_folder, 
+                       dry_run, original_recipients_count, base_folder, 
+                       cc_recipients, bcc_recipients, original_cc_count, original_bcc_count):
+        successful_batches = 1
+        log_and_print("success", "CC/BCC-only email completed successfully")
+    else:
+        failed_batches = 1
+        log_and_print("error", "CC/BCC-only email failed")
+```
+**Send email with empty TO list but include CC/BCC, then track success/failure**
+
+```python
+else:
+    for i in range(0, total_recipients, batch_size):
+        batch = recipients[i:i + batch_size]
+        batch_num = i // batch_size + 1
+```
+**Process TO recipients in batches, creating sublists and calculating batch numbers**
+
+```python
+        current_cc = cc_recipients  # Always include CC
+        current_bcc = bcc_recipients  # Always include BCC
+```
+**Include CC/BCC in ALL batches (not just the first one)**
+
+```python
+        if dry_run:
+            log_and_print("processing", f"Processing DRAFT batch {batch_num}/{total_batches} ({len(batch)} approver(s))")
+        else:
+            batch_total = len(batch) + len(current_cc) + len(current_bcc)
+            log_and_print("processing", f"Processing batch {batch_num}/{total_batches} ({batch_total} recipients)")
+            if current_cc or current_bcc:
+                log_and_print("info", f"CC/BCC included in this batch")
+```
+**Log batch processing information with different messages for dry-run vs live mode**
+
+```python
+        if send_via_sendmail(batch, subject, body_html, from_address, attachment_folder, 
+                           dry_run, original_recipients_count, base_folder, 
+                           current_cc, current_bcc, original_cc_count, original_bcc_count):
+            successful_batches += 1
+            log_and_print("success", f"Batch {batch_num} completed successfully")
+        else:
+            failed_batches += 1
+            log_and_print("error", f"Batch {batch_num} failed")
+```
+**Send the current batch and track success/failure**
+
+```python
+        if i + batch_size < total_recipients and not dry_run:
+            log_and_print("info", f"Waiting {delay} seconds before next batch...")
+            time.sleep(delay)
+```
+**Add delay between batches (except last batch) and only in live mode**
+
+```python
+if dry_run:
+    total_original = original_recipients_count + original_cc_count + original_bcc_count
+    log_and_print("info", f"DRAFT processing complete: {successful_batches} successful, {failed_batches} failed")
+    if total_original > 0:
+        log_and_print("info", f"DRAFT emails sent to approvers for campaign targeting {total_original} recipients")
+    else:
+        log_and_print("info", f"DRAFT emails sent to approvers")
+```
+**Log dry-run completion summary with original recipient count information**
+
+```python
+else:
+    log_and_print("info", f"Batch processing complete: {successful_batches} successful, {failed_batches} failed")
+    if successful_batches > 0:
+        total_sent = (original_recipients_count + 
+                     (original_cc_count * successful_batches) + 
+                     (original_bcc_count * successful_batches))
+        log_and_print("info", f"Total emails delivered: {total_sent}")
+        if successful_batches > 1 and (original_cc_count > 0 or original_bcc_count > 0):
+            log_and_print("info", f"Note: CC/BCC recipients received {successful_batches} copies (one per batch)")
+```
+**Log live mode completion summary, calculating total emails sent and warning about duplicate CC/BCC**
+
+---
+
+## 22. `send_email` Function
+
+This is a legacy compatibility function that routes to the sendmail implementation.
+
+```python
+def send_email(recipients: List[str], subject: str, body_html: str, 
+              from_address: str, dry_run: bool = False) -> None:
+```
+**Function signature for backward compatibility email sending**
+
+```python
+    # This function is kept for backward compatibility but routing to sendmail
+    attachment_folder = None  # Will be set properly in the main function
+    original_count = len(recipients) if not dry_run else 0
+    send_via_sendmail(recipients, subject, body_html, from_address, attachment_folder, dry_run, original_count)
+```
+**Route the call to send_via_sendmail with default parameters for backward compatibility**
+
+---
+
+## 23. `main` Function
+
+The main function orchestrates the entire email sending process with argument parsing and validation.
+
+```python
+def main():
+    """Updated main function with CC/BCC support"""
+    parser = argparse.ArgumentParser(description="Send batch emails with attachments, CC, and BCC.")
+    parser.add_argument("--base-folder", required=True, help="Base folder name inside /notifybot/basefolder.")
+    parser.add_argument("--dry-run", action="store_true", help="Send emails only to approvers with DRAFT prefix.")
+    parser.add_argument("--force", action="store_true", help="Skip confirmation prompt.")
+    parser.add_argument("--batch-size", type=int, default=500, help="Number of emails per batch (default: 500).")
+    parser.add_argument("--delay", type=float, default=5.0, help="Delay in seconds between batches (default: 5.0).")
+```
+**Set up command-line argument parser with all available options**
+
+```python
+    args = parser.parse_args()
+    setup_logging()
+```
+**Parse command-line arguments and initialize logging system**
+
+```python
+    try:
+        base_folder = validate_base_folder(args.base_folder)
+```
+**Validate that the base folder exists and is in the correct location**
+
+```python
+        required_files = ["subject.txt", "body.html", "from.txt", "approver.txt"]
+        check_required_files(base_folder, required_files, args.dry_run)
+```
+**Define required files and check they exist in the base folder**
+
+```python
+        subject = read_file(base_folder / "subject.txt")
+        body_html = read_file(base_folder / "body.html")
+        from_address = read_file(base_folder / "from.txt")
+        approver_emails = read_recipients(base_folder / "approver.txt")
+```
+**Read essential email content from files**
+
+```python
+        cc_emails = read_recipients(base_folder / "cc.txt")
+        bcc_emails = read_recipients(base_folder / "bcc.txt")
+```
+**Read optional CC and BCC recipient lists**
+
+```python
+        if cc_emails:
+            log_and_print("info", f"Loaded {len(cc_emails)} CC recipients from cc.txt")
+        if bcc_emails:
+            log_and_print("info", f"Loaded {len(bcc_emails)} BCC recipients from bcc.txt")
+```
+**Log information about loaded CC/BCC recipients**
+
+```python
+        if not subject:
+            log_and_print("error", "Subject is empty")
+            sys.exit(1)
+        if not body_html:
+            log_and_print("error", "Body HTML is empty")
+            sys.exit(1)
+        if not from_address or not is_valid_email(from_address):
+            log_and_print("error", f"Invalid from address: {from_address}")
+            sys.exit(1)
+        if not approver_emails:
+            log_and_print("error", "No valid approver emails found in approver.txt")
+            sys.exit(1)
+```
+**Validate essential email content and exit if any critical fields are missing or invalid**
+
+```python
+        final_recipients = []
+        final_cc_recipients = []
+        final_bcc_recipients = []
+        original_recipients_count = 0
+        original_cc_count = 0
+        original_bcc_count = 0
+```
+**Initialize variables for final recipient lists and original counts**
+
+```python
+        if args.dry_run:
+            final_recipients = approver_emails
+            final_cc_recipients = []  # No CC/BCC in dry-run
+            final_bcc_recipients = []
+```
+**In dry-run mode, send only to approvers with no CC/BCC**
+
+```python
+            # Count original recipients for display purposes
+            original_recipients = []
+            to_file_path = base_folder / "to.txt"
+            additional_to_file_path = base_folder / "additional_to.txt"
+            filter_file_path = base_folder / "filter.txt"
+```
+**Set up paths for different recipient source files**
+
+```python
+            original_cc_count = len(cc_emails)
+            original_bcc_count = len(bcc_emails)
+```
+**Store original CC/BCC counts for reporting**
+
+```python
+            # Calculate original TO recipients (logic for counting different recipient sources)
+            if to_file_path.is_file():
+                original_recipients = read_recipients(to_file_path)
+                if additional_to_file_path.is_file():
+                    additional_recipients = read_recipients(additional_to_file_path)
+                    if additional_recipients:
+                        original_recipients = merge_recipients(original_recipients, additional_recipients)
+```
+**If to.txt exists, read it and merge with additional recipients if available**
+
+```python
+            elif filter_file_path.is_file() and INVENTORY_PATH.is_file():
+                filters = read_file(filter_file_path).splitlines()
+                original_recipients = apply_filter_logic(filters, INVENTORY_PATH)
+                # ... merge with additional recipients and create to.txt
+```
+**If no to.txt but filter.txt exists, apply filter logic and merge with additional recipients**
+
+```python
+            elif additional_to_file_path.is_file():
+                original_recipients = read_recipients(additional_to_file_path)
+                # ... create to.txt from additional recipients
+```
+**If only additional_to.txt exists, use it as the source**
+
+```python
+            original_recipients_count = len(original_recipients)
+            total_original = original_recipients_count + original_cc_count + original_bcc_count
+            log_and_print("draft", f"DRY-RUN MODE: Will send to {len(final_recipients)} approvers instead of {total_original} actual recipients")
+```
+**Calculate and log dry-run statistics**
+
+```python
+        else:
+            # Live mode - determine actual recipients
+            final_cc_recipients = cc_emails
+            final_bcc_recipients = bcc_emails
+            original_cc_count = len(cc_emails)
+            original_bcc_count = len(bcc_emails)
+```
+**In live mode, use actual CC/BCC recipients**
+
+```python
+            # Priority 1: Use to.txt if it exists
+            if to_file_path.is_file():
+                recipients = read_recipients(to_file_path)
+                # ... merge with additional_to.txt if it exists
+```
+**First priority: use existing to.txt file**
+
+```python
+            # Priority 2: Use filter logic if to.txt doesn't exist
+            elif filter_file_path.is_file() and INVENTORY_PATH.is_file():
+                filters = read_file(filter_file_path).splitlines()
+                recipients = apply_filter_logic(filters, INVENTORY_PATH)
+                # ... merge with additional_to.txt and create to.txt
+```
+**Second priority: apply filter logic from filter.txt and inventory.csv**
+
+```python
+            # Priority 3: Use only additional_to.txt if nothing else is available
+            elif additional_to_file_path.is_file():
+                recipients = read_recipients(additional_to_file_path)
+                # ... create to.txt from additional_to.txt
+```
+**Third priority: use only additional_to.txt**
+
+```python
+            else:
+                if not (cc_emails or bcc_emails):
+                    log_and_print("error", "No valid recipient source found (no TO, CC, or BCC recipients)")
+                    sys.exit(1)
+                else:
+                    log_and_print("info", "No TO recipients found, but CC/BCC recipients available")
+                    recipients = []
+```
+**Handle case where no TO recipients exist but CC/BCC do**
+
+```python
+        attachment_folder = base_folder / "attachment"
+        if attachment_folder.exists():
+            attachment_count = len([f for f in attachment_folder.iterdir() if f.is_file()])
+            log_and_print("info", f"Found {attachment_count} attachment(s) in {attachment_folder}")
+        else:
+            attachment_folder = None
+            log_and_print("info", "No attachment folder found")
+```
+**Check for attachments folder and count files**
+
+```python
+        # Show summary with CC/BCC info
+        log_and_print("confirmation", f"Email Summary:")
+        log_and_print("confirmation", f"From: {from_address}")
+        log_and_print("confirmation", f"Subject: {subject}")
+```
+**Display email summary information**
+
+```python
+        if args.dry_run:
+            # ... log dry-run summary
+        else:
+            # ... log live mode summary
+```
+**Display different summaries for dry-run vs live mode**
+
+```python
+        if not args.force:
+            if not prompt_for_confirmation():
+                log_and_print("info", "Email sending aborted by user.")
+                sys.exit(0)
+```
+**Prompt for user confirmation unless --force flag is used**
+
+```python
+        send_email_batch(
+            final_recipients, 
+            subject, 
+            body_html, 
+            from_address, 
+            args.batch_size, 
+            dry_run=args.dry_run, 
+            delay=args.delay,
+            attachment_folder=attachment_folder,
+            original_recipients_count=original_recipients_count,
+            base_folder=base_folder,
+            cc_recipients=final_cc_recipients,
+            bcc_recipients=final_bcc_recipients,
+            original_cc_count=original_cc_count,
+            original_bcc_count=original_bcc_count
+        )
+```
+**Call the batch email sending function with all parameters**
+
+```python
+        log_and_print("success", "NotifyBot execution completed successfully")
+```
+**Log successful completion**
+
+```python
+    except MissingRequiredFilesError as e:
+        log_and_print("error", str(e))
+        sys.exit(1)
+    except ValueError as e:
+        log_and_print("error", str(e))
+        sys.exit(1)
+    except KeyboardInterrupt:
+        log_and_print("warning", "Operation interrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        log_and_print("error", f"Unexpected error: {e}")
+        log_and_print("error", f"Traceback: {traceback.format_exc()}")
+        sys.exit(1)
+```
+**Handle various exceptions and exit gracefully with appropriate error codes**
+
+---
+
+## 24. `embed_images_in_html` Function
+
+This function processes HTML content to embed images as inline attachments for email clients.
+
+```python
+def embed_images_in_html(html_content: str, base_folder: Path) -> Tuple[str, List[MIMEImage]]:
+    """
+    Replace image src attributes with cid references and return embedded images.
+    """
+```
+**Function signature that takes HTML content and returns modified HTML plus MIME images**
+
+```python
+    images_folder = base_folder / "images"
+    embedded_images = []
+```
+**Set up images folder path and initialize list for embedded images**
+
+```python
+    if not images_folder.exists():
+        log_and_print("info", "No images folder found, skipping image embedding")
+        return html_content, embedded_images
+```
+**Early return if no images folder exists**
+
+```python
+    img_pattern = r'<img[^>]+src=["\']([^"\']+)["\'][^>]*>'
+```
+**Regular expression pattern to find all img tags with src attributes**
+
+```python
+    def replace_img_src(match):
+        img_tag = match.group(0)
+        src = match.group(1)
+```
+**Inner function to process each matched img tag, extract full tag and src attribute**
+
+```python
+        if src.startswith('cid:'):
+            return img_tag
+```
+**Skip images that already have cid: references (already processed)**
+
+```python
+        if src.startswith(('http://', 'https://')):
+            log_and_print("warning", f"External image URL found: {src} - may be blocked by email clients")
+            return img_tag
+```
+**Skip external URLs but warn user they may be blocked by email clients**
+
+```python
+        image_filename = Path(src).name
+        image_path = images_folder / image_filename
+```
+**Extract filename from src and construct full path to image file**
+
+```python
+        if not image_path.exists():
+            log_and_print("warning", f"Image file not found: {image_path}")
+            return img_tag
+```
+**Skip if image file doesn't exist in the images folder**
+
+```python
+        try:
+            with open(image_path, 'rb') as img_file:
+                img_data = img_file.read()
+```
+**Read image file as binary data**
+
+```python
+            cid = f"image_{len(embedded_images)}_{image_filename.replace('.', '_')}"
+```
+**Generate unique Content-ID for the image using counter and filename**
+
+```python
+            mime_type, _ = mimetypes.guess_type(str(image_path))
+            if mime_type and mime_type.startswith('image/'):
+                maintype, subtype = mime_type.split('/', 1)
+```
+**Determine MIME type and split into main type and subtype**
+
+```python
+                mime_img = MIMEImage(img_data, subtype)
+                mime_img.add_header('Content-ID', f'<{cid}>')
+                mime_img.add_header('Content-Disposition', 'inline', filename=image_filename)
+                embedded_images.append(mime_img)
+```
+**Create MIME image object with proper headers and add to embedded images list**
+
+```python
+                new_img_tag = re.sub(r'src=["\'][^"\']+["\']', f'src="cid:{cid}"', img_tag)
+                log_and_print("info", f"Embedded image: {image_filename} as {cid}")
+                return new_img_tag
+```
+**Replace src attribute with cid reference and return modified img tag**
+
+```python
+            else:
+                log_and_print("warning", f"Unsupported image type: {image_path}")
+                return img_tag
+```
+**Warn about unsupported image types and return original tag**
+
+```python
+        except Exception as exc:
+            log_and_print("error", f"Failed to embed image {image_path}: {exc}")
+            return img_tag
+```
+**Handle any errors during image processing and return original tag**
+
+```python
+    modified_html = re.sub(img_pattern, replace_img_src, html_content)
+```
+**Apply the replacement function to all img tags in the HTML content**
+
+```python
+    if embedded_images:
+        log_and_print("info", f"Embedded {len(embedded_images)} image(s) in email")
+```
+**Log summary of embedded images**
+
+```python
+    return modified_html, embedded_images
+```
+**Return the modified HTML content and list of MIME images for email attachment**
