@@ -1,5 +1,10 @@
 import csv
-
+# Field values
+# region:North,East,West,South
+# env:prod,dev,test
+# department:IT,HR,Finance,Sales
+# role:Developer,Manager,Analyst,SalesRep,SysAdmin,Assistant,CFO
+# clustername:
 # Sample data for inventory with multiple emails per row, using semicolons as separators
 inventory_data = [
     ["region", "env", "clustername", "department", "role", "email"],
