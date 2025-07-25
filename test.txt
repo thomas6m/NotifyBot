@@ -1,6 +1,11 @@
 Valid Characters in Email Local Part:
-Your code allows all standard email characters including:
-
 Letters: a-z, A-Z
 Numbers: 0-9
 Special characters: _ (underscore), - (hyphen), . (dot), + (plus)
+
+
+
+problematic_chars = ['|', '`', '$', '\\']
+
+
+
