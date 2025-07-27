@@ -1233,7 +1233,10 @@ def main():
                 log_and_print("confirmation", f"Batch size: {args.batch_size}")
                 log_and_print("confirmation", f"Delay: {args.delay}s")
                 log_and_print("info", "Email sending aborted by user.")
-                sys.exit(0)
+            if not args.force:
+                if not prompt_for_confirmation():
+                    log_and_print("info", "Email sending aborted by user.")
+                    sys.exit(0)
             
             # Send emails in single mode
             send_single_mode_emails(
