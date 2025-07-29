@@ -156,27 +156,31 @@ def determine_mode(base_folder: Path, cli_mode: str = None) -> str:
     log_and_print("mode", "Mode defaulted to: single")
     return "single"
 
-def read_signature(base_folder: Path) -> str:
+def read_signature() -> str:
     """
-    Read signature from signature.html file if it exists.
+    Read signature from /notifybot/signature.html file if it exists.
     Returns empty string if file doesn't exist or can't be read.
+    
+    Returns:
+        str: Signature HTML content or empty string
     """
-    signature_file = base_folder / "signature.html"
+    # Changed to use global signature location
+    signature_file = NOTIFYBOT_ROOT / "signature.html"  # /notifybot/signature.html
     
     if not signature_file.is_file():
-        log_and_print("info", "No signature.html found, emails will be sent without signature")
+        log_and_print("info", "No signature.html found at /notifybot/signature.html, emails will be sent without signature")
         return ""
     
     try:
         signature_content = signature_file.read_text(encoding="utf-8").strip()
         if signature_content:
-            log_and_print("signature", f"Loaded signature from signature.html ({len(signature_content)} characters)")
+            log_and_print("signature", f"Loaded signature from /notifybot/signature.html ({len(signature_content)} characters)")
             return signature_content
         else:
-            log_and_print("warning", "signature.html is empty")
+            log_and_print("warning", "/notifybot/signature.html is empty")
             return ""
     except Exception as exc:
-        log_and_print("error", f"Failed to read signature.html: {exc}")
+        log_and_print("error", f"Failed to read /notifybot/signature.html: {exc}")
         return ""
 
 def combine_body_and_signature(body_html: str, signature_html: str) -> str:
