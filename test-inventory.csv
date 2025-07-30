@@ -1,0 +1,10 @@
+region,sector,env,namespace,datacenter,clustername,email
+apac,gcb,prod,finance-app,sgdc,apcgcbsgd20p,"john.doe@company.com;jane.smith@company.com;mike.johnson@company.com"
+apac,gcb,prod,hr-system,sgdc,apcgcbsgd20p,"jane.smith@company.com;sarah.wilson@company.com;david.brown@company.com"
+apac,gcb,dev,finance-app,sgdc,apcgcbsgd20d,"john.doe@company.com;alex.davis@company.com"
+apac,icg,prod,trading-platform,sgdc,apcicgsgd20p,"robert.taylor@company.com;emily.clark@company.com;james.martinez@company.com"
+apac,icg,dev,trading-platform,sgdc,apcicgsgd20d,"robert.taylor@company.com;emily.clark@company.com"
+apac,cti,prod,infrastructure-tools,sgdc,apcctisgd20p,"tom.anderson@company.com;maria.gonzalez@company.com;kevin.white@company.com"
+nam,gcb,prod,finance-app,mwdc,namgcbmwd20p,"john.doe@company.com;nancy.harris@company.com;peter.thompson@company.com"
+nam,icg,prod,trading-platform,mwdc,namicgmwd20p,"robert.taylor@company.com;susan.lewis@company.com;mark.walker@company.com"
+emea,gcb,prod,finance-app,swdc,emeagcbswd20p,"jane.smith@company.com;lucas.allen@company.com;sophie.king@company.com"
