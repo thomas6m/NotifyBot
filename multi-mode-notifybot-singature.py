@@ -1229,7 +1229,7 @@ def main():
         from_address = read_file(base_folder / "from.txt")
         
         # Read signature (optional)
-        signature_html = read_signature(base_folder)
+        signature_html = read_signature()
         
         # Combine body and signature
         final_body_html = combine_body_and_signature(body_html, signature_html)
