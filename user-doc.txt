@@ -1,0 +1,270 @@
+NotifyBot User Documentation
+⚠️ CRITICAL SAFETY NOTICE ⚠️
+🚨 ALWAYS RUN DRY-RUN BEFORE SENDING LIVE EMAILS 🚨
+
+MANDATORY WORKFLOW:
+1. Create your <user-basefolder>
+2. Run: /notifybot/venv/bin/python notifybot.py --base-folder <user-basefolder> --dry-run
+3. Review draft emails sent to approvers
+4. Only after approval, run live: /notifybot/venv/bin/python notifybot.py --base-folder <user-basefolder>
+
+NEVER skip the dry-run step - it prevents sending emails to wrong recipients!
+
+⚠️ AVOID --force FLAG: Never use --force flag unless absolutely required for automation.
+   It bypasses the confirmation prompt, increasing risk of accidental sends!
+Overview
+NotifyBot is an automated email batch sender that supports two distinct modes of operation:
+
+Single Mode: Send ONE email to MULTIPLE recipients
+Multi Mode: Send MULTIPLE personalized emails based on filter conditions
+
+The system includes features like dry-run testing, image embedding, attachments, signatures, filtering, and comprehensive logging.
+
+System Architecture
+/notifybot/
+├── basefolder/           # Base directory for email campaigns
+│   └── <user-basefolder>/  # Individual campaign folders
+├── inventory/
+│   └── inventory.csv     # Master recipient database
+├── signature.html        # Global email signature
+└── logs/
+    └── notifybot.log     # System logs
+
+
+
+Quick Start
+Basic Usage Examples
+bash# 🚨 ALWAYS START WITH DRY-RUN 🚨
+/notifybot/venv/bin/python notifybot.py --base-folder <user-basefolder> --dry-run
+
+# After dry-run approval, proceed with live sending (WITH confirmation prompt)
+/notifybot/venv/bin/python notifybot.py --base-folder <user-basefolder> --mode single
+
+# Multi mode with dry-run first (MANDATORY)
+/notifybot/venv/bin/python notifybot.py --base-folder <user-basefolder> --dry-run
+/notifybot/venv/bin/python notifybot.py --base-folder <user-basefolder> --mode multi
+
+# Custom batch settings (dry-run first!)
+/notifybot/venv/bin/python notifybot.py --base-folder <user-basefolder> --dry-run
+/notifybot/venv/bin/python notifybot.py --base-folder <user-basefolder> --batch-size 100 --delay 10
+
+# ⚠️ AVOID: --force flag (only for automation)
+# python notifybot.py --base-folder my-campaign --force  # DANGEROUS!
+
+⚠️ DRY-RUN: YOUR SAFETY NET ⚠️
+Dry-run mode is MANDATORY before any live email campaign:
+
+✅ Safe Testing: Sends emails ONLY to approvers (never to actual recipients)
+✅ Content Preview: Shows exactly what recipients will receive
+✅ Recipient Validation: Displays count of who would receive the email
+✅ Error Detection: Catches configuration issues before going live
+✅ Approval Workflow: Allows stakeholders to review before sending
+
+NEVER skip dry-run - it's your protection against email disasters!
+🚫 --force FLAG WARNING 🚫
+The --force flag is DANGEROUS and should be avoided in most cases:
+
+❌ Bypasses Confirmation: No final prompt before sending
+❌ Increases Risk: Easy to accidentally send to wrong recipients
+❌ No Last Chance: No opportunity to abort if you notice an error
+❌ Human Error Prone: Removes the final safety check
+
+⚠️ Only use --force for:
+
+Automated scripts in controlled environments
+Scheduled campaigns with thorough pre-testing
+
+✅ Recommended approach:
+
+Always let the system prompt for confirmation
+Use the final prompt to double-check everything
+Take a moment to verify recipient counts and settings
+
+Directory Structure
+Create your <user-basefolder> folder inside /notifybot/basefolder/:
+
+/notifybot/basefolder/<user-basefolder>/
+							├── subject.txt         # Email subject line
+							├── body.html           # HTML email body
+							├── from.txt            # Sender email address
+							├── approver.txt        # Approver emails (for dry-run)
+							├── mode.txt            # Optional: "single" or "multi"
+							├── to.txt              # Recipients (single mode)
+							├── cc.txt              # CC recipients (optional)
+							├── bcc.txt             # BCC recipients (optional)
+							├── filter.txt          # Filter conditions
+							├── field.txt           # Field names for substitution (multi mode)
+							├── additional_to.txt   # Additional recipients to merge
+							├── attachment/         # Folder for email attachments
+							└── images/             # Folder for embedded images
+							
+
+Required Files
+All Modes
+
+subject.txt 	- Email subject line
+body.html 		- HTML email content
+from.txt 		- Sender email address
+approver.txt 	- Email addresses for dry-run testing
+
+
+Single Mode Additional Requirements
+
+to.txt 											- Direct recipient list
+filter.txt + /notifybot/inventory/inventory.csv - Filtered recipients
+additional_to.txt 								- Additional recipients
+cc.txt 											- CC recipients
+bcc.txt 										- BCC recipients
+
+Multi Mode Additional Requirements
+
+filter.txt 										- Filter conditions (required)
+/notifybot/inventory/inventory.csv 				- Master database (required)
+field.txt 										- Field names for personalization (optional)
+
+
+
+to.txt / cc.txt / bcc.txt / additional_to.txt  - format
+
+user1@company.com;user2@company.com
+user3@company.com
+user4@company.com;user5@company.com;user6@company.com
+
+
+❌ NEVER DO THIS:
+
+Skip dry-run testing
+Send live emails without approval
+Make changes without re-testing
+Ignore dry-run recipient counts
+Use --force flag for manual operations
+Bypass confirmation prompts unnecessarily
+
+✅ ALWAYS DO THIS:
+
+Start every campaign with dry-run
+Get approver sign-off on drafts
+Verify recipient counts match expectations
+Test all personalization and formatting
+Allow system to prompt for final confirmation
+Take time to review before confirming send
+
+
+NotifyBot Recipient Priority Guide
+🚨 DRY-RUN MODE (All Modes)
+Highest Priority: Safety First
+In dry-run mode, ALL recipients are replaced with approvers regardless of mode:
+
+✅ ONLY sends to: approver.txt recipients
+❌ NEVER sends to: Any actual recipients (TO, CC, BCC)
+📧 Subject prefix: "DRAFT - " (auto-added)
+📊 Shows counts: Original recipient numbers for review
+⚠️ Purpose: Safe testing and approval workflow
+
+SINGLE MODE - Live Sending
+Sends ONE email to MULTIPLE recipients
+TO Recipients Priority (Choose ONE source):
+
+Priority 1: to.txt (if exists)
+
+Uses existing to.txt directly
+➕ Merges with: additional_to.txt (if exists)
+📝 Note: No overwriting of existing to.txt
+
+
+Priority 2: Filter Logic (if to.txt doesn't exist)
+
+Uses filter.txt + /notifybot/inventory/inventory.csv
+➕ Merges with: additional_to.txt (if exists)
+💾 Creates: to.txt with merged results for future use
+
+
+Priority 3: additional_to.txt only (if nothing else available)
+
+Uses only additional_to.txt
+💾 Creates: to.txt from additional_to.txt
+
+
+
+CC/BCC Recipients:
+
+CC: cc.txt (included in ALL batches)
+BCC: bcc.txt (included in ALL batches)
+⚠️ Important: CC/BCC recipients receive multiple copies if batching is used
+
+Batching Behavior:
+
+TO recipients split into batches (default: 500)
+CC/BCC included in every batch (causing duplicates)
+Delay between batches (default: 5 seconds)
+
+
+🎯 MULTI MODE - Live Sending
+Sends MULTIPLE personalized emails (one per filter condition)
+Required Files:
+
+filter.txt (required) - Each line = one separate email
+/notifybot/inventory/inventory.csv (required)
+field.txt (optional) - For personalization placeholders
+
+Email Generation:
+
+One email per line in filter.txt
+Each email uses filter conditions to select recipients from inventory
+Personalization via {field_name} placeholders in subject/body
+
+Recipients Per Email:
+
+TO: Recipients matching that specific filter condition
+CC: cc.txt recipients (added to EVERY individual email)
+BCC: bcc.txt recipients (added to EVERY individual email)
+
+CC/BCC Multiplication:
+
+If you have 5 filter lines and 3 CC recipients
+CC recipients get 5 separate emails (one per filter)
+Same applies to BCC recipients
+
+🔄 Recipient Processing Flow
+Single Mode Flow:
+1. Check for to.txt → Use directly
+2. If no to.txt → Apply filter.txt logic → Create to.txt
+3. Merge with additional_to.txt (if exists)
+4. Add CC/BCC to every batch
+5. Send in batches with delays
+
+
+Multi Mode Flow:
+1. Read each line from filter.txt
+2. For each line:
+   - Apply filter to inventory.csv
+   - Generate personalized content
+   - Add CC/BCC recipients
+   - Send individual email
+3. Delay between each email
+
+⚠️ Important Warnings
+CC/BCC Duplication:
+
+Single Mode: CC/BCC get multiple emails if batching occurs
+Multi Mode: CC/BCC get separate emails for each filter condition
+Solution: Consider this when planning campaigns
+
+File Priority Conflicts:
+
+If both to.txt and filter.txt exist in single mode, to.txt wins
+Delete to.txt to force fresh filter results
+Dry-run shows warning about existing to.txt
+
+Recipient Validation:
+
+All email addresses validated before sending
+Invalid emails logged and skipped
+Duplicates automatically removed (case-insensitive)
+
+
+📊 Summary Table
+Mode				TO Source Priority				CC/BCC Behavior		Batching	Duplication Risk	
+Dry-Run				approver.txt only				None (disabled)		No			None
+Single Live			to.txt → filter → additional	Every batch			Yes			CC/BCC per batch
+Multi Live			Per filter condition			Every email			No			CC/BCC per email
