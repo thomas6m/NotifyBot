@@ -1,749 +1,204 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NotifyBot User Runbook</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        
-        .header {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-            color: white;
-            padding: 40px 30px;
-            text-align: center;
-        }
-        
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-        
-        .header p {
-            font-size: 1.2em;
-            opacity: 0.9;
-        }
-        
-        .content {
-            padding: 40px 30px;
-        }
-        
-        .nav-pills {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 30px;
-            justify-content: center;
-        }
-        
-        .nav-pill {
-            background: #3498db;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 25px;
-            text-decoration: none;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            font-size: 14px;
-        }
-        
-        .nav-pill:hover {
-            background: #2980b9;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
-        }
-        
-        .section {
-            margin-bottom: 40px;
-            scroll-margin-top: 20px;
-        }
-        
-        .section h2 {
-            color: #2c3e50;
-            font-size: 1.8em;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 3px solid #3498db;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .section h3 {
-            color: #34495e;
-            font-size: 1.3em;
-            margin: 25px 0 15px 0;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .code-block {
-            background: #2d3748;
-            color: #e2e8f0;
-            padding: 20px;
-            border-radius: 10px;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            margin: 15px 0;
-            overflow-x: auto;
-            border-left: 4px solid #3498db;
-        }
-        
-        .file-structure {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 20px;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            margin: 15px 0;
-        }
-        
-        .alert {
-            padding: 15px 20px;
-            border-radius: 8px;
-            margin: 15px 0;
-            border-left: 4px solid;
-        }
-        
-        .alert-info {
-            background: #e3f2fd;
-            border-color: #2196f3;
-            color: #0d47a1;
-        }
-        
-        .alert-warning {
-            background: #fff3e0;
-            border-color: #ff9800;
-            color: #e65100;
-        }
-        
-        .alert-success {
-            background: #e8f5e8;
-            border-color: #4caf50;
-            color: #2e7d32;
-        }
-        
-        .alert-danger {
-            background: #ffebee;
-            border-color: #f44336;
-            color: #c62828;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        th, td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        
-        th {
-            background: #3498db;
-            color: white;
-            font-weight: 600;
-        }
-        
-        tr:nth-child(even) {
-            background: #f8f9fa;
-        }
-        
-        .badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: bold;
-            color: white;
-        }
-        
-        .badge-required {
-            background: #e74c3c;
-        }
-        
-        .badge-optional {
-            background: #95a5a6;
-        }
-        
-        .step-number {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 30px;
-            height: 30px;
-            background: #3498db;
-            color: white;
-            border-radius: 50%;
-            font-weight: bold;
-            margin-right: 10px;
-        }
-        
-        .comparison-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin: 20px 0;
-        }
-        
-        .mode-card {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            border: 2px solid #e9ecef;
-        }
-        
-        .mode-card h4 {
-            color: #2c3e50;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .footer {
-            background: #34495e;
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        
-        @media (max-width: 768px) {
-            .comparison-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .nav-pills {
-                flex-direction: column;
-                align-items: center;
-            }
-            
-            .content {
-                padding: 20px 15px;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>🚀 NotifyBot User Runbook</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; color: #333; }
+    h1, h2, h3 { color: #0056b3; }
+    code, pre { background: #eee; padding: 4px 6px; border-radius: 4px; }
+    section { margin-bottom: 30px; }
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background: #f0f0f0; }
+    .note { background: #fff3cd; padding: 10px; border-left: 4px solid #ff9800; margin: 10px 0; color: #856404; }
+    .important { background: #ffcccc; padding: 15px; border-left: 6px solid #cc0000; margin: 20px 0; font-weight: bold; color: #660000; border-radius: 6px; }
+    .tip { background: #e7f5ff; padding: 15px; border-left: 6px solid #2196f3; margin: 20px 0; color: #0c5460; border-radius: 6px; }
+    .features { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .feature-list { list-style: none; padding: 0; }
+    .feature-list li { margin: 10px 0; font-size: 15px; }
+    ol { background: #f0f7ff; padding: 15px; border-left: 4px solid #2196f3; }
+    .button-link { 
+      display: inline-block; 
+      margin-top: 10px; 
+      padding: 10px 20px; 
+      background-color: #2d6cdf; 
+      color: white; 
+      text-decoration: none; 
+      border-radius: 5px; 
+      font-weight: bold;
+    }
+    .button-link:hover { background-color: #1a4fbf; }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🚀 NotifyBot User Runbook</h1>
-            <p>Complete Guide for Automated Email Batch Sending</p>
-        </div>
-        
-        <div class="content">
-            <div class="nav-pills">
-                <a href="#overview" class="nav-pill">📋 Overview</a>
-                <a href="#setup" class="nav-pill">⚙️ Setup</a>
-                <a href="#modes" class="nav-pill">🔄 Modes</a>
-                <a href="#files" class="nav-pill">📁 File Structure</a>
-                <a href="#usage" class="nav-pill">🚀 Usage</a>
-                <a href="#examples" class="nav-pill">💡 Examples</a>
-                <a href="#troubleshooting" class="nav-pill">🔧 Troubleshooting</a>
-            </div>
-            
-            <section id="overview" class="section">
-                <h2>📋 Overview</h2>
-                <p>NotifyBot is a powerful Python script for automated email batch sending with two distinct operating modes:</p>
-                
-                <div class="comparison-grid">
-                    <div class="mode-card">
-                        <h4>📨 Single Mode</h4>
-                        <p>Sends <strong>ONE email</strong> to <strong>MULTIPLE recipients</strong></p>
-                        <ul>
-                            <li>Mass announcements</li>
-                            <li>Company-wide updates</li>
-                            <li>Newsletter distribution</li>
-                        </ul>
-                    </div>
-                    <div class="mode-card">
-                        <h4>📬 Multi Mode</h4>
-                        <p>Sends <strong>MULTIPLE personalized emails</strong></p>
-                        <ul>
-                            <li>Personalized reports</li>
-                            <li>Department-specific updates</li>
-                            <li>Customized notifications</li>
-                        </ul>
-                    </div>
-                </div>
-                
-                <div class="alert alert-info">
-                    <strong>🎯 Key Features:</strong> Dry-run testing, batch processing, email validation, signature support, image embedding, attachment handling, and comprehensive logging.
-                </div>
-            </section>
-            
-            <section id="setup" class="section">
-                <h2>⚙️ Initial Setup</h2>
-                
-                <h3>📂 Directory Structure</h3>
-                <div class="file-structure">
-/notifybot/
-├── basefolder/                    # Main working directory
-│   └── your-campaign-folder/      # Your email campaign folder
-├── inventory/
-│   └── inventory.csv             # Master database (for filtering)
-├── logs/
-│   └── notifybot.log            # Activity logs
-└── signature.html               # Global email signature (optional)
-                </div>
-                
-                <h3>🔧 Prerequisites</h3>
-                <ul>
-                    <li><strong>Python 3.6+</strong> with required packages</li>
-                    <li><strong>Sendmail</strong> configured on the system</li>
-                    <li><strong>email_validator</strong> Python package</li>
-                    <li>Proper permissions for <code>/notifybot/</code> directory</li>
-                </ul>
-            </section>
-            
-            <section id="modes" class="section">
-                <h2>🔄 Operating Modes</h2>
-                
-                <h3>📨 Single Mode</h3>
-                <p>Perfect for broadcasting the same message to multiple recipients.</p>
-                
-                <div class="alert alert-success">
-                    <strong>✅ Use Single Mode for:</strong>
-                    <ul>
-                        <li>Company announcements</li>
-                        <li>Event invitations</li>
-                        <li>Policy updates</li>
-                        <li>Newsletter distribution</li>
-                    </ul>
-                </div>
-                
-                <h3>📬 Multi Mode</h3>
-                <p>Ideal for sending customized emails based on filter conditions.</p>
-                
-                <div class="alert alert-success">
-                    <strong>✅ Use Multi Mode for:</strong>
-                    <ul>
-                        <li>Personalized reports (e.g., department-specific data)</li>
-                        <li>Targeted campaigns</li>
-                        <li>Custom notifications based on user attributes</li>
-                        <li>Dynamic content delivery</li>
-                    </ul>
-                </div>
-                
-                <h3>🎛️ Mode Selection Priority</h3>
-                <ol>
-                    <li><strong>CLI argument</strong> <code>--mode single|multi</code> (highest priority)</li>
-                    <li><strong>mode.txt file</strong> in campaign folder</li>
-                    <li><strong>Default:</strong> single mode (if no mode specified)</li>
-                </ol>
-            </section>
-            
-            <section id="files" class="section">
-                <h2>📁 File Structure & Requirements</h2>
-                
-                <h3>📋 Required Files</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>File</th>
-                            <th>Purpose</th>
-                            <th>Example Content</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><code>subject.txt</code> <span class="badge badge-required">REQUIRED</span></td>
-                            <td>Email subject line</td>
-                            <td>Monthly Report - {department}</td>
-                        </tr>
-                        <tr>
-                            <td><code>body.html</code> <span class="badge badge-required">REQUIRED</span></td>
-                            <td>Email body content</td>
-                            <td>HTML formatted email content</td>
-                        </tr>
-                        <tr>
-                            <td><code>from.txt</code> <span class="badge badge-required">REQUIRED</span></td>
-                            <td>Sender email address</td>
-                            <td>notifications@company.com</td>
-                        </tr>
-                        <tr>
-                            <td><code>approver.txt</code> <span class="badge badge-required">REQUIRED</span></td>
-                            <td>Approval/testing emails</td>
-                            <td>manager@company.com</td>
-                        </tr>
-                    </tbody>
-                </table>
-                
-                <h3>📋 Recipient Files</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>File</th>
-                            <th>Mode</th>
-                            <th>Purpose</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><code>to.txt</code> <span class="badge badge-optional">OPTIONAL</span></td>
-                            <td>Single</td>
-                            <td>Primary recipients (semicolon-separated)</td>
-                        </tr>
-                        <tr>
-                            <td><code>cc.txt</code> <span class="badge badge-optional">OPTIONAL</span></td>
-                            <td>Both</td>
-                            <td>CC recipients</td>
-                        </tr>
-                        <tr>
-                            <td><code>bcc.txt</code> <span class="badge badge-optional">OPTIONAL</span></td>
-                            <td>Both</td>
-                            <td>BCC recipients</td>
-                        </tr>
-                        <tr>
-                            <td><code>additional_to.txt</code> <span class="badge badge-optional">OPTIONAL</span></td>
-                            <td>Single</td>
-                            <td>Additional TO recipients</td>
-                        </tr>
-                        <tr>
-                            <td><code>filter.txt</code> <span class="badge badge-required">REQUIRED</span></td>
-                            <td>Multi</td>
-                            <td>Filter conditions for inventory (Multi mode only)</td>
-                        </tr>
-                    </tbody>
-                </table>
-                
-                <h3>📂 Optional Folders</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Folder</th>
-                            <th>Purpose</th>
-                            <th>Notes</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><code>attachment/</code></td>
-                            <td>File attachments</td>
-                            <td>All files in folder will be attached</td>
-                        </tr>
-                        <tr>
-                            <td><code>images/</code></td>
-                            <td>Embedded images</td>
-                            <td>Referenced in HTML with &lt;img src="filename.jpg"&gt;</td>
-                        </tr>
-                    </tbody>
-                </table>
-                
-                <h3>🎛️ Configuration Files</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>File</th>
-                            <th>Purpose</th>
-                            <th>Example</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><code>mode.txt</code></td>
-                            <td>Set operating mode</td>
-                            <td>single or multi</td>
-                        </tr>
-                        <tr>
-                            <td><code>field.txt</code></td>
-                            <td>Fields for personalization (Multi mode)</td>
-                            <td>department<br>region<br>manager</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </section>
-            
-            <section id="usage" class="section">
-                <h2>🚀 Usage Commands</h2>
-                
-                <h3>🧪 Testing (Dry Run)</h3>
-                <div class="alert alert-warning">
-                    <strong>⚠️ Always test first!</strong> Dry run sends draft emails only to approvers.
-                </div>
-                
-                <div class="code-block">
-# Test single mode
-python notifybot.py --base-folder my-campaign --dry-run
 
-# Test multi mode  
-python notifybot.py --base-folder my-campaign --dry-run --mode multi
-                </div>
-                
-                <h3>🎯 Live Execution</h3>
-                <div class="code-block">
-# Single mode with confirmation
-python notifybot.py --base-folder my-campaign
+  <h1>🚀 NotifyBot User Runbook</h1>
 
-# Multi mode, skip confirmation
-python notifybot.py --base-folder my-campaign --mode multi --force
+  <div class="features">
+    <p>
+      <strong>NotifyBot</strong>, our smart, scalable solution for email automation.  
+      Whether you're sending a handful of emails or thousands, NotifyBot makes it effortless, safe, and efficient.  
+      It supports both single and multi modes, with dry-run and signature capabilities.
+    </p>
+    <ul class="feature-list">
+      <li>📧 <b>Batch Email Sending</b>: Deliver emails in customizable batches with controlled delays</li>
+      <li>🖋️ <b>HTML Email Support</b>: Craft rich, styled messages (with attachments!)</li>
+      <li>🎯 <b>Recipient Filtering</b>: Easily target the right audience with CSV filters</li>
+      <li>🧪 <b>Dry Run Mode</b>: Test configurations safely without sending actual emails</li>
+      <li>✅ <b>Email Validation</b>: Automatically validate addresses to reduce bounces</li>
+      <li>📎 <b>Attachment Support</b>: Attach files up to 15MB each</li>
+      <li>🔁 <b>Deduplication</b>: Automatically remove duplicate recipients</li>
+      <li>📊 <b>Logging & Transparency</b>: Detailed logs with automatic log rotation</li>
+    </ul>
+    <p><i>Stay in control. Stay efficient. That’s the NotifyBot way.</i></p>
+  </div>
 
-# Custom batch settings
-python notifybot.py --base-folder my-campaign --batch-size 100 --delay 3.0
-                </div>
-                
-                <h3>📊 Command Options</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Option</th>
-                            <th>Description</th>
-                            <th>Default</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><code>--base-folder</code></td>
-                            <td>Campaign folder name</td>
-                            <td>Required</td>
-                        </tr>
-                        <tr>
-                            <td><code>--mode</code></td>
-                            <td>Force single/multi mode</td>
-                            <td>Auto-detect</td>
-                        </tr>
-                        <tr>
-                            <td><code>--dry-run</code></td>
-                            <td>Test mode (approvers only)</td>
-                            <td>false</td>
-                        </tr>
-                        <tr>
-                            <td><code>--force</code></td>
-                            <td>Skip confirmation</td>
-                            <td>false</td>
-                        </tr>
-                        <tr>
-                            <td><code>--batch-size</code></td>
-                            <td>Emails per batch</td>
-                            <td>500</td>
-                        </tr>
-                        <tr>
-                            <td><code>--delay</code></td>
-                            <td>Seconds between batches</td>
-                            <td>5.0</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </section>
-            
-            <section id="examples" class="section">
-                <h2>💡 Practical Examples</h2>
-                
-                <h3><span class="step-number">1</span>Single Mode: Company Newsletter</h3>
-                
-                <p><strong>Scenario:</strong> Send monthly newsletter to all employees</p>
-                
-                <div class="file-structure">
-/notifybot/basefolder/newsletter-march/
-├── mode.txt                 → single
-├── subject.txt             → March 2024 Company Newsletter
-├── body.html               → Newsletter content
-├── from.txt                → newsletter@company.com
-├── approver.txt            → communications@company.com
-├── filter.txt              → status=active
-├── cc.txt                  → management@company.com
-└── images/
-    └── logo.png
-                </div>
-                
-                <div class="code-block">
-# Test first
-python notifybot.py --base-folder newsletter-march --dry-run
+  <div class="important">
+    ⚠️ <b>Critical Disclaimer:</b><br><br>
+    📧 Always run NotifyBot in <code>--dry-run</code> mode first to verify recipients and content.<br>
+    ❌ Do <b>not</b> use <code>--force</code> unless running in a fully automated script with prior approval.<br>
+    ⚠️ Running live without a dry-run review may result in unintended mass emails.<br>
+    📂 The <code>&lt;user-basefolder&gt;</code> is the directory where you must maintain all required input files 
+    (e.g. <code>subject.txt</code>, <code>body.html</code>, <code>to.txt</code>).
+  </div>
 
-# Send live
-python notifybot.py --base-folder newsletter-march --force
-                </div>
-                
-                <h3><span class="step-number">2</span>Multi Mode: Department Reports</h3>
-                
-                <p><strong>Scenario:</strong> Send customized reports to each department</p>
-                
-                <div class="file-structure">
-/notifybot/basefolder/dept-reports/
-├── mode.txt                 → multi
-├── subject.txt             → {department} Monthly Report
-├── body.html               → Dear {department} team...
-├── from.txt                → reports@company.com
-├── approver.txt            → manager@company.com
-├── filter.txt              → department=sales
-│                            department=marketing
-│                            department=engineering
-├── field.txt               → department
-└── attachment/
-    └── template.xlsx
-                </div>
-                
-                <div class="code-block">
-# Test personalization
-python notifybot.py --base-folder dept-reports --dry-run --mode multi
+  <div class="tip">
+    💡 <b>Tip:</b> Always replace <code>&lt;user-basefolder&gt;</code> in the examples below with the name of your campaign folder inside <code>/notifybot/basefolder/</code>.  
+    Example: If your folder is <code>newsletter_august</code>, use:  
+    <br><code>/notifybot/venv/bin/python notifybot.py --base-folder newsletter_august --dry-run</code>
+  </div>
 
-# Execute campaign
-python notifybot.py --base-folder dept-reports --mode multi
-                </div>
-                
-                <h3><span class="step-number">3</span>Advanced Filtering</h3>
-                
-                <p><strong>filter.txt examples:</strong></p>
-                
-                <div class="code-block">
-# Simple field matching
-department=sales
-status=active
+  <section>
+    <h2>Usage Examples</h2>
+    <pre>
+# Dry-run mode (always recommended first)
+ /notifybot/venv/bin/python notifybot.py --base-folder &lt;user-basefolder&gt; --dry-run
 
-# Multiple conditions (AND logic)
-department=marketing,region=north
+# Live mode (single, default)
+ /notifybot/venv/bin/python notifybot.py --base-folder &lt;user-basefolder&gt;
 
-# Wildcard patterns
-department=sales*
-region=*west
-name=john*
+# Live mode (multi) with custom batch size and delay
+ /notifybot/venv/bin/python notifybot.py --base-folder &lt;user-basefolder&gt; --mode multi --batch-size 500 --delay 5.0
 
-# Complex conditions
-department=engineering,level=senior,location=*office
-department=sales,region=north,status=active
-                </div>
-            </section>
-            
-            <section id="troubleshooting" class="section">
-                <h2>🔧 Troubleshooting</h2>
-                
-                <h3>❌ Common Issues</h3>
-                
-                <div class="alert alert-danger">
-                    <strong>Error: Missing required files</strong><br>
-                    <strong>Solution:</strong> Ensure all required files exist: subject.txt, body.html, from.txt, approver.txt
-                </div>
-                
-                <div class="alert alert-danger">
-                    <strong>Error: Invalid base folder</strong><br>
-                    <strong>Solution:</strong> Folder must exist inside /notifybot/basefolder/
-                </div>
-                
-                <div class="alert alert-danger">
-                    <strong>Error: No recipients found (Single mode)</strong><br>
-                    <strong>Solution:</strong> Provide at least one: to.txt, filter.txt+inventory.csv, additional_to.txt, cc.txt, or bcc.txt
-                </div>
-                
-                <div class="alert alert-danger">
-                    <strong>Error: Multi mode requires filter.txt</strong><br>
-                    <strong>Solution:</strong> Create filter.txt with filtering conditions for multi mode operation
-                </div>
-                
-                <div class="alert alert-danger">
-                    <strong>Error: Sendmail not found</strong><br>
-                    <strong>Solution:</strong> Install and configure sendmail on your system
-                </div>
-                
-                <h3>📊 Log Analysis</h3>
-                <p>Check logs at <code>/notifybot/logs/notifybot.log</code> for detailed execution information:</p>
-                
-                <div class="code-block">
-# View recent logs
-tail -f /notifybot/logs/notifybot.log
+# Show all available options
+ /notifybot/venv/bin/python notifybot.py --help
+    </pre>
+  </section>
 
-# Search for errors
-grep "❌" /notifybot/logs/notifybot.log
-                </div>
-                
-                <h3>🔍 Validation Checklist</h3>
-                <ul>
-                    <li>✅ All required files present</li>
-                    <li>✅ Email addresses properly formatted</li>
-                    <li>✅ HTML content valid</li>
-                    <li>✅ Images exist in images/ folder</li>
-                    <li>✅ Filter conditions match inventory data</li>
-                    <li>✅ Sendmail service running</li>
-                    <li>✅ Proper file permissions</li>
-                </ul>
-                
-                <h3>🧪 Testing Best Practices</h3>
-                <div class="alert alert-info">
-                    <strong>💡 Pro Tips:</strong>
-                    <ul>
-                        <li>Always run <code>--dry-run</code> first</li>
-                        <li>Test with small recipient lists</li>
-                        <li>Verify HTML rendering in email clients</li>
-                        <li>Check spam folder during testing</li>
-                        <li>Monitor system resources during large batches</li>
-                    </ul>
-                </div>
-                
-                <h3>📞 Support Information</h3>
-                <div class="alert alert-info">
-                    <strong>Need Help?</strong><br>
-                    <ul>
-                        <li>Check the log files for detailed error messages</li>
-                        <li>Verify your inventory.csv format and content</li>
-                        <li>Test email delivery with a small batch first</li>
-                        <li>Ensure proper system permissions and sendmail configuration</li>
-                    </ul>
-                </div>
-            </section>
-        </div>
-        
-        <div class="footer">
-            <p>🚀 NotifyBot User Runbook | Last Updated: 2024</p>
-            <p>🔒 Confidential - For Internal Use Only</p>
-        </div>
+  <section>
+    <h2>Command-Line Options</h2>
+    <table>
+      <tr><th>Option</th><th>Description</th></tr>
+      <tr><td><code>--base-folder</code></td>
+          <td>User-defined base directory (e.g. <code>&lt;user-basefolder&gt;</code>) inside 
+          <code>/notifybot/basefolder</code> containing email input files <b>(required)</b>.</td></tr>
+      <tr><td><code>--mode</code></td><td>Force mode: <code>single</code> or <code>multi</code>. Overrides <code>mode.txt</code>. <br><b>Default: single</b>.</td></tr>
+      <tr><td><code>--dry-run</code></td><td>Simulate sending emails. Sends only to approvers with <b>DRAFT</b> prefix. <b>Always recommended first</b>.</td></tr>
+      <tr><td><code>--batch-size</code></td><td>Number of emails to send per batch (default: 500). <br>Applies to <b>single mode</b>.</td></tr>
+      <tr><td><code>--delay</code></td><td>Delay in seconds between batches (default: 5.0).</td></tr>
+      <tr><td><code>--force</code></td><td><b>Use with caution.</b> Skips confirmation prompt. Only for automated scripts.</td></tr>
+      <tr><td><code>--help</code></td><td>Show help message and exit.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Recipient Creation Priority (Single Mode)</h2>
+    <ol>
+      <li><b><code>to.txt</code></b> (if present) → Always takes precedence as the primary recipient list.</li>
+      <li><b><code>filter.txt</code> + <code>inventory.csv</code></b> → Used if <code>to.txt</code> is not found.</li>
+      <li><b><code>additional_to.txt</code></b> → Merged with whichever source is used above.</li>
+      <li><b><code>cc.txt</code> and <code>bcc.txt</code></b> → Included in all emails but do not affect <code>TO</code>.</li>
+    </ol>
+    <div class="note">
+      If no valid recipient source is found (and not running <code>--dry-run</code>), the process will stop with an error.
     </div>
-    
-    <script>
-        // Smooth scrolling for navigation links
-        document.querySelectorAll('.nav-pill').forEach(link => {
-            link.addEventListener('click', function(e) {
-                e.preventDefault();
-                const targetId = this.getAttribute('href').substring(1);
-                const targetElement = document.getElementById(targetId);
-                if (targetElement) {
-                    targetElement.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-                }
-            });
-        });
-        
-        // Add loading animation to code blocks
-        document.querySelectorAll('.code-block').forEach(block => {
-            block.addEventListener('mouseenter', function() {
-                this.style.transform = 'scale(1.02)';
-                this.style.transition = 'transform 0.2s ease';
-            });
-            
-            block.addEventListener('mouseleave', function() {
-                this.style.transform = 'scale(1)';
-            });
-        });
-    </script>
+  </section>
+
+  <section>
+    <h2>Recipient Creation Priority (Multi Mode)</h2>
+    <ol>
+      <li><b><code>filter.txt</code> + <code>inventory.csv</code></b> → Defines conditions and generates emails per matching row.</li>
+      <li><b><code>field.txt</code> (optional)</b> → Placeholder substitutions using fields from <code>inventory.csv</code>.</li>
+      <li><b><code>additional_to.txt</code> (optional)</b> → Adds extra recipients to those from <code>inventory.csv</code>.</li>
+      <li><b><code>cc.txt</code> and <code>bcc.txt</code> (optional)</b> → Added to every personalized email.</li>
+    </ol>
+    <div class="note">
+      Multi mode will fail if <code>filter.txt</code> or <code>inventory.csv</code> is missing.
+    </div>
+  </section>
+
+  <section>
+    <h2>Operating Modes</h2>
+    <h3>Single Mode (Default)</h3>
+    <ul>
+      <li>✅ <b>Required:</b> <code>subject.txt</code>, <code>body.html</code>, <code>from.txt</code>, <code>approver.txt</code></li>
+      <li>📧 <b>Recipient Sources:</b> <code>to.txt</code> OR (<code>filter.txt</code> + <code>inventory.csv</code>) OR <code>additional_to.txt</code></li>
+      <li>📎 <b>Optional:</b> <code>cc.txt</code>, <code>bcc.txt</code>, <code>attachment/</code>, <code>images/</code>, <code>signature.html</code></li>
+    </ul>
+
+    <h3>Multi Mode</h3>
+    <ul>
+      <li>✅ <b>Required:</b> <code>subject.txt</code>, <code>body.html</code>, <code>from.txt</code>, <code>approver.txt</code>, <code>filter.txt</code></li>
+      <li>📎 <b>Optional:</b> <code>field.txt</code>, <code>cc.txt</code>, <code>bcc.txt</code>, <code>attachment/</code>, <code>images/</code>, <code>signature.html</code></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Required Directory Structure</h2>
+    <pre>
+/notifybot
+  ├── basefolder/
+  │   └── &lt;user-basefolder&gt;/
+  │       ├── subject.txt
+  │       ├── body.html
+  │       ├── from.txt
+  │       ├── approver.txt
+  │       ├── to.txt (optional)
+  │       ├── filter.txt (optional)
+  │       ├── additional_to.txt (optional)
+  │       ├── cc.txt / bcc.txt (optional)
+  │       ├── attachment/ (optional)
+  │       └── images/ (optional)
+  ├── signature.html (optional)
+  └── inventory/
+      └── inventory.csv
+    </pre>
+  </section>
+
+  <section>
+    <h2>Dry-Run Mode</h2>
+    <div class="note">
+      In <b>--dry-run</b>, NotifyBot sends only to <code>approver.txt</code> addresses.  
+      The subject is prefixed with <b>DRAFT</b> and the body includes recipient count info.  
+      <b>Always run dry-run first to prevent unintended mass emails.</b>
+    </div>
+  </section>
+
+  <section>
+    <h2>Logging</h2>
+    <p>Logs are written to <code>/notifybot/logs/notifybot.log</code> in CSV format with emojis for quick scanning.</p>
+    <pre>
+ℹ️ Info, ⚠️ Warning, ❌ Error, ✅ Success, 📝 Draft, 🔧 Mode
+    </pre>
+    <p>
+      📡 All logs are also forwarded in real-time to <b>Splunk</b> for auditing and long-term reference.
+    </p>
+    <a class="button-link" href="https://tinyurl/notifybot" target="_blank">🔗 Open Splunk Dashboard</a>
+  </section>
+
+  <section>
+    <h2>Attachments & Images</h2>
+    <ul>
+      <li>📎 Files in <code>attachment/</code> are sent as attachments.</li>
+      <li>🖼️ Images in <code>images/</code> are embedded in HTML emails automatically.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Approval Process</h2>
+    <p>Before sending email in live mode, <code>approver.txt</code> ensures dry-run copies are reviewed and approved.</p>
+  </section>
+
 </body>
 </html>
