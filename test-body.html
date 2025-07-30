@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: 'Helvetica Neue', 'Segoe UI', Arial, sans-serif;
+            line-height: 1.7;
+            color: #2c3e50;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .email-container {
+            max-width: 900px;
+            margin: 20px auto;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>') repeat;
+            animation: grain 20s linear infinite;
+        }
+        @keyframes grain {
+            0%, 100% { transform: translate(0, 0) }
+            10% { transform: translate(-5%, -5%) }
+            20% { transform: translate(-10%, 5%) }
+            30% { transform: translate(5%, -10%) }
+            40% { transform: translate(-5%, 15%) }
+            50% { transform: translate(-10%, 5%) }
+            60% { transform: translate(15%, 0%) }
+            70% { transform: translate(0%, 10%) }
+            80% { transform: translate(-15%, 0%) }
+            90% { transform: translate(10%, 5%) }
+        }
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 32px;
+            font-weight: 700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            position: relative;
+            z-index: 1;
+        }
+        .header p {
+            margin: 0;
+            font-size: 16px;
+            opacity: 0.95;
+            font-weight: 300;
+            position: relative;
+            z-index: 1;
+        }
+        .content {
+            padding: 30px 40px;
+        }
+        .alert-box {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border-left: 6px solid #f39c12;
+            padding: 25px;
+            margin: 25px 0;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(243, 156, 18, 0.15);
+        }
+        .alert-box h3 {
+            margin: 0 0 15px 0;
+            color: #d68910;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .namespace-info {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border-left: 6px solid #2196f3;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 25px 0;
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.15);
+        }
+        .namespace-info h3 {
+            margin: 0 0 20px 0;
+            color: #1565c0;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .namespace-info ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .namespace-info li {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(33, 150, 243, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .namespace-info li:last-child {
+            border-bottom: none;
+        }
+        .action-required {
+            background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+            border-left: 6px solid #f44336;
+            padding: 25px;
+            margin: 25px 0;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(244, 67, 54, 0.15);
+        }
+        .action-required h3 {
+            margin: 0 0 15px 0;
+            color: #c62828;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .code-block {
+            background: linear-gradient(135deg, #263238 0%, #37474f 100%);
+            color: #4fc3f7;
+            border-radius: 6px;
+            padding: 18px 20px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            margin: 15px 0;
+            overflow-x: auto;
+            border-left: 4px solid #4fc3f7;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .migration-steps {
+            background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+            border-left: 6px solid #9c27b0;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 25px 0;
+            box-shadow: 0 4px 12px rgba(156, 39, 176, 0.15);
+        }
+        .migration-steps h3 {
+            margin: 0 0 20px 0;
+            color: #7b1fa2;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .migration-steps ol {
+            padding-left: 25px;
+            margin: 0;
+        }
+        .migration-steps li {
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        .migration-steps li strong {
+            color: #6a1b9a;
+        }
+        .timeline-section {
+            background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+            border-left: 6px solid #4caf50;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 25px 0;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.15);
+        }
+        .timeline-section h3 {
+            margin: 0 0 20px 0;
+            color: #2e7d32;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .timeline-section ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .timeline-section li {
+            padding: 12px 0;
+            border-left: 3px solid #4caf50;
+            padding-left: 20px;
+            margin-bottom: 10px;
+            position: relative;
+        }
+        .timeline-section li::before {
+            content: '';
+            position: absolute;
+            left: -6px;
+            top: 18px;
+            width: 12px;
+            height: 12px;
+            background: #4caf50;
+            border-radius: 50%;
+        }
+        .resources-section {
+            background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+            border-left: 6px solid #ff9800;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 25px 0;
+            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.15);
+        }
+        .resources-section h3 {
+            margin: 0 0 20px 0;
+            color: #ef6c00;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .next-steps {
+            background: linear-gradient(135deg, #f1f8e9 0%, #dcedc8 100%);
+            border-left: 6px solid #8bc34a;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 25px 0;
+            box-shadow: 0 4px 12px rgba(139, 195, 74, 0.15);
+        }
+        .next-steps h3 {
+            margin: 0 0 20px 0;
+            color: #558b2f;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .next-steps ol {
+            padding-left: 25px;
+            margin: 0;
+        }
+        .next-steps li {
+            margin-bottom: 12px;
+            line-height: 1.6;
+        }
+        .footer {
+            background: linear-gradient(135deg, #37474f 0%, #263238 100%);
+            color: #ecf0f1;
+            padding: 30px 40px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .footer p {
+            margin: 8px 0;
+        }
+        .footer strong {
+            color: #4fc3f7;
+            font-size: 16px;
+        }
+        .important {
+            font-weight: 700;
+            color: #e74c3c;
+        }
+        .highlight {
+            background: linear-gradient(135deg, #fff59d 0%, #fff176 100%);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            color: #f57f17;
+            border: 1px solid #ffeb3b;
+        }
+        .emoji {
+            font-size: 1.2em;
+            margin-right: 8px;
+        }
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .email-container {
+                margin: 10px;
+                border-radius: 8px;
+            }
+            .content {
+                padding: 20px 25px;
+            }
+            .header {
+                padding: 30px 25px;
+            }
+            .header h1 {
+                font-size: 26px;
+            }
+            .footer {
+                padding: 25px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1><span class="emoji">🚨</span>URGENT: OpenShift Migration Required</h1>
+            <p>DeploymentConfig End of Support Notice</p>
+        </div>
+
+        <div class="content">
+            <div class="namespace-info">
+                <h3><span class="emoji">📍</span>Deployment Information</h3>
+                <ul>
+                    <li><strong>Cluster Name:</strong> <span class="highlight">{clustername}</span></li>
+                    <li><strong>Namespace:</strong> <span class="highlight">{namespace}</span></li>
+                </ul>
+            </div>
+
+            <div class="alert-box">
+                <h3><span class="emoji">⚠️</span>Important Notice</h3>
+                <p>Red Hat has announced that <strong>DeploymentConfig</strong> resources will reach <span class="important">End of Vendor Support</span> in upcoming OpenShift releases. All applications using DeploymentConfig must be migrated to <strong>Deployment</strong> resources.</p>
+            </div>
+
+            <div class="action-required">
+                <h3><span class="emoji">🎯</span>Action Required for {namespace}</h3>
+                <p class="important">You must migrate all DeploymentConfig resources in the <strong>{namespace}</strong> namespace on cluster <strong>{clustername}</strong> to Deployment resources before the support deadline.</p>
+            </div>
+
+            <div class="migration-steps">
+                <h3><span class="emoji">📋</span>Migration Steps</h3>
+                <ol>
+                    <li><strong>Audit Current DeploymentConfigs on {clustername}:</strong>
+                        <div class="code-block">oc get dc -n {namespace} --server={clustername}</div>
+                    </li>
+                    <li><strong>Review Application Dependencies:</strong>
+                        <ul>
+                            <li>Check for custom deployment hooks</li>
+                            <li>Verify image stream references</li>
+                            <li>Review environment variable configurations</li>
+                        </ul>
+                    </li>
+                    <li><strong>Create Deployment Manifests:</strong>
+                        <div class="code-block">oc get dc/your-app -n {namespace} --server={clustername} -o yaml > deployment-backup.yaml</div>
+                    </li>
+                    <li><strong>Convert to Deployment:</strong>
+                        <ul>
+                            <li>Change <code>kind: DeploymentConfig</code> to <code>kind: Deployment</code></li>
+                            <li>Update <code>apiVersion</code> to <code>apps/v1</code></li>
+                            <li>Add required selector labels</li>
+                            <li>Remove DeploymentConfig-specific fields</li>
+                        </ul>
+                    </li>
+                    <li><strong>Test in Lower Environment:</strong>
+                        <p>If this is production, test the migration in a development environment first</p>
+                    </li>
+                    <li><strong>Schedule Migration Window:</strong>
+                        <p>Plan for brief application downtime during the migration</p>
+                    </li>
+                </ol>
+            </div>
+
+            <div class="timeline-section">
+                <h3><span class="emoji">📅</span>Timeline</h3>
+                <ul>
+                    <li><strong>Immediate:</strong> Begin migration planning and testing</li>
+                    <li><strong>Within 2 weeks:</strong> Complete migration in development/UAT environments</li>
+                    <li><strong>Within 4 weeks:</strong> Complete migration in production environments</li>
+                </ul>
+            </div>
+
+            <div class="resources-section">
+                <h3><span class="emoji">🔗</span>Resources & Support</h3>
+                <ul>
+                    <li><strong>Documentation:</strong> Internal OpenShift Migration Guide</li>
+                    <li><strong>Support Channel:</strong> #openshift-support</li>
+                    <li><strong>Office Hours:</strong> Tuesdays & Thursdays, 2-4 PM</li>
+                    <li><strong>Migration Workshop:</strong> Contact platform team for hands-on assistance</li>
+                </ul>
+            </div>
+
+            <div class="next-steps">
+                <h3><span class="emoji">⚡</span>Next Steps</h3>
+                <ol>
+                    <li>Reply to this email with your migration timeline</li>
+                    <li>Schedule a consultation with the platform team if needed</li>
+                    <li>Update your CI/CD pipelines to use Deployment resources</li>
+                    <li>Document any application-specific migration notes</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>OpenShift Platform Team</strong></p>
+            <p>This is an automated notification for namespace: <strong>{namespace}</strong> on cluster: <strong>{clustername}</strong></p>
+            <p>For urgent issues, contact the platform team immediately</p>
+        </div>
+    </div>
+</body>
+</html>
