@@ -1,0 +1,12 @@
+# Filter conditions for multi-mode email sending - 3 test filters
+# Each line represents one email to be sent
+# Format: field=value,field=value (AND conditions)
+
+# Filter 1: APAC GCB Production Finance App
+clustername=apcgcbsgd20p,namespace=finance-app
+
+# Filter 2: APAC ICG Production Trading Platform  
+clustername=apcicgsgd20p,namespace=trading-platform
+
+# Filter 3: APAC CTI Production Infrastructure Tools
+clustername=apcctisgd20p,namespace=infrastructure-tools
