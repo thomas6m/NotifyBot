@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>📧 NotifyBot Runbook & Demo Sessions</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; color: #333; }
+    h1, h2, h3 { color: #0056b3; }
+    code, pre { background: #eee; padding: 4px 6px; border-radius: 4px; }
+    section { margin-bottom: 30px; }
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background: #f0f0f0; }
+    .note { background: #fff3cd; padding: 10px; border-left: 4px solid #ff9800; margin: 10px 0; color: #856404; }
+    .important { background: #ffcccc; padding: 15px; border-left: 6px solid #cc0000; margin: 20px 0; font-weight: bold; color: #660000; border-radius: 6px; }
+    .tip { background: #e7f5ff; padding: 15px; border-left: 6px solid #2196f3; margin: 20px 0; color: #0c5460; border-radius: 6px; }
+    .features { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .feature-list { list-style: none; padding: 0; }
+    .feature-list li { margin: 10px 0; font-size: 15px; }
+    ol { background: #f0f7ff; padding: 15px; border-left: 4px solid #2196f3; }
+    .intro-message { 
+      background: #e8f4ff; 
+      padding: 20px; 
+      border: 2px solid #2d6cdf;
+      margin: 0 auto 30px auto;
+      border-radius: 8px; 
+      font-size: 16px; 
+      color: #0c3c60;
+      max-width: 700px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .button-link { 
+      display: inline-block; 
+      margin-top: 10px; 
+      padding: 10px 20px; 
+      background-color: #2d6cdf; 
+      color: white; 
+      text-decoration: none; 
+      border-radius: 5px; 
+      font-weight: bold;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    .button-link:hover { background-color: #1a4fbf; }
+  </style>
+</head>
+<body>
+
+  <div class="intro-message">
+    <p>Dear Team,</p>
+    <p>
+      Thank you for joining the demo session.  
+      Please find below the NotifyBot runbook for your reference.  
+      If you have any questions or need further clarification, feel free to reach out to me — your feedback is highly appreciated.
+    </p>
+    <p>
+      I’ll also be hosting an additional demo session during <b>APAC</b> and <b>NAM</b> hours.
+    </p>
+    <p>Best regards,<br><b>[Your Name]</b></p>
+  </div>
+
+  <h1>🚀 NotifyBot User Runbook</h1>
+
+  <div class="features">
+    <p>
+      <strong>NotifyBot</strong>, our smart, scalable solution for email automation.  
+      Whether you're sending a handful of emails or thousands, NotifyBot makes it effortless, safe, and efficient.  
+      It supports both single and multi modes, with dry-run and signature capabilities.
+    </p>
+    <ul class="feature-list">
+      <li>📧 <b>Batch Email Sending</b>: Deliver emails in customizable batches with controlled delays</li>
+      <li>🖋️ <b>HTML Email Support</b>: Craft rich, styled messages (with attachments!)</li>
+      <li>🎯 <b>Recipient Filtering</b>: Easily target the right audience with CSV filters</li>
+      <li>🧪 <b>Dry Run Mode</b>: Test configurations safely without sending actual emails</li>
+      <li>✅ <b>Email Validation</b>: Automatically validate addresses to reduce bounces</li>
+      <li>📎 <b>Attachment Support</b>: Attach files up to 15MB each</li>
+      <li>🔁 <b>Deduplication</b>: Automatically remove duplicate recipients</li>
+      <li>📊 <b>Logging & Transparency</b>: Detailed logs with automatic log rotation</li>
+    </ul>
+    <p><i>Stay in control. Stay efficient. That’s the NotifyBot way.</i></p>
+  </div>
+
+  <div class="important">
+    ⚠️ <b>Critical Disclaimer:</b><br><br>
+    📧 Always run NotifyBot in <code>--dry-run</code> mode first to verify recipients and content.<br>
+    ❌ Do <b>not</b> use <code>--force</code> unless running in a fully automated script with prior approval.<br>
+    ⚠️ Running live without a dry-run review may result in unintended mass emails.<br>
+    📂 The <code>&lt;user-basefolder&gt;</code> is the directory where you must maintain all required input files 
+    (e.g. <code>subject.txt</code>, <code>body.html</code>, <code>to.txt</code>).
+  </div>
+
+  <div class="tip">
+    💡 <b>Tip:</b> Always replace <code>&lt;user-basefolder&gt;</code> in the examples below with the name of your campaign folder inside <code>/notifybot/basefolder/</code>.  
+    Example: If your folder is <code>newsletter_august</code>, use:  
+    <br><code>/notifybot/venv/bin/python notifybot.py --base-folder newsletter_august --dry-run</code>
+  </div>
+
+  <section>
+    <h2>Usage Examples</h2>
+    <pre>
+# Dry-run mode (always recommended first)
+ /notifybot/venv/bin/python notifybot.py --base-folder &lt;user-basefolder&gt; --dry-run
+
+# Live mode (single, default)
+ /notifybot/venv/bin/python notifybot.py --base-folder &lt;user-basefolder&gt;
+
+# Live mode (multi) with custom batch size and delay
+ /notifybot/venv/bin/python notifybot.py --base-folder &lt;user-basefolder&gt; --mode multi --batch-size 500 --delay 5.0
+
+# Show all available options
+ /notifybot/venv/bin/python notifybot.py --help
+    </pre>
+  </section>
+
+  <section>
+    <h2>Command-Line Options</h2>
+    <table>
+      <tr><th>Option</th><th>Description</th></tr>
+      <tr><td><code>--base-folder</code></td>
+          <td>User-defined base directory (e.g. <code>&lt;user-basefolder&gt;</code>) inside 
+          <code>/notifybot/basefolder</code> containing email input files <b>(required)</b>.</td></tr>
+      <tr><td><code>--mode</code></td><td>Force mode: <code>single</code> or <code>multi</code>. Overrides <code>mode.txt</code>. <br><b>Default: single</b>.</td></tr>
+      <tr><td><code>--dry-run</code></td><td>Simulate sending emails. Sends only to approvers with <b>DRAFT</b> prefix. <b>Always recommended first</b>.</td></tr>
+      <tr><td><code>--batch-size</code></td><td>Number of emails to send per batch (default: 500). <br>Applies to <b>single mode</b>.</td></tr>
+      <tr><td><code>--delay</code></td><td>Delay in seconds between batches (default: 5.0).</td></tr>
+      <tr><td><code>--force</code></td><td><b>Use with caution.</b> Skips confirmation prompt. Only for automated scripts.</td></tr>
+      <tr><td><code>--help</code></td><td>Show help message and exit.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Recipient Creation Priority (Single Mode)</h2>
+    <ol>
+      <li><b><code>to.txt</code></b> (if present) → Always takes precedence as the primary recipient list.</li>
+      <li><b><code>filter.txt</code> + <code>inventory.csv</code></b> → Used if <code>to.txt</code> is not found.</li>
+      <li><b><code>additional_to.txt</code></b> → Merged with whichever source is used above.</li>
+      <li><b><code>cc.txt</code> and <code>bcc.txt</code></b> → Included in all emails but do not affect <code>TO</code>.</li>
+    </ol>
+    <div class="note">
+      If no valid recipient source is found (and not running <code>--dry-run</code>), the process will stop with an error.
+    </div>
+  </section>
+
+  <section>
+    <h2>Recipient Creation Priority (Multi Mode)</h2>
+    <ol>
+      <li><b><code>filter.txt</code> + <code>inventory.csv</code></b> → Defines conditions and generates emails per matching row.</li>
+      <li><b><code>field.txt</code> (optional)</b> → Placeholder substitutions using fields from <code>inventory.csv</code>.</li>
+      <li><b><code>additional_to.txt</code> (optional)</b> → Adds extra recipients to those from <code>inventory.csv</code>.</li>
+      <li><b><code>cc.txt</code> and <code>bcc.txt</code> (optional)</b> → Added to every personalized email.</li>
+    </ol>
+    <div class="note">
+      Multi mode will fail if <code>filter.txt</code> or <code>inventory.csv</code> is missing.
+    </div>
+  </section>
+
+  <section>
+    <h2>Operating Modes</h2>
+    <h3>Single Mode (Default)</h3>
+    <ul>
+      <li>✅ <b>Required:</b> <code>subject.txt</code>, <code>body.html</code>, <code>from.txt</code>, <code>approver.txt</code></li>
+      <li>📧 <b>Recipient Sources:</b> <code>to.txt</code> OR (<code>filter.txt</code> + <code>inventory.csv</code>) OR <code>additional_to.txt</code></li>
+      <li>📎 <b>Optional:</b> <code>cc.txt</code>, <code>bcc.txt</code>, <code>attachment/</code>, <code>images/</code>, <code>signature.html</code></li>
+    </ul>
+
+    <h3>Multi Mode</h3>
+    <ul>
+      <li>✅ <b>Required:</b> <code>subject.txt</code>, <code>body.html</code>, <code>from.txt</code>, <code>approver.txt</code>, <code>filter.txt</code></li>
+      <li>📎 <b>Optional:</b> <code>field.txt</code>, <code>cc.txt</code>, <code>bcc.txt</code>, <code>attachment/</code>, <code>images/</code>, <code>signature.html</code></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Required Directory Structure</h2>
+    <pre>
+/notifybot
+  ├── basefolder/
+  │   └── &lt;user-basefolder&gt;/
+  │       ├── subject.txt
+  │       ├── body.html
+  │       ├── from.txt
+  │       ├── approver.txt
+  │       ├── to.txt (optional)
+  │       ├── filter.txt (optional)
+  │       ├── additional_to.txt (optional)
+  │       ├── cc.txt / bcc.txt (optional)
+  │       ├── attachment/ (optional)
+  │       └── images/ (optional)
+  ├── signature.html (optional)
+  └── inventory/
+      └── inventory.csv
+    </pre>
+  </section>
+
+  <section>
+    <h2>Dry-Run Mode</h2>
+    <div class="note">
+      In <b>--dry-run</b>, NotifyBot sends only to <code>approver.txt</code> addresses.  
+      The subject is prefixed with <b>DRAFT</b> and the body includes recipient count info.  
+      <b>Always run dry-run first to prevent unintended mass emails.</b>
+    </div>
+  </section>
+
+  <section>
+    <h2>Logging</h2>
+    <p>Logs are written to <code>/notifybot/logs/notifybot.log</code> in CSV format with emojis for quick scanning.</p>
+    <pre>
+ℹ️ Info, ⚠️ Warning, ❌ Error, ✅ Success, 📝 Draft, 🔧 Mode
+    </pre>
+    <p>
+      📡 All logs are also forwarded in real-time to <b>Splunk</b> for auditing and long-term reference.
+    </p>
+    <a class="button-link" href="https://tinyurl/notifybot" target="_blank">📊 Open Splunk Dashboard</a>
+  </section>
+
+  <section>
+    <h2>Attachments & Images</h2>
+    <ul>
+      <li>📎 Files in <code>attachment/</code> are sent as attachments.</li>
+      <li>🖼️ Images in <code>images/</code> are embedded in HTML emails automatically.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Approval Process</h2>
+    <p>Before sending email in live mode, <code>approver.txt</code> ensures dry-run copies are reviewed and approved.</p>
+  </section>
+
+</body>
+</html>
