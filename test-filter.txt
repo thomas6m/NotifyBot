@@ -1,12 +1,217 @@
-# Filter conditions for multi-mode email sending - 3 test filters
-# Each line represents one email to be sent
-# Format: field=value,field=value (AND conditions)
+# PromQL Filter Examples for NotifyBot Testing
+# Each line creates a separate email in MULTI mode
+# All lines combined create one email in SINGLE mode
 
-# Filter 1: APAC GCB Production Finance App
-clustername=apcgcbsgd20p,namespace=finance-app
+# ==========================================
+# EXACT MATCH EXAMPLES (=)
+# ==========================================
 
-# Filter 2: APAC ICG Production Trading Platform  
-clustername=apcicgsgd20p,namespace=trading-platform
+# Sales department only
+department="sales"
 
-# Filter 3: APAC CTI Production Infrastructure Tools
-clustername=apcctisgd20p,namespace=infrastructure-tools
+# North region only  
+region="north"
+
+# USA country only
+country="USA"
+
+# Specific employee by ID
+idnumber="EMP001"
+
+# ==========================================
+# NOT EQUAL EXAMPLES (!=)
+# ==========================================
+
+# Everyone except HR department
+department!="hr"
+
+# All countries except USA
+country!="USA"
+
+# All regions except north
+region!="north"
+
+# Exclude specific employee
+idnumber!="EMP001"
+
+# ==========================================
+# REGEX MATCH EXAMPLES (=~)
+# ==========================================
+
+# Multiple departments (OR logic)
+department=~"sales|marketing|engineering"
+
+# Multiple regions
+region=~"north|south|east"
+
+# North American countries
+country=~"USA|Canada|Mexico"
+
+# Employee IDs starting with EMP
+idnumber=~"EMP.*"
+
+# Gmail email addresses only
+email=~".*@gmail\.com"
+
+# Names starting with specific letters
+name=~"[A-C].*"
+
+# European countries
+country=~"UK|Germany|Spain"
+
+# APAC region variations
+region=~"apac|asia|pacific"
+
+# ==========================================
+# REGEX NOT MATCH EXAMPLES (!~)
+# ==========================================
+
+# Exclude temporary workers, contractors, interns
+name!~"(Temp|Contract|Intern).*"
+
+# Exclude test/demo accounts
+email!~".*(test|demo).*"
+
+# Exclude temporary employee IDs
+idnumber!~"(TEMP|CONT|INT|TEST|DEMO).*"
+
+# Exclude admin and HR departments
+department!~"admin|hr"
+
+# Exclude European region
+region!~"europe"
+
+# Names NOT starting with vowels
+name!~"[AEIOU].*"
+
+# ==========================================
+# COMPLEX AND CONDITIONS (comma-separated)
+# ==========================================
+
+# Active sales team in North America
+department="sales",country=~"USA|Canada|Mexico"
+
+# Engineering in specific regions
+department="engineering",region=~"north|west|apac"
+
+# Marketing team excluding Europe
+department="marketing",region!="europe"
+
+# USA employees in sales or marketing
+country="USA",department=~"sales|marketing"
+
+# Non-admin roles in USA north region
+country="USA",region="north",department!="admin"
+
+# Specific employee ID range and department
+idnumber=~"EMP0[1-2].*",department="sales"
+
+# Finance team excluding temporary workers
+department="finance",name!~"(Temp|Contract|Intern).*"
+
+# Engineering team in English-speaking countries
+department="engineering",country=~"USA|Canada|UK|Australia"
+
+# ==========================================
+# COMPLEX OR CONDITIONS (separate lines)
+# ==========================================
+
+# Sales team OR all managers (assuming name contains title)
+department="sales"
+name=~".*Manager.*"
+
+# All USA employees OR all sales department
+country="USA"
+department="sales"
+
+# North region OR Engineering department
+region="north"
+department="engineering"
+
+# ==========================================
+# MIXED COMPLEX CONDITIONS
+# ==========================================
+
+# Sales in North America OR Marketing globally
+department="sales",country=~"USA|Canada|Mexico"
+department="marketing"
+
+# All USA employees OR European engineering team
+country="USA"
+department="engineering",region="europe"
+
+# Finance team OR HR team, but exclude contractors
+department="finance",name!~"Contract.*"
+department="hr",name!~"Contract.*"
+
+# ==========================================
+# ADVANCED REGEX PATTERNS
+# ==========================================
+
+# Employee IDs with specific patterns
+idnumber=~"EMP0[0-4][0-9]"
+
+# Email domains for company employees only
+email=~".*@company\.com"
+
+# Names with exactly 2 words (first last)
+name=~"[A-Z][a-z]+ [A-Z][a-z]+"
+
+# Countries starting with U (USA, UK)
+country=~"U.*"
+
+# Departments ending with 'ing'
+department=~".*ing"
+
+# Regions containing 'a'
+region=~".*a.*"
+
+# ==========================================
+# EXCLUSION PATTERNS
+# ==========================================
+
+# All employees except test accounts
+email!~".*(test|demo|temp).*",idnumber!~"(TEST|DEMO|TEMP|CONT|INT).*"
+
+# Regular employees only (exclude all temporary types)
+name!~".*(Temp|Contract|Intern|Test|Demo).*"
+
+# Production employees (exclude admin and support roles)
+department!~"admin|hr",name!~".*(Test|Demo).*"
+
+# ==========================================
+# FIELD-SPECIFIC ADVANCED EXAMPLES
+# ==========================================
+
+# Names with apostrophes or hyphens (if any existed)
+name=~".*['-].*"
+
+# Employee IDs with specific format
+idnumber=~"EMP[0-9]{3}"
+
+# International employees (non-USA)
+country!="USA"
+
+# Coastal regions (if we consider east/west as coastal)
+region=~"east|west"
+
+# Core business departments
+department=~"sales|marketing|engineering|finance"
+
+# ==========================================
+# COMMENTS AND DOCUMENTATION
+# ==========================================
+
+# This is a comment line - it will be ignored
+# Use comments to document your filter logic
+
+# The following filters target specific groups:
+
+# Q1 Campaign - Sales team in North America
+department="sales",country=~"USA|Canada|Mexico"
+
+# Q2 Campaign - Engineering team globally  
+department="engineering"
+
+# Q3 Campaign - Marketing excluding test accounts
+department="marketing",email!~".*(test|demo).*"
