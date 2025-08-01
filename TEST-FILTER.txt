@@ -1,0 +1,107 @@
+Examples:
+  department="sales"                    # Exact match
+  region!="europe"                      # Not equal
+  name=~".*Manager.*"                   # Regex match
+  email!~".*(test|demo).*"              # Regex not match
+  status=active*                        # Wildcard match
+  department="sales",region="north"     # AND condition
+  department="sales"                    # OR condition
+  department="marketing"                # (on separate lines)
+
+Complex Examples:
+  # Sales in North America OR Marketing globally
+  department="sales",country=~"USA|Canada|Mexico"
+  department="marketing"
+
+  # All employees except contractors
+  name!~".*(Contract|Temp|Intern).*"
+
+  # Engineering team in English-speaking countries
+  department="engineering",country=~"USA|Canada|UK|Australia"
+
+#################################################################
+
+1. department="sales" (Exact match)
+
+
+awk -F, 'NR>1 && $6 == "sales" {
+  split($2, emails, /;/); for (e in emails) seen[emails[e]]++
+} END { for (e in seen) print e }' /notifybot/inventory/inventory.csv
+
+
+
+2. region!="europe" (Not equal)
+
+awk -F, 'NR>1 && $5 != "europe" {
+  split($2, emails, /;/); for (e in emails) seen[emails[e]]++
+} END { for (e in seen) print e }' /notifybot/inventory/inventory.csv
+
+
+
+3. name=~".*Manager.*" (Regex match)
+
+awk -F, 'NR>1 && $1 ~ /Manager/ {
+  split($2, emails, /;/); for (e in emails) seen[emails[e]]++
+} END { for (e in seen) print e }' /notifybot/inventory/inventory.csv
+
+4. email!~".*(test|demo).*" (Regex not match)
+
+
+awk -F, 'NR>1 {
+  split($2, emails, /;/);
+  for (i in emails)
+    if (emails[i] !~ /(test|demo)/) seen[emails[i]]++
+} END { for (e in seen) print e }' /notifybot/inventory/inventory.csv
+
+
+5. status=active* (Wildcard match → starts with "active")
+Assuming status is a 7th field (you'll need to adjust if different):
+
+
+awk -F, 'NR>1 && $7 ~ /^active/ {
+  split($2, emails, /;/); for (e in emails) seen[emails[e]]++
+} END { for (e in seen) print e }' /notifybot/inventory/inventory.csv
+
+6. department="sales",region="north" (AND condition)
+
+
+awk -F, 'NR>1 && $6 == "sales" && $5 == "north" {
+  split($2, emails, /;/); for (e in emails) seen[emails[e]]++
+} END { for (e in seen) print e }' /notifybot/inventory/inventory.csv
+
+7. department="sales" OR department="marketing"
+
+
+awk -F, 'NR>1 && ($6 == "sales" || $6 == "marketing") {
+  split($2, emails, /;/); for (e in emails) seen[emails[e]]++
+} END { for (e in seen) print e }' /notifybot/inventory/inventory.csv
+
+
+🔹 Complex Examples
+8. department="sales",country=~"USA|Canada|Mexico"
+**OR**  
+`department="marketing"`  
+
+
+awk -F, 'NR>1 && (
+  ($6 == "sales" && $4 ~ /^(USA|Canada|Mexico)$/) || $6 == "marketing"
+) {
+  split($2, emails, /;/); for (e in emails) seen[emails[e]]++
+} END { for (e in seen) print e }' /notifybot/inventory/inventory.csv
+
+
+9. name!~".*(Contract|Temp|Intern).*"
+(All employees except contractors)
+
+
+awk -F, 'NR>1 && $1 !~ /(Contract|Temp|Intern)/ {
+  split($2, emails, /;/); for (e in emails) seen[emails[e]]++
+} END { for (e in seen) print e }' /notifybot/inventory/inventory.csv
+
+10. department="engineering",country=~"USA|Canada|UK|Australia"
+(Engineering in English-speaking countries)
+
+
+awk -F, 'NR>1 && $6 == "engineering" && $4 ~ /^(USA|Canada|UK|Australia)$/ {
+  split($2, emails, /;/); for (e in emails) seen[emails[e]]++
+} END { for (e in seen) print e }' /notifybot/inventory/inventory.csv
