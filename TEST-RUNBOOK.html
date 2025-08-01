@@ -9,7 +9,7 @@
     code { background: #f4f4f4; padding: 2px 4px; border-radius: 4px; }
     pre { background: #f8f8f8; padding: 1em; border-left: 4px solid #ccc; overflow-x: auto; }
     .box, .important, .tip, .note { background: #eef5fb; padding: 1em; border: 1px solid #b6d5f2; border-radius: 6px; margin-bottom: 1em; }
-    .important { background-color: #fff4e5; border-color: #ffc107; }
+    .important { background-color: #FFCCCB; border-color: #8B0000; }
     .tip { background-color: #e6ffed; border-color: #28a745; }
     .note { background-color: #f1f1f1; border-color: #ccc; }
     .button-link {
@@ -95,25 +95,6 @@
   </pre>
 </div>
 
-<h2>✍️ Global Signature Support</h2>
-<div class="box">
-  <p><strong>NEW:</strong> NotifyBot now supports a global signature that is automatically appended to all emails.</p>
-  <ul>
-    <li>📍 <strong>Location:</strong> <code>/notifybot/signature.html</code></li>
-    <li>📝 <strong>Format:</strong> HTML content that will be appended to all email bodies</li>
-    <li>🔄 <strong>Automatic:</strong> Applied to both single and multi mode emails</li>
-    <li>📏 <strong>Spacing:</strong> Proper spacing is automatically added between body and signature</li>
-  </ul>
-  
-  <h4>Example signature.html:</h4>
-  <pre>
-&lt;div style="border-top: 1px solid #ccc; margin-top: 20px; padding-top: 10px;"&gt;
-  &lt;p&gt;&lt;strong&gt;Best regards,&lt;/strong&gt;&lt;br&gt;
-  Your Company Name&lt;br&gt;
-  &lt;a href="mailto:support@company.com"&gt;support@company.com&lt;/a&gt;&lt;/p&gt;
-&lt;/div&gt;
-  </pre>
-</div>
 
 <h2>🖼️ Image Embedding</h2>
 <div class="box">
@@ -332,7 +313,7 @@ department="marketing",region="south"
 <section>
   <h2>🎯 Command Line Examples</h2>
   <div class="box">
-    <h4>Basic Dry-Run (Always start here):</h4>
+    <h4 style="color: #8B0000;">Basic Dry-Run (Always start here):</h4>
     <pre>/notifybot/venv/bin/python notifybot.py --base-folder newsletter_august --dry-run</pre>
     
     <h4>Single Mode (Live):</h4>
@@ -341,7 +322,7 @@ department="marketing",region="south"
     <h4>Multi Mode (Live):</h4>
     <pre>/notifybot/venv/bin/python notifybot.py --base-folder newsletter_august --mode multi --delay 2.0</pre>
     
-    <h4>Automated Script (with force):</h4>
+    <h4 style="color: #8B0000;">⚠️ Automated Script (with force - Use with extreme caution):</h4>
     <pre>/notifybot/venv/bin/python notifybot.py --base-folder newsletter_august --mode single --force</pre>
   </div>
 </section>
@@ -372,7 +353,6 @@ department="marketing",region="south"
     
     <h4>📧 Email Best Practices:</h4>
     <ul>
-      <li>Use the global signature for consistent branding</li>
       <li>Embed images instead of linking to external URLs</li>
       <li>Test filter logic with a small subset first</li>
       <li>Use meaningful campaign folder names</li>
