@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NotifyBot - Enterprise Email Automation Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #2c3e50;
+            background: #ffffff;
+        }
+
+        /* Header */
+        .header {
+            background: #ffffff;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            backdrop-filter: blur(20px);
+        }
+
+        .nav {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 80px;
+        }
+
+        .logo-nav {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #1a2332 0%, #2c3e50 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            box-shadow: 0 4px 15px rgba(26, 35, 50, 0.2);
+        }
+
+        .logo-text {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #1a2332;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links span {
+            color: #2c3e50;
+            font-weight: 500;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links span:hover {
+            color: #3498db;
+        }
+
+        .nav-cta {
+            background: #3498db;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .nav-cta:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(52, 152, 219, 0.3);
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 140px 20px 80px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            text-align: center;
+        }
+
+        .hero-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .hero-badge {
+            display: inline-block;
+            background: rgba(52, 152, 219, 0.1);
+            color: #3498db;
+            padding: 8px 20px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(52, 152, 219, 0.2);
+        }
+
+        .hero h1 {
+            font-size: clamp(2.5rem, 6vw, 4rem);
+            font-weight: 800;
+            color: #1a2332;
+            margin-bottom: 1.5rem;
+            line-height: 1.2;
+        }
+
+        .hero-subtitle {
+            font-size: 1.3rem;
+            color: #6c757d;
+            margin-bottom: 3rem;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            font-weight: 400;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 4rem;
+        }
+
+        .btn {
+            padding: 16px 28px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-block;
+            border: 2px solid transparent;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #3498db;
+            border-color: #3498db;
+        }
+
+        .btn-secondary:hover {
+            background: #3498db;
+            color: white;
+        }
+
+        .hero-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 2rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #1a2332;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+        }
+
+        /* Common Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Features Section */
+        .features {
+            padding: 100px 20px;
+            background: white;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .section-badge {
+            display: inline-block;
+            background: rgba(52, 152, 219, 0.1);
+            color: #3498db;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .section-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #1a2332;
+            margin-bottom: 1rem;
+        }
+
+        .section-description {
+            font-size: 1.2rem;
+            color: #6c757d;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 25px rgba(0,0,0,0.08);
+            border: 1px solid #e9ecef;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.12);
+            border-color: #3498db;
+        }
+
+        .feature-icon {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+            color: white;
+        }
+
+        .feature-card h3 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #1a2332;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card p {
+            color: #6c757d;
+            line-height: 1.6;
+        }
+
+        /* Modes Section */
+        .modes {
+            padding: 100px 20px;
+            background: #f8f9fa;
+        }
+
+        .modes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 3rem;
+            margin-top: 3rem;
+        }
+
+        .mode-card {
+            background: white;
+            padding: 3rem;
+            border-radius: 20px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+            border-left: 5px solid #3498db;
+            transition: all 0.3s ease;
+        }
+
+        .mode-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+        }
+
+        .mode-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .mode-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: white;
+        }
+
+        .mode-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #1a2332;
+        }
+
+        .mode-description {
+            font-size: 1.1rem;
+            color: #6c757d;
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+
+        .mode-features {
+            list-style: none;
+        }
+
+        .mode-features li {
+            padding: 0.8rem 0;
+            border-bottom: 1px solid #e9ecef;
+            position: relative;
+            padding-left: 2rem;
+            color: #2c3e50;
+        }
+
+        .mode-features li:before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            top: 0.8rem;
+            color: #27ae60;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mode-features li:last-child {
+            border-bottom: none;
+        }
+
+        /* Architecture Section */
+        .architecture {
+            padding: 100px 20px;
+            background: white;
+        }
+
+        .architecture-visual {
+            background: #f8f9fa;
+            border-radius: 20px;
+            padding: 3rem;
+            margin-top: 3rem;
+            border: 2px solid #e9ecef;
+        }
+
+        .process-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .process-step {
+            text-align: center;
+            position: relative;
+        }
+
+        .step-number {
+            width: 50px;
+            height: 50px;
+            background: #3498db;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+            margin: 0 auto 1rem;
+        }
+
+        .step-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1a2332;
+            margin-bottom: 0.5rem;
+        }
+
+        .step-description {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        /* Directory Structure Section */
+        .directory-structure {
+            padding: 100px 20px;
+            background: white;
+            color: #1a1a1a;
+        }
+
+        .directory-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .directory-header {
+            text-align: center;
+            margin-bottom: 50px;
+            color: #1a2332;
+        }
+
+        .directory-header h2 {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            text-shadow: none;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: #1a2332;
+        }
+
+        .directory-header p {
+            font-size: 1.3rem;
+            opacity: 0.8;
+            font-weight: 300;
+            color: #6c757d;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            margin-bottom: 40px;
+            border: 1px solid rgba(255,255,255,0.3);
+            color: #1a1a1a;
+        }
+
+        .folder-structure {
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+            background: #0d1117;
+            color: #e6edf3;
+            padding: 30px;
+            border-radius: 12px;
+            overflow-x: auto;
+            margin: 25px 0;
+            border: 1px solid #30363d;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+            line-height: 1.8;
+            font-size: 14px;
+        }
+
+        .folder-line {
+            display: block;
+            margin: 2px 0;
+            font-family: inherit;
+        }
+
+        .folder-structure .root {
+            color: #f85149;
+            font-weight: 600;
+        }
+
+        .folder-structure .folder {
+            color: #79c0ff;
+            font-weight: 600;
+        }
+
+        .folder-structure .file {
+            color: #a5d6ff;
+        }
+
+        .folder-structure .required {
+            color: #ffa657;
+            font-weight: 500;
+        }
+
+        .folder-structure .optional {
+            color: #7ee787;
+            font-weight: 400;
+        }
+
+        .folder-structure .comment {
+            color: #8b949e;
+            font-style: italic;
+            font-weight: 300;
+        }
+
+        .folder-structure .tree-line {
+            color: #6e7681;
+        }
+
+        .directory-section-title {
+            color: #2d3748;
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 3px solid #667eea;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .mode-requirements-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 40px 0;
+        }
+
+        .mode-requirements-card {
+            background: white;
+            color: #1a2332;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+
+        .mode-requirements-card:hover {
+            border-color: #3498db;
+            box-shadow: 0 8px 30px rgba(52, 152, 219, 0.15);
+        }
+
+        .mode-requirements-card h3 {
+            font-size: 1.4rem;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+            color: #1a2332;
+        }
+
+        .file-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .file-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #2c3e50;
+        }
+
+        .file-list li:last-child {
+            border-bottom: none;
+        }
+
+        .required-badge {
+            background: #ef4444;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .optional-badge {
+            background: #10b981;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            padding: 25px;
+            border-radius: 12px;
+            margin: 25px 0;
+            border-left: 4px solid #3b82f6;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.1);
+        }
+
+        .highlight-box h4 {
+            color: #1e40af;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .highlight-box ul, .highlight-box ol {
+            margin-left: 20px;
+        }
+
+        .highlight-box li {
+            margin: 8px 0;
+        }
+
+        .example-section {
+            background: #f8fafc;
+            padding: 25px;
+            border-radius: 12px;
+            margin: 25px 0;
+            border-left: 4px solid #10b981;
+            box-shadow: 0 2px 10px rgba(16, 185, 129, 0.05);
+        }
+
+        .example-section h4 {
+            color: #065f46;
+            margin-bottom: 20px;
+            font-weight: 600;
+            font-size: 1.3rem;
+        }
+
+        .example-section ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .example-section li {
+            margin: 12px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+
+        .example-section li:last-child {
+            border-bottom: none;
+        }
+
+        .command-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 25px;
+            border-radius: 10px;
+            font-family: 'SF Mono', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+
+        .command-block .comment {
+            color: #64748b;
+        }
+
+        /* Footer */
+        .footer {
+            background: #1a2332;
+            color: white;
+            padding: 60px 20px 40px;
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 3rem;
+        }
+
+        .footer-section h4 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: white;
+        }
+
+        .footer-section p,
+        .footer-section span {
+            color: #adb5bd;
+            line-height: 1.8;
+            cursor: pointer;
+        }
+
+        .footer-section span:hover {
+            color: #3498db;
+        }
+
+        .footer-logo-section {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+        }
+
+        .footer-logo {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .footer-brand {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 0.5rem;
+        }
+
+        .footer-tagline {
+            color: #adb5bd;
+            font-size: 0.9rem;
+        }
+
+        .footer-bottom {
+            border-top: 1px solid #495057;
+            padding-top: 2rem;
+            margin-top: 3rem;
+            text-align: center;
+            color: #adb5bd;
+            font-size: 0.9rem;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 2rem;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+            position: relative;
+        }
+
+        .close {
+            position: absolute;
+            right: 1rem;
+            top: 1rem;
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .close:hover {
+            color: #333;
+        }
+
+        .modal h3 {
+            color: #1a2332;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+
+        .modal p {
+            color: #6c757d;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+
+        .email-display {
+            background: #f8f9fa;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            padding: 1rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1a2332;
+            margin-bottom: 1rem;
+            user-select: all;
+        }
+
+        .copy-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+
+        .copy-btn:hover {
+            background: #2980b9;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .hero-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .btn {
+                width: 100%;
+                max-width: 300px;
+            }
+
+            .hero-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .features-grid,
+            .modes-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .section-title {
+                font-size: 2rem;
+            }
+
+            .mode-card {
+                padding: 2rem;
+            }
+
+            .process-steps {
+                grid-template-columns: 1fr;
+            }
+
+            .modal-content {
+                margin: 30% auto;
+                width: 95%;
+            }
+
+            .mode-requirements-section {
+                grid-template-columns: 1fr;
+            }
+
+            .directory-header h2 {
+                font-size: 2.2rem;
+            }
+
+            .folder-structure {
+                font-size: 12px;
+                padding: 20px;
+            }
+
+            .card {
+                padding: 25px;
+            }
+        }
+
+        /* Animations */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s ease;
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <nav class="nav">
+            <div class="logo-nav">
+                <div class="logo-icon">🤖</div>
+                <div class="logo-text">NotifyBot</div>
+            </div>
+            <ul class="nav-links">
+                <li><span onclick="scrollToSection('features')">Features</span></li>
+                <li><span onclick="scrollToSection('modes')">Modes</span></li>
+                <li><span onclick="scrollToSection('architecture')">How It Works</span></li>
+                <li><span onclick="scrollToSection('directory')">Directory Structure</span></li>
+                <li><span onclick="scrollToSection('contact')">Contact</span></li>
+            </ul>
+            <div class="nav-cta" onclick="showDemo()">Get Started</div>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-container">
+            <div class="hero-badge">Enterprise Email Automation</div>
+            <h1>Professional Email Notifications at Scale</h1>
+            <p class="hero-subtitle">
+                NotifyBot delivers enterprise-grade email automation with intelligent filtering, 
+                template personalization, and robust batch processing for teams of all sizes.
+            </p>
+            
+            <div class="hero-buttons">
+                <div class="btn btn-primary" onclick="scrollToSection('features')">Explore Platform</div>
+                <div class="btn btn-secondary" onclick="showDemo()">Schedule Demo</div>
+            </div>
+            
+            <div class="hero-stats fade-in">
+                <div class="stat-item">
+                    <span class="stat-number">99.9%</span>
+                    <span class="stat-label">Reliability</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">500+</span>
+                    <span class="stat-label">Emails per Batch</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">15MB</span>
+                    <span class="stat-label">Attachment Support</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">24/7</span>
+                    <span class="stat-label">Monitoring & Logs</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-badge">Core Capabilities</div>
+                <h2 class="section-title fade-in">Enterprise Features</h2>
+                <p class="section-description fade-in">
+                    Comprehensive email automation tools designed for professional environments 
+                    with security, scalability, and reliability at the core.
+                </p>
+            </div>
+            
+            <div class="features-grid">
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">📊</div>
+                    <h3>Advanced Analytics</h3>
+                    <p>Comprehensive logging with CSV export, real-time monitoring, and detailed notification analytics for informed decision-making.</p>
+                </div>
+                
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Precision Targeting</h3>
+                    <p>Sophisticated filtering system with regex support, wildcard matching, and complex logic operators for precise audience segmentation.</p>
+                </div>
+                
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Security & Validation</h3>
+                    <p>Built-in email validation, dry-run testing, and comprehensive security measures to protect your notifications and reputation.</p>
+                </div>
+                
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">⚡</div>
+                    <h3>High Performance</h3>
+                    <p>Optimized batch processing with intelligent delays, concurrent operations, and resource management for maximum throughput.</p>
+                </div>
+                
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">🛠️</div>
+                    <h3>Template Engine</h3>
+                    <p>Dynamic content personalization with field substitution, conditional logic, and rich HTML support for professional communications.</p>
+                </div>
+                
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">📎</div>
+                    <h3>Rich Media Support</h3>
+                    <p>HTML emails with embedded images, file attachments up to 15MB, and automatic signature integration for branded communications.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Modes Section -->
+    <section id="modes" class="modes">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-badge">Operation Modes</div>
+                <h2 class="section-title fade-in">Flexible Notification Types</h2>
+                <p class="section-description fade-in">
+                    Choose the optimal approach for your email notifications with our dual-mode architecture 
+                    designed for different business scenarios.
+                </p>
+            </div>
+            
+            <div class="modes-grid">
+                <div class="mode-card fade-in">
+                    <div class="mode-header">
+                        <div class="mode-icon">📢</div>
+                        <div class="mode-title">Single Mode</div>
+                    </div>
+                    <div class="mode-description">
+                        Broadcast identical content to multiple recipients efficiently. 
+                        Perfect for company announcements, newsletters, and mass communications.
+                    </div>
+                    <ul class="mode-features">
+                        <li>Unified message delivery to all recipients</li>
+                        <li>Support for TO, CC, and BCC distribution</li>
+                        <li>Advanced filtering from inventory database</li>
+                        <li>Automatic recipient deduplication</li>
+                        <li>Configurable batch processing with delays</li>
+                        <li>Comprehensive delivery tracking</li>
+                    </ul>
+                </div>
+                
+                <div class="mode-card fade-in">
+                    <div class="mode-header">
+                        <div class="mode-icon">🎯</div>
+                        <div class="mode-title">Multi Mode</div>
+                    </div>
+                    <div class="mode-description">
+                        Generate personalized emails based on dynamic filter conditions. 
+                        Ideal for targeted notifications, departmental updates, and segmented messaging.
+                    </div>
+                    <ul class="mode-features">
+                        <li>Individual emails per filter condition</li>
+                        <li>Dynamic template personalization</li>
+                        <li>Field-based content substitution</li>
+                        <li>Advanced segmentation capabilities</li>
+                        <li>Scalable multi-notification processing</li>
+                        <li>Granular recipient targeting</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architecture Section -->
+    <section id="architecture" class="architecture">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-badge">System Architecture</div>
+                <h2 class="section-title fade-in">How NotifyBot Works</h2>
+                <p class="section-description fade-in">
+                    Our streamlined workflow ensures reliable, secure, and efficient email delivery 
+                    with comprehensive validation and monitoring at every step.
+                </p>
+            </div>
+            
+            <div class="architecture-visual fade-in">
+                <div class="process-steps">
+                    <div class="process-step">
+                        <div class="step-number">1</div>
+                        <div class="step-title">Configuration</div>
+                        <div class="step-description">Set up notification parameters, recipients, and content templates</div>
+                    </div>
+                    <div class="process-step">
+                        <div class="step-number">2</div>
+                        <div class="step-title">Validation</div>
+                        <div class="step-description">Comprehensive pre-flight checks and email address validation</div>
+                    </div>
+                    <div class="process-step">
+                        <div class="step-number">3</div>
+                        <div class="step-title">Processing</div>
+                        <div class="step-description">Intelligent filtering, deduplication, and batch preparation</div>
+                    </div>
+                    <div class="process-step">
+                        <div class="step-number">4</div>
+                        <div class="step-title">Delivery</div>
+                        <div class="step-description">Secure batch sending with monitoring and logging</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Directory Structure Section -->
+    <section id="directory" class="directory-structure">
+        <div class="container">
+            <div class="directory-header">
+                <h2>🗂️ Directory Structure Guide</h2>
+                <p>Professional file organization and campaign management reference</p>
+            </div>
+
+            <div class="card">
+                <h2 class="directory-section-title">🗂️ Complete Directory Structure</h2>
+                
+                <div class="folder-structure">
+<span class="folder-line"><span class="root">/notifybot/</span> <span class="comment"># Root directory</span></span>
+<span class="folder-line"><span class="tree-line">├──</span> <span class="folder">basefolder/</span> <span class="comment"># Campaign base directory</span></span>
+<span class="folder-line"><span class="tree-line">│   ├──</span> <span class="folder">campaign1/</span> <span class="comment"># Example campaign folder</span></span>
+<span class="folder-line"><span class="tree-line">│   │   ├──</span> <span class="required">subject.txt</span> <span class="comment"># Email subject line</span></span>
+<span class="folder-line"><span class="tree-line">│   │   ├──</span> <span class="required">body.html</span> <span class="comment"># Email body content (HTML)</span></span>
+<span class="folder-line"><span class="tree-line">│   │   ├──</span> <span class="required">from.txt</span> <span class="comment"># Sender email address</span></span>
+<span class="folder-line"><span class="tree-line">│   │   ├──</span> <span class="required">approver.txt</span> <span class="comment"># Approver emails for dry-run</span></span>
+<span class="folder-line"><span class="tree-line">│   │   ├──</span> <span class="optional">mode.txt</span> <span class="comment"># Mode: "single" or "multi" (optional)</span></span>
+<span class="folder-line"><span class="tree-line">│   │   ├──</span> <span class="optional">to.txt</span> <span class="comment"># Direct recipient list (semicolon-separated)</span></span>
+<span class="folder-line"><span class="tree-line">│   │   ├──</span> <span class="optional">cc.txt</span> <span class="comment"># CC recipients (semicolon-separated)</span></span>
+<span class="folder-line"><span class="tree-line">│   │   ├──</span> <span class="optional">bcc.txt</span> <span class="comment"># BCC recipients (semicolon-separated)</span></span>
+<span class="folder-line"><span class="tree-line">│   │   ├──</span> <span class="optional">filter.txt</span> <span class="comment"># Filter conditions for inventory</span></span>
+<span class="folder-line"><span class="tree-line">│   │   ├──</span> <span class="optional">field.txt</span> <span class="comment"># Field names for substitution (multi mode)</span></span>
+<span class="folder-line"><span class="tree-line">│   │   ├──</span> <span class="optional">additional_to.txt</span> <span class="comment"># Additional recipients to merge</span></span>
+<span class="folder-line"><span class="tree-line">│   │   ├──</span> <span class="folder">attachment/</span> <span class="comment"># Email attachments folder (optional)</span></span>
+<span class="folder-line"><span class="tree-line">│   │   │   ├──</span> <span class="file">document1.pdf</span></span>
+<span class="folder-line"><span class="tree-line">│   │   │   ├──</span> <span class="file">report.xlsx</span></span>
+<span class="folder-line"><span class="tree-line">│   │   │   └──</span> <span class="file">...</span></span>
+<span class="folder-line"><span class="tree-line">│   │   ├──</span> <span class="folder">images/</span> <span class="comment"># Email embedded images (optional)</span></span>
+<span class="folder-line"><span class="tree-line">│   │   │   ├──</span> <span class="file">logo.png</span></span>
+<span class="folder-line"><span class="tree-line">│   │   │   ├──</span> <span class="file">banner.jpg</span></span>
+<span class="folder-line"><span class="tree-line">│   │   │   └──</span> <span class="file">...</span></span>
+<span class="folder-line"><span class="tree-line">│   │   └──</span> <span class="folder">recipients/</span> <span class="comment"># Generated recipient files (auto-created)</span></span>
+<span class="folder-line"><span class="tree-line">│   │       ├──</span> <span class="file">filter_001_department_sales.txt</span></span>
+<span class="folder-line"><span class="tree-line">│   │       ├──</span> <span class="file">cc_recipients.txt</span></span>
+<span class="folder-line"><span class="tree-line">│   │       ├──</span> <span class="file">multi_mode_summary.txt</span></span>
+<span class="folder-line"><span class="tree-line">│   │       └──</span> <span class="file">all_unique_recipients.txt</span></span>
+<span class="folder-line"><span class="tree-line">│   ├──</span> <span class="folder">campaign2/</span> <span class="comment"># Another campaign folder</span></span>
+<span class="folder-line"><span class="tree-line">│   └──</span> <span class="folder">campaign3/</span> <span class="comment"># More campaigns...</span></span>
+<span class="folder-line"><span class="tree-line">├──</span> <span class="folder">inventory/</span> <span class="comment"># Global inventory directory</span></span>
+<span class="folder-line"><span class="tree-line">│   └──</span> <span class="required">inventory.csv</span> <span class="comment"># Master contact database</span></span>
+<span class="folder-line"><span class="tree-line">├──</span> <span class="folder">logs/</span> <span class="comment"># Log files directory</span></span>
+<span class="folder-line"><span class="tree-line">│   └──</span> <span class="file">notifybot.log</span> <span class="comment"># Application logs (auto-created)</span></span>
+<span class="folder-line"><span class="tree-line">├──</span> <span class="optional">signature.html</span> <span class="comment"># Global email signature (optional)</span></span>
+<span class="folder-line"><span class="tree-line">└──</span> <span class="file">notifybot.py</span> <span class="comment"># Main application script</span></span>
+                </div>
+            </div>
+
+            <div class="mode-requirements-section">
+                <div class="mode-requirements-card">
+                    <h3>🎯 Single Mode Requirements</h3>
+                    <ul class="file-list">
+                        <li><span>subject.txt</span> <span class="required-badge">Required</span></li>
+                        <li><span>body.html</span> <span class="required-badge">Required</span></li>
+                        <li><span>from.txt</span> <span class="required-badge">Required</span></li>
+                        <li><span>approver.txt</span> <span class="required-badge">Required</span></li>
+                        <li><span>to.txt</span> <span class="optional-badge">Optional</span></li>
+                        <li><span>cc.txt</span> <span class="optional-badge">Optional</span></li>
+                        <li><span>bcc.txt</span> <span class="optional-badge">Optional</span></li>
+                        <li><span>filter.txt</span> <span class="optional-badge">Optional</span></li>
+                        <li><span>additional_to.txt</span> <span class="optional-badge">Optional</span></li>
+                    </ul>
+                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e9ecef; font-size: 0.9rem; color: #6c757d;">
+                        <strong>Note:</strong> At least ONE recipient source required (to.txt, filter.txt, additional_to.txt, cc.txt, or bcc.txt)
+                    </div>
+                </div>
+
+                <div class="mode-requirements-card">
+                    <h3>🔄 Multi Mode Requirements</h3>
+                    <ul class="file-list">
+                        <li><span>subject.txt</span> <span class="required-badge">Required</span></li>
+                        <li><span>body.html</span> <span class="required-badge">Required</span></li>
+                        <li><span>from.txt</span> <span class="required-badge">Required</span></li>
+                        <li><span>approver.txt</span> <span class="required-badge">Required</span></li>
+                        <li><span>filter.txt</span> <span class="required-badge">Required</span></li>
+                        <li><span>inventory.csv</span> <span class="required-badge">Required</span></li>
+                        <li><span>field.txt</span> <span class="optional-badge">Optional</span></li>
+                        <li><span>cc.txt</span> <span class="optional-badge">Optional</span></li>
+                        <li><span>bcc.txt</span> <span class="optional-badge">Optional</span></li>
+                        <li><span>additional_to.txt</span> <span class="optional-badge">Optional</span></li>
+                    </ul>
+                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e9ecef; font-size: 0.9rem; color: #6c757d;">
+                        <strong>Note:</strong> Creates multiple personalized emails based on filter conditions
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="directory-section-title">📋 File Descriptions</h2>
+                
+                <div class="example-section">
+                    <h4>📄 Core Configuration Files</h4>
+                    <ul>
+                        <li><strong>subject.txt:</strong> Email subject line (supports template placeholders in multi mode)</li>
+                        <li><strong>body.html:</strong> Email body content in HTML format (supports template placeholders)</li>
+                        <li><strong>from.txt:</strong> Sender email address</li>
+                        <li><strong>approver.txt:</strong> Email addresses to receive draft emails during dry-run mode</li>
+                        <li><strong>mode.txt:</strong> Contains "single" or "multi" to set operation mode</li>
+                    </ul>
+                </div>
+
+                <div class="example-section">
+                    <h4>👥 Recipient Management Files</h4>
+                    <ul>
+                        <li><strong>to.txt:</strong> Direct recipient email addresses (semicolon-separated)</li>
+                        <li><strong>cc.txt:</strong> CC recipient email addresses (semicolon-separated)</li>
+                        <li><strong>bcc.txt:</strong> BCC recipient email addresses (semicolon-separated)</li>
+                        <li><strong>additional_to.txt:</strong> Additional recipients to merge with main list</li>
+                        <li><strong>filter.txt:</strong> Filter conditions to select recipients from inventory.csv</li>
+                        <li><strong>field.txt:</strong> Field names for template substitution (multi mode only)</li>
+                    </ul>
+                </div>
+
+                <div class="example-section">
+                    <h4>🗃️ Data & Asset Files</h4>
+                    <ul>
+                        <li><strong>inventory.csv:</strong> Master contact database with headers for filtering</li>
+                        <li><strong>signature.html:</strong> Global email signature (automatically appended to all emails)</li>
+                        <li><strong>attachment/ folder:</strong> Contains files to attach to emails</li>
+                        <li><strong>images/ folder:</strong> Contains images to embed in email HTML</li>
+                        <li><strong>recipients/ folder:</strong> Auto-generated files with recipient details</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="directory-section-title">⚠️ Configuration Guidelines</h2>
+                
+                <div class="highlight-box">
+                    <h4>🔒 Directory Path Requirements</h4>
+                    <ul>
+                        <li>All campaign folders must be inside <code>/notifybot/basefolder/</code></li>
+                        <li>Inventory file must be at <code>/notifybot/inventory/inventory.csv</code></li>
+                        <li>Global signature file at <code>/notifybot/signature.html</code></li>
+                        <li>Logs are automatically created at <code>/notifybot/logs/notifybot.log</code></li>
+                    </ul>
+                </div>
+
+                <div class="highlight-box">
+                    <h4>✅ Field Validation Rules</h4>
+                    <ul>
+                        <li>All field names in <code>filter.txt</code> must exist in <code>inventory.csv</code> headers</li>
+                        <li>All field names in <code>field.txt</code> must exist in <code>inventory.csv</code> headers (multi mode)</li>
+                        <li>Field validation occurs before email sending to prevent errors</li>
+                        <li>Case-sensitive field name matching is enforced</li>
+                    </ul>
+                </div>
+
+                <div class="highlight-box">
+                    <h4>🎯 Mode Selection Priority</h4>
+                    <ol>
+                        <li><strong>CLI argument:</strong> <code>--mode single</code> or <code>--mode multi</code> (highest priority)</li>
+                        <li><strong>mode.txt file:</strong> Contains "single" or "multi"</li>
+                        <li><strong>Default:</strong> "single" mode if not specified anywhere</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="directory-section-title">🚀 Quick Start Examples</h2>
+                
+                <div class="example-section">
+                    <h4>📧 Basic Single Mode Campaign</h4>
+                    <div class="command-block">
+<span class="comment"># Create basic single mode campaign</span><br>
+mkdir -p /notifybot/basefolder/my-campaign<br>
+cd /notifybot/basefolder/my-campaign<br>
+<br>
+<span class="comment"># Create required files</span><br>
+echo "Monthly Newsletter" > subject.txt<br>
+echo "admin@company.com" > from.txt<br>
+echo "approver@company.com" > approver.txt<br>
+echo "&lt;h1&gt;Hello!&lt;/h1&gt;&lt;p&gt;This is our monthly newsletter.&lt;/p&gt;" > body.html<br>
+echo "user1@example.com;user2@example.com" > to.txt<br>
+<br>
+<span class="comment"># Run dry-run to test</span><br>
+python /notifybot/notifybot.py --base-folder my-campaign --dry-run<br>
+<br>
+<span class="comment"># Run live campaign</span><br>
+python /notifybot/notifybot.py --base-folder my-campaign --force
+                    </div>
+                </div>
+
+                <div class="example-section">
+                    <h4>🔄 Advanced Multi Mode Campaign</h4>
+                    <div class="command-block">
+<span class="comment"># Create multi mode campaign with personalization</span><br>
+mkdir -p /notifybot/basefolder/personalized-campaign<br>
+cd /notifybot/basefolder/personalized-campaign<br>
+<br>
+<span class="comment"># Create required files</span><br>
+echo "Quarterly Report for {department}" > subject.txt<br>
+echo "admin@company.com" > from.txt<br>
+echo "approver@company.com" > approver.txt<br>
+echo "&lt;h1&gt;Report for {department}&lt;/h1&gt;&lt;p&gt;Region: {region}&lt;/p&gt;" > body.html<br>
+echo 'department="sales"' > filter.txt<br>
+echo -e "department\nregion" > field.txt<br>
+<br>
+<span class="comment"># Ensure inventory exists with required columns</span><br>
+<span class="comment"># /notifybot/inventory/inventory.csv should have: department,region,email</span><br>
+<br>
+<span class="comment"># Test with dry-run first</span><br>
+python /notifybot/notifybot.py --base-folder personalized-campaign --mode multi --dry-run<br>
+<br>
+<span class="comment"># Execute live campaign</span><br>
+python /notifybot/notifybot.py --base-folder personalized-campaign --mode multi --force
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Demo Modal -->
+    <div id="demoModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeDemo()">&times;</span>
+            <h3>Contact Us</h3>
+            <p>Need help or ready to start? Contact us today.</p>
+            <div class="email-display" id="emailDisplay">thomas@gmail.com</div>
+            <button class="copy-btn" onclick="copyEmail()">Copy Email</button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer id="contact" class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <div class="footer-logo-section">
+                    <div class="footer-logo">🤖</div>
+                    <div>
+                        <div class="footer-brand">NotifyBot</div>
+                        <div class="footer-tagline">Enterprise email automation platform</div>
+                    </div>
+                </div>
+                <p style="margin-top: 1rem;">
+                    Reliable, scalable, and secure email automation for modern organizations. 
+                    Built for performance, designed for professionals.
+                </p>
+            </div>
+            
+            <div class="footer-section">
+                <h4>Platform</h4>
+                <p><span onclick="scrollToSection('features')">Features</span></p>
+                <p><span onclick="scrollToSection('modes')">Operation Modes</span></p>
+                <p><span onclick="scrollToSection('architecture')">Architecture</span></p>
+                <p><span onclick="scrollToSection('directory')">Directory Structure</span></p>
+                <p><span>API Reference</span></p>
+            </div>
+            
+            <div class="footer-section">
+                <h4>Support</h4>
+                <p><span>Getting Started</span></p>
+                <p><span>Technical Support</span></p>
+                <p><span>Best Practices</span></p>
+                <p><span>Troubleshooting</span></p>
+                <p><span>System Status</span></p>
+            </div>
+            
+            <div class="footer-section">
+                <h4>Contact</h4>
+                <p><span onclick="showDemo()">Get in Touch</span></p>
+            </div>
+        </div>
+        
+        <div class="footer-bottom">
+            <p>&copy; 2024 NotifyBot. Professional email automation platform. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scrolling function
+        function scrollToSection(sectionId) {
+            const target = document.getElementById(sectionId);
+            if (target) {
+                const headerOffset = 80;
+                const elementPosition = target.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                
+                window.scrollTo({
+                    top: offsetPosition,
+                    behavior: 'smooth'
+                });
+            }
+        }
+
+        // Demo modal functions
+        function showDemo() {
+            document.getElementById('demoModal').style.display = 'block';
+        }
+
+        function closeDemo() {
+            document.getElementById('demoModal').style.display = 'none';
+        }
+
+        function copyEmail() {
+            const email = document.getElementById('emailDisplay').textContent;
+            navigator.clipboard.writeText(email).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = email;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            });
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('demoModal');
+            if (event.target === modal) {
+                closeDemo();
+            }
+        }
+
+        // Fade in animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.fade-in').forEach(el => {
+            observer.observe(el);
+        });
+
+        // Add stagger delay to grid items
+        document.querySelectorAll('.features-grid .feature-card').forEach((card, index) => {
+            card.style.transitionDelay = `${index * 0.1}s`;
+        });
+
+        document.querySelectorAll('.modes-grid .mode-card').forEach((card, index) => {
+            card.style.transitionDelay = `${index * 0.15}s`;
+        });
+    </script>
+</body>
+</html>
