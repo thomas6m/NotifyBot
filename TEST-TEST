@@ -2442,7 +2442,7 @@ def send_multi_mode_emails(email_configs: List[Dict], subject_template: str, bod
                 # Send current batch with CC/BCC included
                 filter_info = filter_line if dry_run else None
                 if send_via_sendmail(batch, personalized_subject, personalized_body, from_address,
-                                   attachment_folder, dry_run, len(batch), base_folder,
+                                   attachment_folder, dry_run, original_count, base_folder,
                                    current_cc, current_bcc, original_cc_count, original_bcc_count,
                                    filter_info):
                     filter_successful_batches += 1
