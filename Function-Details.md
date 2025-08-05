@@ -229,28 +229,27 @@ Message: The log message passed as parameter
 CSV Escaping: Uses Python's csv.writer to properly escape the message field, handling commas, quotes, and newlines that could break CSV format
 
 Returns: A properly escaped CSV line as a string (timestamp, username, message)
-Example output: 1704067200000,john_doe,"Email sent to 150 recipients successfully"
+Example output:
+1704067200000,john_doe,"Email sent to 150 recipients successfully"
 6. setup_logging()
 This function configures the application's logging system and creates a global logging utility.
 What it does:
-
-Directory Setup: Ensures the log directory exists at /notifybot/logs/
-Logging Configuration:
+1. Directory Setup
+Ensures the log directory exists at /notifybot/logs/
+2. Logging Configuration
 
 Sets up file logging to /notifybot/logs/notifybot.log
 Uses INFO level and above (INFO, WARNING, ERROR)
 Uses a simple format that just outputs the message (since CSV formatting is handled elsewhere)
 Uses append mode to preserve existing logs
 
-
-Global Function Creation: Creates a log_and_print() function that:
+3. Global Function Creation
+Creates a log_and_print() function that:
 
 Dual Output: Both logs to file AND prints to console
 Emoji Support: Maps log levels to emojis (ℹ️ for info, ⚠️ for warning, ❌ for error, etc.)
 CSV Formatting: Uses csv_log_entry() to format all log entries consistently
 Level Mapping: Supports custom levels like "success", "processing", "backup", etc.
-
-
 
 The log_and_print() function:
 pythondef log_and_print(level: str, message: str) -> None:
@@ -263,7 +262,18 @@ Usage throughout the application:
 pythonlog_and_print("info", "Processing 150 recipients")
 log_and_print("success", "Email sent successfully") 
 log_and_print("error", "Failed to send email")
-####################################
+Emoji Mappings:
 
+info: ℹ️
+warning: ⚠️
+error: ❌
+success: ✅
+processing: ⏳
+backup: 💾
+file: 📂
+confirmation: ✋
+draft: 📝
+mode: 🔧
+signature: ✍️
 
-
+#######################
