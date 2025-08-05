@@ -1,6 +1,30 @@
 #!/usr/bin/env python3
 """
+NotifyBot: Automated email batch sender with single/multi mode support, filtering, logging, signature support, and dry-run.
 
+Usage:
+    python notifybot.py --base-folder emails --dry-run
+    python notifybot.py --base-folder emails --force --mode single
+    python notifybot.py --base-folder emails --batch-size 500 --delay 5.0 --mode multi
+
+CLI Options:
+    --base-folder         Base directory containing email input files [REQUIRED]. 
+                          The directory should be inside /notifybot/basefolder.
+    --mode               Force mode: 'single' or 'multi' (overrides mode.txt)
+    --dry-run            Simulate sending emails without SMTP. Sends only to approvers with DRAFT prefix.
+    --batch-size         Number of emails to send per batch (default: 500).
+    --delay              Delay in seconds between batches (default: 5.0).
+    --force              Skip confirmation prompt (for automation).
+
+Single Mode - Sends ONE email to MULTIPLE recipients:
+    Required files: subject.txt, body.html, from.txt, approver.txt
+    Recipient sources: to.txt OR filter.txt+inventory.csv OR additional_to.txt
+    Optional: cc.txt, bcc.txt, attachment/, images/, signature.html
+
+Multi Mode - Sends MULTIPLE personalized emails:
+    Required files: subject.txt, body.html, from.txt, approver.txt, filter.txt
+    Optional: field.txt (for placeholder substitution), cc.txt, bcc.txt, attachment/, images/, signature.html
+    Each line in filter.txt creates a separate personalized email.
 """
 import base64
 import mimetypes
@@ -1566,31 +1590,21 @@ def get_recipients_for_single_mode(base_folder: Path, dry_run: bool) -> Tuple[Li
     return (final_recipients, final_cc_recipients, final_bcc_recipients, 
             original_recipients_count, original_cc_count, original_bcc_count)
 
-
-def extract_field_values_from_matched_rows(filter_line: str, field_names: List[str], inventory_path: Path) -> Dict[str, str]:
+def extract_field_values_from_matched_rows(filter_line: str, field_names: List[str], inventory_path: Path, base_folder: Path) -> Dict[str, str]:
     """
     Extract ALL unique field values from matched rows in inventory.csv for template substitution.
     Collects all unique values for each field from all rows that match the filter.
     ENHANCED: Now properly uses priority-based inventory selection (local field-inventory.csv first, then global).
-    FIXED: Improved whitespace handling and field matching logic.
+    FIXED: Now receives base_folder as parameter for reliable local field-inventory.csv detection.
     
     Args:
         filter_line: Single filter line like "department='sales',region!='europe'" or "department=sales*"
         field_names: List of field names to extract
-        inventory_path: Path to inventory.csv (NOTE: This will be overridden by priority logic)
+        inventory_path: Path to global inventory.csv
+        base_folder: Base folder path containing potential field-inventory.csv
     
     Returns:
         Dictionary of field_name -> comma_separated_unique_values mappings from all matched rows
-        
-    Examples:
-        Filter: department="marketing", country=~"USA|Canada|Mexico"
-        Field: country
-        Result: {'country': 'USA,Canada,Mexico'} (actual unique countries from matched rows)
-        
-        Filter: department=sales*, region!="europe" 
-        Field: department, region
-        Result: {'department': 'sales,sales_north,sales_south', 'region': 'north,south,asia'} 
-                (actual unique values from CSV, not the wildcard pattern)
     """
     field_values = {}
     
@@ -1599,64 +1613,10 @@ def extract_field_values_from_matched_rows(filter_line: str, field_names: List[s
         field_values[field] = ""
     
     # PRIORITY-BASED INVENTORY SELECTION - FIXED LOGIC
-    # The inventory_path passed in is typically the global /notifybot/inventory/inventory.csv
-    # We need to determine the base folder from the context and check for local field-inventory.csv
-    
-    # Get the base folder - we need to work backwards from the global inventory path
-    # Since we know the structure: /notifybot/basefolder/<user-folder>/
-    # And the global inventory is at: /notifybot/inventory/inventory.csv
-    # We need to get the actual base folder from the current working directory or context
-    
-    # Try to get base folder from current context
-    # Look for the base folder by finding where we're operating from
-    current_path = Path.cwd()
-    base_folder = None
-    
-    # Check if we're in a basefolder subdirectory
-    if '/notifybot/basefolder/' in str(current_path):
-        # Extract base folder from current path
-        path_parts = str(current_path).split('/notifybot/basefolder/')
-        if len(path_parts) > 1:
-            # Get the first directory after basefolder
-            subfolder = path_parts[1].split('/')[0]
-            base_folder = Path(f"/notifybot/basefolder/{subfolder}")
-    
-    # Fallback: try to infer from common patterns
-    if not base_folder:
-        # Check common locations relative to where the script might be running
-        possible_bases = [
-            Path("/notifybot/basefolder").glob("*"),  # All subdirectories
-        ]
-        
-        for base_pattern in possible_bases:
-            for potential_base in base_pattern:
-                if potential_base.is_dir():
-                    local_field_inventory = potential_base / "field-inventory.csv"
-                    if local_field_inventory.exists():
-                        base_folder = potential_base
-                        break
-            if base_folder:
-                break
-    
-    # Final fallback: use the parent directory of where we expect the filter.txt to be
-    if not base_folder:
-        # This is a fallback - try to find any field-inventory.csv in basefolder structure
-        basefolder_root = Path("/notifybot/basefolder")
-        if basefolder_root.exists():
-            for potential_base in basefolder_root.iterdir():
-                if potential_base.is_dir():
-                    local_field_inventory = potential_base / "field-inventory.csv"
-                    if local_field_inventory.exists():
-                        base_folder = potential_base
-                        break
-    
-    # Determine which inventory to use based on priority
-    local_field_inventory_path = None
-    if base_folder:
-        local_field_inventory_path = base_folder / "field-inventory.csv"
+    local_field_inventory_path = base_folder / "field-inventory.csv"
     
     # Priority 1: Check for local field-inventory.csv 
-    if local_field_inventory_path and local_field_inventory_path.exists():
+    if local_field_inventory_path.exists():
         actual_inventory_path = local_field_inventory_path
         inventory_source = "local field-inventory.csv"
         log_and_print("info", f"Using local field-inventory.csv for field extraction (priority): {actual_inventory_path}")
@@ -1664,8 +1624,7 @@ def extract_field_values_from_matched_rows(filter_line: str, field_names: List[s
         actual_inventory_path = inventory_path  # Use the global inventory
         inventory_source = "global inventory.csv"
         log_and_print("info", f"Using global inventory.csv for field extraction (fallback): {actual_inventory_path}")
-        if local_field_inventory_path:
-            log_and_print("info", f"Local field-inventory.csv not found at: {local_field_inventory_path}")
+        log_and_print("info", f"Local field-inventory.csv not found at: {local_field_inventory_path}")
     
     if not actual_inventory_path.exists():
         log_and_print("warning", f"Inventory file not found: {actual_inventory_path}")
@@ -1787,11 +1746,13 @@ def extract_field_values_from_matched_rows(filter_line: str, field_names: List[s
     
     return field_values
 
+
+
 def get_recipients_for_multi_mode(base_folder: Path, dry_run: bool) -> Tuple[List[Dict], List[str], List[str], int, int, int]:
     """
     Get recipients for multi mode operation.
     ENHANCED: Improved field value extraction with better validation and logging.
-    FIXED: Properly calculate original recipient counts in dry-run mode.
+    FIXED: Now passes base_folder to extract_field_values_from_matched_rows for proper local field-inventory.csv detection.
     
     Returns:
         (email_configs, final_cc_recipients, final_bcc_recipients, 
@@ -1867,7 +1828,8 @@ def get_recipients_for_multi_mode(base_folder: Path, dry_run: bool) -> Tuple[Lis
         field_values = {}
         if field_names:
             log_and_print("info", f"Filter {i}: Extracting field values from CSV for template substitution...")
-            field_values = extract_field_values_from_matched_rows(filter_line, field_names, INVENTORY_PATH)
+            # FIXED: Pass base_folder to the function
+            field_values = extract_field_values_from_matched_rows(filter_line, field_names, INVENTORY_PATH, base_folder)
             
             # Validate and report field extraction results
             extracted_info = []
@@ -1965,7 +1927,11 @@ def get_recipients_for_multi_mode(base_folder: Path, dry_run: bool) -> Tuple[Lis
     
     # Return original counts regardless of dry-run mode
     return (email_configs, final_cc_recipients, final_bcc_recipients, 
-            total_original_recipients_count, original_cc_count, original_bcc_count)
+            total_original_recipients_count, original_cc_count, original_bcc_count)   
+    
+
+
+
 
 
 def save_multi_mode_recipients(base_folder: Path, email_configs: List[Dict], 
@@ -2617,7 +2583,65 @@ def main():
         epilog=f"""
 PRECHECK REQUIREMENTS:
 ======================
- python notifybot.py --base-folder emails --batch-size 300 --delay 10 --mode multi
+
+SINGLE MODE Requirements:
+  Required files: subject.txt, body.html, from.txt, approver.txt
+  Recipient sources (at least ONE required):
+    - to.txt (direct recipient list)
+    - filter.txt + inventory.csv (filtered recipients)
+    - additional_to.txt (additional recipients)
+    - cc.txt (CC recipients)
+    - bcc.txt (BCC recipients)
+  Optional files: cc.txt, bcc.txt, field.txt, mode.txt
+  Optional folders: attachment/, images/
+
+MULTI MODE Requirements:
+  Required files: subject.txt, body.html, from.txt, approver.txt, filter.txt
+  Optional files: field.txt, cc.txt, bcc.txt, additional_to.txt, mode.txt
+  Optional folders: attachment/, images/
+
+INVENTORY FIELDS & VALIDATION:
+==============================
+
+Priority-based Field Validation:
+  1. filter.txt fields → validated against /notifybot/inventory/inventory.csv (ALWAYS)
+  2. field.txt fields → validated with priority system:
+     - If <base-folder>/field-inventory.csv exists: use it for field.txt validation
+     - If local field-inventory.csv exists: filter.txt fields ALSO validated against it
+     - If no local field-inventory.csv: field.txt validated against global inventory.csv
+
+Global Inventory Location: /notifybot/inventory/inventory.csv
+Local Field Inventory: <base-folder>/field-inventory.csv (optional)
+
+{inventory_fields_help}
+
+Field Validation Rules:
+  - All field names in filter.txt must exist in global inventory.csv headers
+  - If local field-inventory.csv exists: filter.txt fields must also exist there
+  - field.txt validation priority: local field-inventory.csv > global inventory.csv
+  - Filter syntax supports: =, !=, =~, !~, wildcards (*, ?, [])
+
+FILTER SYNTAX EXAMPLES:
+=======================
+  department="sales"                    # Exact match
+  region!="europe"                      # Not equal  
+  name=~".*Manager.*"                   # Regex match
+  email!~".*(test|demo).*"              # Regex not match
+  status=active*                        # Wildcard match
+  department="sales",region="north"     # AND condition
+  department="sales"                    # OR condition
+  department="marketing"                # (on separate lines)
+
+File Locations:
+  - Base folder: /notifybot/basefolder/<your-folder>/
+  - Global inventory: /notifybot/inventory/inventory.csv
+  - Local field inventory: /notifybot/basefolder/<your-folder>/field-inventory.csv (optional)
+  - Logs: /notifybot/logs/notifybot.log
+
+Examples:
+  python notifybot.py --base-folder emails --dry-run
+  python notifybot.py --base-folder emails --force --mode single
+  python notifybot.py --base-folder emails --batch-size 300 --delay 10 --mode multi
         """
     )
     
