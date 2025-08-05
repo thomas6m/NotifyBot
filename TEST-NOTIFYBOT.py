@@ -58,6 +58,351 @@ BASEFOLDER_PATH = NOTIFYBOT_ROOT / "basefolder"  # Enforced base folder location
 LOG_FILENAME = NOTIFYBOT_ROOT / "logs" / "notifybot.log"  # Log file location
 INVENTORY_PATH = NOTIFYBOT_ROOT / "inventory" / "inventory.csv"  # New location of inventory.csv
 
+def validate_fields_against_inventory(base_folder: Path, inventory_path: Path, mode: str = "single") -> Tuple[bool, List[str]]:
+    """
+    Validate that all field names used in filter.txt and field.txt exist in inventory.csv headers.
+    
+    Args:
+        base_folder: Base folder containing filter.txt and field.txt
+        inventory_path: Path to inventory.csv file
+        mode: Operating mode ("single" or "multi") - field.txt only validated in multi mode
+    
+    Returns:
+        Tuple of (is_valid, error_messages)
+    """
+    errors = []
+    
+    if not inventory_path.exists():
+        errors.append(f"Inventory file not found: {inventory_path}")
+        return False, errors
+    
+    # Read available fields from inventory.csv
+    try:
+        with open(inventory_path, mode="r", newline="", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            available_fields = set(reader.fieldnames or [])
+            
+        if not available_fields:
+            errors.append("No headers found in inventory.csv")
+            return False, errors
+            
+        log_and_print("info", f"Available fields in inventory.csv: {', '.join(sorted(available_fields))}")
+        
+    except Exception as exc:
+        errors.append(f"Error reading inventory.csv headers: {exc}")
+        return False, errors
+    
+    # Check filter.txt for field names
+    filter_file = base_folder / "filter.txt"
+    if filter_file.is_file():
+        try:
+            filter_content = read_file(filter_file)
+            filter_lines = [line.strip() for line in filter_content.splitlines() 
+                          if line.strip() and not line.strip().startswith('#')]
+            
+            # Extract field names from filter conditions
+            filter_fields = set()
+            for line_num, filter_line in enumerate(filter_lines, 1):
+                # Split by commas for AND conditions
+                conditions = [condition.strip() for condition in filter_line.split(',')]
+                
+                for condition in conditions:
+                    if not condition:
+                        continue
+                    
+                    # Extract field name from condition (before operator)
+                    # Support operators: =~, !~, !=, =
+                    field_name = None
+                    for op in ['=~', '!~', '!=', '=']:
+                        if op in condition:
+                            field_name = condition.split(op)[0].strip()
+                            break
+                    
+                    if field_name and field_name not in available_fields:
+                        filter_fields.add(field_name)
+                        errors.append(f"filter.txt line {line_num}: Field '{field_name}' not found in inventory.csv")
+            
+            if filter_fields:
+                log_and_print("error", f"Invalid fields in filter.txt: {', '.join(sorted(filter_fields))}")
+            else:
+                log_and_print("info", "All filter.txt field names validated successfully")
+                
+        except Exception as exc:
+            errors.append(f"Error validating filter.txt: {exc}")
+    
+    # Check field.txt for field names - ONLY in multi mode
+    if mode == "multi":
+        field_file = base_folder / "field.txt"
+        if field_file.is_file():
+            try:
+                field_content = read_file(field_file)
+                field_names = [line.strip() for line in field_content.splitlines() if line.strip()]
+                
+                invalid_fields = []
+                for line_num, field_name in enumerate(field_names, 1):
+                    if field_name not in available_fields:
+                        invalid_fields.append(field_name)
+                        errors.append(f"field.txt line {line_num}: Field '{field_name}' not found in inventory.csv")
+                
+                if invalid_fields:
+                    log_and_print("error", f"Invalid fields in field.txt: {', '.join(invalid_fields)}")
+                else:
+                    if field_names:  # Only log success if there were field names to validate
+                        log_and_print("info", "All field.txt field names validated successfully")
+                    
+            except Exception as exc:
+                errors.append(f"Error validating field.txt: {exc}")
+        else:
+            log_and_print("info", "No field.txt found (optional for multi mode)")
+    # In single mode, field.txt is not validated at all (no logging needed)
+    
+    # Provide helpful suggestions if there are errors
+    if errors:
+        log_and_print("info", "Field validation failed. Available fields in inventory.csv:")
+        for field in sorted(available_fields):
+            log_and_print("info", f"  - {field}")
+    
+    return len(errors) == 0, errors
+
+def validate_fields_with_priority(base_folder: Path, mode: str = "single") -> Tuple[bool, List[str]]:
+    """
+    Enhanced field validation with priority-based inventory checking.
+    
+    Priority rules:
+    1. All fields in filter.txt should exist in /notifybot/inventory/inventory.csv
+    2. All fields in field.txt should exist in <base-folder>/field-inventory.csv if it exists,
+       AND all fields in filter.txt should also exist in <base-folder>/field-inventory.csv
+    3. If <base-folder>/field-inventory.csv doesn't exist, then all fields in field.txt 
+       should exist in /notifybot/inventory/inventory.csv
+    
+    Args:
+        base_folder: Base folder containing filter.txt and field.txt
+        mode: Operating mode ("single" or "multi") - field.txt only validated in multi mode
+    
+    Returns:
+        Tuple of (is_valid, error_messages)
+    """
+    errors = []
+    
+    # Check if global inventory exists
+    if not INVENTORY_PATH.exists():
+        errors.append(f"Global inventory file not found: {INVENTORY_PATH}")
+        return False, errors
+    
+    # Check if local field inventory exists
+    local_field_inventory_path = base_folder / "field-inventory.csv"
+    has_local_field_inventory = local_field_inventory_path.exists()
+    
+    # Read available fields from global inventory
+    try:
+        with open(INVENTORY_PATH, mode="r", newline="", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            # Strip whitespace from field names
+            global_available_fields = set(field.strip() for field in (reader.fieldnames or []))
+            
+        if not global_available_fields:
+            errors.append("No headers found in global inventory.csv")
+            return False, errors
+            
+        log_and_print("info", f"Global inventory fields: {', '.join(sorted(global_available_fields))}")
+        
+    except Exception as exc:
+        errors.append(f"Error reading global inventory.csv headers: {exc}")
+        return False, errors
+    
+    # Read available fields from local field inventory if it exists
+    local_available_fields = set()
+    if has_local_field_inventory:
+        try:
+            with open(local_field_inventory_path, mode="r", newline="", encoding="utf-8") as file:
+                reader = csv.DictReader(file)
+                # Strip whitespace from field names - THIS IS THE KEY FIX
+                local_available_fields = set(field.strip() for field in (reader.fieldnames or []))
+                
+            if not local_available_fields:
+                errors.append(f"No headers found in local field-inventory.csv")
+                return False, errors
+                
+            log_and_print("info", f"Local field-inventory.csv found with fields: {', '.join(sorted(local_available_fields))}")
+            
+        except Exception as exc:
+            errors.append(f"Error reading local field-inventory.csv headers: {exc}")
+            return False, errors
+    else:
+        log_and_print("info", "No local field-inventory.csv found, using global inventory for field.txt validation")
+    
+    # RULE 1: Validate filter.txt against global inventory
+    filter_file = base_folder / "filter.txt"
+    if filter_file.is_file():
+        try:
+            filter_content = read_file(filter_file)
+            filter_lines = [line.strip() for line in filter_content.splitlines() 
+                          if line.strip() and not line.strip().startswith('#')]
+            
+            # Extract field names from filter conditions
+            filter_fields = set()
+            for line_num, filter_line in enumerate(filter_lines, 1):
+                # Split by commas for AND conditions
+                conditions = [condition.strip() for condition in filter_line.split(',')]
+                
+                for condition in conditions:
+                    if not condition:
+                        continue
+                    
+                    # Extract field name from condition (before operator)
+                    field_name = None
+                    for op in ['=~', '!~', '!=', '=']:
+                        if op in condition:
+                            field_name = condition.split(op)[0].strip()
+                            break
+                    
+                    if field_name:
+                        filter_fields.add(field_name)
+                        
+                        # Check against global inventory
+                        if field_name not in global_available_fields:
+                            errors.append(f"filter.txt line {line_num}: Field '{field_name}' not found in global inventory.csv")
+                        
+                        # RULE 2: If local field inventory exists, also check filter fields against it
+                        if has_local_field_inventory and field_name not in local_available_fields:
+                            errors.append(f"filter.txt line {line_num}: Field '{field_name}' not found in local field-inventory.csv")
+            
+            if filter_fields:
+                if not any(f"Field '{field}' not found" in error for error in errors):
+                    log_and_print("info", "All filter.txt field names validated successfully against global inventory")
+                    if has_local_field_inventory:
+                        if not any("field-inventory.csv" in error for error in errors):
+                            log_and_print("info", "All filter.txt field names validated successfully against local field-inventory")
+                else:
+                    invalid_global = [field for field in filter_fields if field not in global_available_fields]
+                    if invalid_global:
+                        log_and_print("error", f"Invalid fields in filter.txt (global inventory): {', '.join(sorted(invalid_global))}")
+                    
+                    if has_local_field_inventory:
+                        invalid_local = [field for field in filter_fields if field not in local_available_fields]
+                        if invalid_local:
+                            log_and_print("error", f"Invalid fields in filter.txt (local field-inventory): {', '.join(sorted(invalid_local))}")
+                
+        except Exception as exc:
+            errors.append(f"Error validating filter.txt: {exc}")
+    
+    # RULE 2 & 3: Validate field.txt - ONLY in multi mode
+    if mode == "multi":
+        field_file = base_folder / "field.txt"
+        if field_file.is_file():
+            try:
+                field_content = read_file(field_file)
+                field_names = [line.strip() for line in field_content.splitlines() if line.strip()]
+                
+                if field_names:
+                    # Determine which inventory to validate against
+                    if has_local_field_inventory:
+                        # RULE 2: Use local field inventory for field.txt validation
+                        inventory_to_use = local_available_fields
+                        inventory_name = "local field-inventory.csv"
+                        log_and_print("info", f"Validating field.txt against local field-inventory.csv (priority)")
+                    else:
+                        # RULE 3: Fallback to global inventory for field.txt validation
+                        inventory_to_use = global_available_fields
+                        inventory_name = "global inventory.csv"
+                        log_and_print("info", f"Validating field.txt against global inventory.csv (fallback)")
+                    
+                    invalid_fields = []
+                    for line_num, field_name in enumerate(field_names, 1):
+                        # Strip whitespace from field name from field.txt as well
+                        field_name = field_name.strip()
+                        if field_name not in inventory_to_use:
+                            invalid_fields.append(field_name)
+                            errors.append(f"field.txt line {line_num}: Field '{field_name}' not found in {inventory_name}")
+                    
+                    if invalid_fields:
+                        log_and_print("error", f"Invalid fields in field.txt ({inventory_name}): {', '.join(invalid_fields)}")
+                    else:
+                        log_and_print("info", f"All field.txt field names validated successfully against {inventory_name}")
+                else:
+                    log_and_print("info", "field.txt is empty - no fields to validate")
+                    
+            except Exception as exc:
+                errors.append(f"Error validating field.txt: {exc}")
+        else:
+            log_and_print("info", "No field.txt found (optional for multi mode)")
+    
+    # Provide helpful suggestions if there are errors
+    if errors:
+        log_and_print("info", "Field validation failed. Available fields:")
+        log_and_print("info", f"Global inventory.csv: {', '.join(sorted(global_available_fields))}")
+        if has_local_field_inventory:
+            log_and_print("info", f"Local field-inventory.csv: {', '.join(sorted(local_available_fields))}")
+    
+    return len(errors) == 0, errors
+
+
+
+
+
+def check_required_files(base: Path, required: List[str], dry_run: bool = True, mode: str = "single") -> None:
+    """Updated check_required_files function to use the new priority-based validation."""
+    missing = [f for f in required if not (base / f).is_file()]
+    if missing:
+        raise MissingRequiredFilesError(f"Missing required files: {', '.join(missing)}")
+    
+    # Multi mode requires filter.txt
+    if mode == "multi":
+        if not (base / "filter.txt").is_file():
+            raise MissingRequiredFilesError("Multi mode requires filter.txt")
+        if not INVENTORY_PATH.is_file():
+            raise MissingRequiredFilesError("Multi mode requires inventory.csv at /notifybot/inventory/inventory.csv")
+    
+    # Single mode requires at least one recipient source (ALWAYS - dry-run or live)
+    if mode == "single":
+        has_to = (base / "to.txt").is_file()
+        has_filters = (base / "filter.txt").is_file() and INVENTORY_PATH.is_file()
+        has_additional = (base / "additional_to.txt").is_file()
+        has_cc = (base / "cc.txt").is_file()
+        has_bcc = (base / "bcc.txt").is_file()
+        
+        if not (has_to or has_filters or has_additional or has_cc or has_bcc):
+            raise MissingRequiredFilesError(
+                "Single mode requires at least one recipient source: 'to.txt', 'filter.txt + inventory.csv', 'additional_to.txt', 'cc.txt', or 'bcc.txt'."
+            )
+        
+        # Log which recipient source(s) were found
+        sources_found = []
+        if has_to:
+            sources_found.append("to.txt")
+        if has_filters:
+            sources_found.append("filter.txt + inventory.csv")
+        if has_additional:
+            sources_found.append("additional_to.txt")
+        if has_cc:
+            sources_found.append("cc.txt")
+        if has_bcc:
+            sources_found.append("bcc.txt")
+        
+        log_and_print("info", f"Single mode recipient sources found: {', '.join(sources_found)}")
+    
+    # Enhanced field validation with priority-based checking
+    needs_inventory = (
+        mode == "multi" or 
+        (mode == "single" and not (base / "to.txt").is_file() and (base / "filter.txt").is_file())
+    )
+    
+    if needs_inventory:
+        log_and_print("info", "Validating field names with priority-based inventory checking...")
+        is_valid, validation_errors = validate_fields_with_priority(base, mode)
+        
+        if not is_valid:
+            log_and_print("error", "Field validation failed:")
+            for error in validation_errors:
+                log_and_print("error", f"  {error}")
+            raise MissingRequiredFilesError(
+                f"Field validation failed. {len(validation_errors)} error(s) found. "
+                "Please check that all field names exist in the appropriate inventory files."
+            )
+        else:
+            log_and_print("success", "Field validation passed - all field names are valid")
+
+
 class MissingRequiredFilesError(Exception):
     """Exception raised when required input files are missing."""
 
@@ -311,31 +656,7 @@ def merge_recipients(base_recipients: List[str], additional_recipients: List[str
     all_recipients = base_recipients + additional_recipients
     return deduplicate_emails(all_recipients)
 
-def check_required_files(base: Path, required: List[str], dry_run: bool = True, mode: str = "single") -> None:
-    """Ensure required files exist based on mode."""
-    missing = [f for f in required if not (base / f).is_file()]
-    if missing:
-        raise MissingRequiredFilesError(f"Missing required files: {', '.join(missing)}")
-    
-    # Multi mode requires filter.txt
-    if mode == "multi":
-        if not (base / "filter.txt").is_file():
-            raise MissingRequiredFilesError("Multi mode requires filter.txt")
-        if not INVENTORY_PATH.is_file():
-            raise MissingRequiredFilesError("Multi mode requires inventory.csv at /notifybot/inventory/inventory.csv")
-    
-    # Single mode requires at least one recipient source in live mode
-    if mode == "single" and not dry_run:
-        has_to = (base / "to.txt").is_file()
-        has_filters = (base / "filter.txt").is_file() and INVENTORY_PATH.is_file()
-        has_additional = (base / "additional_to.txt").is_file()
-        has_cc = (base / "cc.txt").is_file()
-        has_bcc = (base / "bcc.txt").is_file()
-        
-        if not (has_to or has_filters or has_additional or has_cc or has_bcc):
-            raise MissingRequiredFilesError(
-                "Single mode requires at least one recipient source: 'to.txt', 'filter.txt + inventory.csv', 'additional_to.txt', 'cc.txt', or 'bcc.txt'."
-            )
+
 
 def sanitize_filename(filename: str) -> str:
     """Sanitize the filename to prevent issues with special characters."""
@@ -569,9 +890,13 @@ def matches_filter_conditions(row: Dict, filters: List[str]) -> bool:
     # None of the OR conditions matched
     return False
 
-def validate_filter_syntax(filters: List[str]) -> Tuple[bool, List[str]]:
+def validate_filter_syntax(filters: List[str], available_fields: Set[str] = None) -> Tuple[bool, List[str]]:
     """
-    Validate filter syntax and return validation results.
+    Validate filter syntax and optionally check field names against available fields.
+    
+    Args:
+        filters: List of filter conditions
+        available_fields: Optional set of available field names for validation
     
     Returns:
         Tuple of (is_valid, error_messages)
@@ -595,6 +920,7 @@ def validate_filter_syntax(filters: List[str]) -> Tuple[bool, List[str]]:
             # Check for valid operators
             valid_operators = ['=~', '!~', '!=', '=']
             has_valid_operator = False
+            field_name = None
             
             for op in valid_operators:
                 if op in condition:
@@ -604,13 +930,17 @@ def validate_filter_syntax(filters: List[str]) -> Tuple[bool, List[str]]:
                         errors.append(f"Line {i}: Invalid condition syntax '{condition}'")
                         break
                     
-                    key, value = parts[0].strip(), parts[1].strip()
+                    field_name, value = parts[0].strip(), parts[1].strip()
                     
-                    if not key:
+                    if not field_name:
                         errors.append(f"Line {i}: Empty field name in '{condition}'")
                     
                     if not value:
                         errors.append(f"Line {i}: Empty value in '{condition}'")
+                    
+                    # NEW: Check if field exists in available fields
+                    if available_fields and field_name and field_name not in available_fields:
+                        errors.append(f"Line {i}: Field '{field_name}' not found in inventory.csv headers")
                     
                     # Validate regex patterns for regex operators
                     if op in ['=~', '!~']:
@@ -628,6 +958,7 @@ def validate_filter_syntax(filters: List[str]) -> Tuple[bool, List[str]]:
                     errors.append(f"Line {i}: No valid operator found in '{condition}'. Use =, !=, =~, !~, or wildcards (*,?,[])")
     
     return len(errors) == 0, errors
+
 
 def print_filter_syntax_help():
     """Print help information about filter syntax."""
@@ -679,6 +1010,7 @@ Complex Examples:
 def apply_filter_logic(filters: List[str], inventory_path: Path) -> List[str]:
     """
     Apply the enhanced filter logic using PromQL-style syntax with 'filter.txt' and 'inventory.csv'.
+    Now includes field validation against inventory headers.
     """
     filtered_recipients = []
     
@@ -686,13 +1018,23 @@ def apply_filter_logic(filters: List[str], inventory_path: Path) -> List[str]:
         log_and_print("error", f"Inventory file not found: {inventory_path}")
         return filtered_recipients
     
-    # Validate filter syntax first
-    is_valid, errors = validate_filter_syntax(filters)
+    # Read available fields from inventory
+    try:
+        with open(inventory_path, mode="r", newline="", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            available_fields = set(reader.fieldnames or [])
+    except Exception as exc:
+        log_and_print("error", f"Error reading inventory headers: {exc}")
+        return filtered_recipients
+    
+    # Validate filter syntax WITH field name checking
+    is_valid, errors = validate_filter_syntax(filters, available_fields)
     if not is_valid:
-        log_and_print("error", "Filter syntax validation failed:")
+        log_and_print("error", "Filter syntax/field validation failed:")
         for error in errors:
             log_and_print("error", f"  {error}")
         print_filter_syntax_help()
+        log_and_print("info", f"Available fields in inventory.csv: {', '.join(sorted(available_fields))}")
         return filtered_recipients
     
     # Count total non-comment filter lines for logging
@@ -760,54 +1102,6 @@ def apply_filter_logic(filters: List[str], inventory_path: Path) -> List[str]:
     return filtered_recipients
 
 
-
-def extract_field_values_from_filter(filter_line: str, field_names: List[str]) -> Dict[str, str]:
-    """
-    Extract field values from a PromQL-style filter line for template substitution.
-    Now supports all PromQL operators: =, !=, =~, !~, and wildcards.
-    
-    Args:
-        filter_line: Single filter line like "department='sales',region=~'north.*'"
-        field_names: List of field names to extract
-    
-    Returns:
-        Dictionary of field_name -> value mappings
-    """
-    field_values = {}
-    
-    # Initialize all fields to empty
-    for field in field_names:
-        field_values[field] = ""
-    
-    # Parse filter conditions with enhanced operator support
-    and_conditions = [condition.strip() for condition in filter_line.split(',')]
-    
-    for condition in and_conditions:
-        if not condition:
-            continue
-        
-        # Parse condition with all supported operators
-        key, operator, value = parse_filter_condition(condition)
-        
-        if key and key in field_names:
-            # For template substitution, we want the literal value regardless of operator
-            # Remove quotes and clean up the value
-            clean_value = value.strip('\'"')
-            
-            # For regex patterns, we might want to extract meaningful parts
-            if operator in ['=~', '!~']:
-                # For simple alternation patterns like "USA|Canada|Mexico", 
-                # we might want to use the first option or a simplified form
-                if '|' in clean_value and not ('.*' in clean_value or '[' in clean_value):
-                    # Simple alternation - use first option
-                    clean_value = clean_value.split('|')[0]
-                elif clean_value.startswith('.*') and clean_value.endswith('.*'):
-                    # Pattern like ".*Manager.*" - extract the middle part
-                    clean_value = clean_value[2:-2]
-            
-            field_values[key] = clean_value
-    
-    return field_values
 
 def parse_filter_condition(condition: str) -> tuple:
     """
@@ -1048,10 +1342,10 @@ def analyze_inventory_data(inventory_path: Path) -> None:
     except Exception as exc:
         print(f"Error analyzing inventory data: {exc}")
     
-
 def substitute_placeholders(template: str, field_values: Dict[str, str]) -> str:
     """
     Replace placeholders in template with field values.
+    ENHANCED: Better handling of comma-separated values and improved formatting.
     
     Args:
         template: Template string with placeholders like "Report for {department}"
@@ -1059,13 +1353,49 @@ def substitute_placeholders(template: str, field_values: Dict[str, str]) -> str:
     
     Returns:
         Template with placeholders replaced
+        
+    Examples:
+        template: "Sales report for {department} in {region}"
+        field_values: {"department": "sales,sales_north", "region": "north,south,east"}
+        result: "Sales report for sales and sales_north in north, south, and east"
     """
     result = template
+    substitutions_made = 0
+    
     for field, value in field_values.items():
         placeholder = f"{{{field}}}"
-        result = result.replace(placeholder, value)
+        
+        if placeholder in result:
+            # Clean up comma-separated values for better readability
+            if value and ',' in value:
+                # For comma-separated values, format them nicely
+                values = [v.strip() for v in value.split(',') if v.strip()]
+                if len(values) == 1:
+                    clean_value = values[0]
+                elif len(values) == 2:
+                    clean_value = f"{values[0]} and {values[1]}"
+                elif len(values) <= 5:
+                    # For small lists, show all with proper formatting
+                    clean_value = f"{', '.join(values[:-1])}, and {values[-1]}"
+                else:
+                    # For large lists, show first few and add "and X more"
+                    remaining = len(values) - 3
+                    clean_value = f"{', '.join(values[:3])}, and {remaining} more"
+            else:
+                clean_value = value if value else f"{{{field}}}" # ← HERE'S THE PROBLEM
+            
+            # Perform the substitution
+            result = result.replace(placeholder, clean_value)
+            substitutions_made += 1
+    
+    # Log substitution details if any were made
+    if substitutions_made > 0:
+        log_and_print("info", f"Template substitution: {substitutions_made} placeholder(s) replaced")
     
     return result
+
+
+
 
 def get_recipients_for_single_mode(base_folder: Path, dry_run: bool) -> Tuple[List[str], List[str], List[str], int, int, int]:
     """
@@ -1260,15 +1590,173 @@ def get_recipients_for_single_mode(base_folder: Path, dry_run: bool) -> Tuple[Li
     return (final_recipients, final_cc_recipients, final_bcc_recipients, 
             original_recipients_count, original_cc_count, original_bcc_count)
 
+def extract_field_values_from_matched_rows(filter_line: str, field_names: List[str], inventory_path: Path, base_folder: Path) -> Dict[str, str]:
+    """
+    Extract ALL unique field values from matched rows in inventory.csv for template substitution.
+    Collects all unique values for each field from all rows that match the filter.
+    ENHANCED: Now properly uses priority-based inventory selection (local field-inventory.csv first, then global).
+    FIXED: Now receives base_folder as parameter for reliable local field-inventory.csv detection.
+    
+    Args:
+        filter_line: Single filter line like "department='sales',region!='europe'" or "department=sales*"
+        field_names: List of field names to extract
+        inventory_path: Path to global inventory.csv
+        base_folder: Base folder path containing potential field-inventory.csv
+    
+    Returns:
+        Dictionary of field_name -> comma_separated_unique_values mappings from all matched rows
+    """
+    field_values = {}
+    
+    # Initialize all fields to empty
+    for field in field_names:
+        field_values[field] = ""
+    
+    # PRIORITY-BASED INVENTORY SELECTION - FIXED LOGIC
+    local_field_inventory_path = base_folder / "field-inventory.csv"
+    
+    # Priority 1: Check for local field-inventory.csv 
+    if local_field_inventory_path.exists():
+        actual_inventory_path = local_field_inventory_path
+        inventory_source = "local field-inventory.csv"
+        log_and_print("info", f"Using local field-inventory.csv for field extraction (priority): {actual_inventory_path}")
+    else:
+        actual_inventory_path = inventory_path  # Use the global inventory
+        inventory_source = "global inventory.csv"
+        log_and_print("info", f"Using global inventory.csv for field extraction (fallback): {actual_inventory_path}")
+        log_and_print("info", f"Local field-inventory.csv not found at: {local_field_inventory_path}")
+    
+    if not actual_inventory_path.exists():
+        log_and_print("warning", f"Inventory file not found: {actual_inventory_path}")
+        return field_values
+    
+    try:
+        # Dictionary to store unique values for each field
+        field_unique_values = {field: set() for field in field_names}
+        matched_rows_count = 0
+        total_rows_processed = 0
+        
+        with open(actual_inventory_path, mode="r", newline="", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            
+            # Get headers and strip whitespace - CRITICAL FIX
+            raw_headers = reader.fieldnames or []
+            clean_headers = [header.strip() for header in raw_headers]
+            
+            # Verify that all requested field names exist in CSV headers
+            available_fields = set(clean_headers)
+            missing_fields = [field for field in field_names if field not in available_fields]
+            if missing_fields:
+                log_and_print("warning", f"Fields not found in {inventory_source}: {', '.join(missing_fields)}")
+                log_and_print("info", f"Available fields: {', '.join(sorted(available_fields))}")
+                log_and_print("info", f"Raw headers from CSV: {raw_headers}")
+            
+            # Find ALL rows that match this filter and extract their actual field values
+            for row in reader:
+                total_rows_processed += 1
+                
+                # Create cleaned row for filter matching (clean keys AND values)
+                cleaned_row = {}
+                for raw_header, raw_value in row.items():
+                    clean_header = raw_header.strip() if raw_header else raw_header
+                    clean_value = raw_value.strip() if raw_value else raw_value
+                    cleaned_row[clean_header] = clean_value
+                
+                # Check if this row matches the filter condition
+                if matches_filter_conditions(cleaned_row, [filter_line]):
+                    matched_rows_count += 1
+                    
+                    # Extract ACTUAL values from this matched row (not the filter pattern)
+                    for field in field_names:
+                        if field in cleaned_row:
+                            raw_value = cleaned_row[field]
+                            if raw_value:  # Only process non-empty values
+                                raw_value_str = str(raw_value).strip()
+                                if raw_value_str:  # Double-check it's not just whitespace
+                                    # Handle comma-separated values within a single CSV cell
+                                    if ',' in raw_value_str:
+                                        # Split comma-separated values and add each one
+                                        for sub_value in raw_value_str.split(','):
+                                            clean_sub_value = sub_value.strip()
+                                            if clean_sub_value:
+                                                field_unique_values[field].add(clean_sub_value)
+                                    else:
+                                        # Single value in the cell
+                                        field_unique_values[field].add(raw_value_str)
+                            else:
+                                # Handle empty values properly by logging them but not adding to results
+                                log_and_print("info", f"Row {total_rows_processed}: Field '{field}' is empty in matched row")
+                        else:
+                            log_and_print("warning", f"Row {total_rows_processed}: Field '{field}' not found in row columns")
+        
+        # Convert sets to comma-separated strings, sorted for consistency
+        for field in field_names:
+            if field_unique_values[field]:
+                # Sort values for consistent output
+                sorted_values = sorted(list(field_unique_values[field]))
+                field_values[field] = ",".join(sorted_values)
+            else:
+                # Keep empty string for fields with no values (don't set to None)
+                field_values[field] = ""
+        
+        # Enhanced logging with better details
+        if matched_rows_count > 0:
+            log_and_print("info", f"Field extraction from filter: '{filter_line}' using {inventory_source}")
+            log_and_print("info", f"  - Processed {total_rows_processed} total rows")
+            log_and_print("info", f"  - Found {matched_rows_count} matching rows")
+            
+            extracted_fields = []
+            for field_name in field_names:
+                field_value = field_values.get(field_name, "")
+                if field_value:
+                    unique_count = len(field_value.split(','))
+                    # Show first few values for preview
+                    preview_values = field_value.split(',')[:3]
+                    preview = ','.join(preview_values)
+                    if unique_count > 3:
+                        preview += f"...+{unique_count-3} more"
+                    extracted_fields.append(f"{field_name}=[{preview}] ({unique_count} unique)")
+                else:
+                    extracted_fields.append(f"{field_name}=[] (no values found)")
+            
+            if extracted_fields:
+                log_and_print("info", f"  - Extracted: {'; '.join(extracted_fields)}")
+            else:
+                log_and_print("warning", f"  - No field values extracted despite {matched_rows_count} matched rows")
+                
+            # Debug logging to help troubleshoot
+            log_and_print("info", f"  - Debug: Available clean headers: {', '.join(sorted(available_fields))}")
+            log_and_print("info", f"  - Debug: Requested fields: {', '.join(field_names)}")
+            
+        else:
+            log_and_print("warning", f"No rows matched filter for field extraction: {filter_line}")
+            log_and_print("info", f"  - Processed {total_rows_processed} total rows from {inventory_source}")
+            log_and_print("info", f"  - Available headers: {', '.join(sorted(available_fields))}")
+    
+    except Exception as exc:
+        log_and_print("error", f"Error extracting field values from {inventory_source}: {exc}")
+        log_and_print("error", f"Filter: {filter_line}")
+        log_and_print("error", f"Fields requested: {field_names}")
+        # Additional debug info
+        try:
+            log_and_print("error", f"Inventory path: {actual_inventory_path}")
+            log_and_print("error", f"Inventory exists: {actual_inventory_path.exists()}")
+        except:
+            pass
+    
+    return field_values
+
+
 
 def get_recipients_for_multi_mode(base_folder: Path, dry_run: bool) -> Tuple[List[Dict], List[str], List[str], int, int, int]:
     """
     Get recipients for multi mode operation.
-    ENHANCED: Now saves recipient details to files for reference.
+    ENHANCED: Improved field value extraction with better validation and logging.
+    FIXED: Now passes base_folder to extract_field_values_from_matched_rows for proper local field-inventory.csv detection.
     
     Returns:
         (email_configs, final_cc_recipients, final_bcc_recipients, 
-         total_original_recipients_count, original_cc_count, original_bcc_count)
+         total_original_recipients_count, total_original_cc_count, total_original_bcc_count)
     """
     # Read filter conditions
     filters = read_file(base_folder / "filter.txt").splitlines()
@@ -1288,17 +1776,21 @@ def get_recipients_for_multi_mode(base_folder: Path, dry_run: bool) -> Tuple[Lis
             log_and_print("info", f"Loaded {len(field_names)} field names for substitution: {', '.join(field_names)}")
         except Exception as exc:
             log_and_print("warning", f"Error reading field.txt: {exc}")
+    else:
+        log_and_print("info", "No field.txt found - no template substitution will be performed")
     
-    # Read CC and BCC recipients
+    # Read CC and BCC recipients - STORE ORIGINAL COUNTS IMMEDIATELY
     cc_emails = read_recipients(base_folder / "cc.txt")
     bcc_emails = read_recipients(base_folder / "bcc.txt")
+    original_cc_count = len(deduplicate_emails(cc_emails))  # Store original count
+    original_bcc_count = len(deduplicate_emails(bcc_emails))  # Store original count
     
     if cc_emails:
         log_and_print("info", f"Loaded {len(cc_emails)} CC recipients from cc.txt (will be added to each email)")
     if bcc_emails:
         log_and_print("info", f"Loaded {len(bcc_emails)} BCC recipients from bcc.txt (will be added to each email)")
     
-    # Read additional_to.txt once (outside the loop) - FIX FOR MULTI-MODE
+    # Read additional_to.txt once (outside the loop)
     additional_to_file_path = base_folder / "additional_to.txt"
     additional_recipients = []
     if additional_to_file_path.is_file():
@@ -1317,7 +1809,7 @@ def get_recipients_for_multi_mode(base_folder: Path, dry_run: bool) -> Tuple[Lis
         filter_recipients = apply_filter_logic([filter_line], INVENTORY_PATH)
         filter_recipients = deduplicate_emails(filter_recipients)
         
-        # Merge with additional recipients - FIX FOR MULTI-MODE
+        # Merge with additional recipients
         if additional_recipients:
             original_count = len(filter_recipients)
             filter_recipients = merge_recipients(filter_recipients, additional_recipients)
@@ -1329,24 +1821,63 @@ def get_recipients_for_multi_mode(base_folder: Path, dry_run: bool) -> Tuple[Lis
             log_and_print("warning", f"Filter {i} matched no recipients: {filter_line}")
             continue
         
-        # Extract field values for substitution
+        # FIXED: Store original recipient count BEFORE any dry-run modifications
+        original_recipients_count = len(filter_recipients)
+        
+        # Extract field values for substitution from matched rows in inventory
         field_values = {}
         if field_names:
-            field_values = extract_field_values_from_filter(filter_line, field_names)
-            log_and_print("info", f"Filter {i} field values: {field_values}")
+            log_and_print("info", f"Filter {i}: Extracting field values from CSV for template substitution...")
+            # FIXED: Pass base_folder to the function
+            field_values = extract_field_values_from_matched_rows(filter_line, field_names, INVENTORY_PATH, base_folder)
+            
+            # Validate and report field extraction results
+            extracted_info = []
+            empty_fields = []
+            
+            for field_name in field_names:
+                field_value = field_values.get(field_name, "")
+                if field_value:
+                    value_count = len(field_value.split(',')) if ',' in field_value else 1
+                    # Create a display-friendly preview
+                    if value_count <= 3:
+                        display_value = field_value
+                    else:
+                        first_three = ','.join(field_value.split(',')[:3])
+                        display_value = f"{first_three}...+{value_count-3} more"
+                    extracted_info.append(f"{field_name}=[{display_value}] ({value_count} unique)")
+                else:
+                    empty_fields.append(field_name)
+            
+            if extracted_info:
+                log_and_print("info", f"Filter {i} successfully extracted: {', '.join(extracted_info)}")
+            
+            if empty_fields:
+                log_and_print("warning", f"Filter {i} no values found for fields: {', '.join(empty_fields)}")
+                log_and_print("info", f"  Check if these fields exist in inventory.csv and have data in matched rows")
+            
+            # Additional validation: warn if no substitutions will occur
+            if not any(field_values.values()):
+                log_and_print("warning", f"Filter {i}: No field values extracted - template placeholders will remain unchanged")
+        else:
+            log_and_print("info", f"Filter {i}: No field.txt found - no template substitution will be performed")
         
-        # Create email configuration
+        # Create email configuration with SEPARATE fields for original and current recipients
         email_config = {
             'filter_line': filter_line,
-            'recipients': filter_recipients,
+            'recipients': filter_recipients.copy(),  # Current recipients (will be modified for dry-run)
+            'original_recipients': filter_recipients.copy(),  # Original recipients (never modified)
             'field_values': field_values,
-            'filter_number': i
+            'filter_number': i,
+            'original_recipients_count': original_recipients_count  # Store original count
         }
         
         email_configs.append(email_config)
-        total_original_recipients_count += len(filter_recipients)
         
-        log_and_print("info", f"Filter {i} will generate 1 email for {len(filter_recipients)} recipients")
+        # FIXED: Add to total_original_recipients_count BEFORE any dry-run modifications
+        total_original_recipients_count += original_recipients_count
+        
+        log_and_print("info", f"Filter {i} will generate 1 email for {original_recipients_count} recipients")
     
     if not email_configs:
         log_and_print("error", "No filters generated any recipients")
@@ -1356,7 +1887,7 @@ def get_recipients_for_multi_mode(base_folder: Path, dry_run: bool) -> Tuple[Lis
     log_and_print("info", f"Total unique recipient addresses across all emails: {total_original_recipients_count}")
     
     if dry_run:
-        # In dry-run mode, replace all recipients with approvers
+        # In dry-run mode, replace ONLY the 'recipients' field with approvers, keep 'original_recipients' intact
         approver_emails = read_recipients(base_folder / "approver.txt")
         approver_emails = deduplicate_emails(approver_emails)
         
@@ -1364,32 +1895,24 @@ def get_recipients_for_multi_mode(base_folder: Path, dry_run: bool) -> Tuple[Lis
             log_and_print("error", "No valid approver emails found in approver.txt")
             sys.exit(1)
         
-        # Replace recipients in each email config with approvers
+        # Replace only the 'recipients' field with approvers for dry-run (keep original_recipients unchanged)
         for config in email_configs:
-            config['original_recipients_count'] = len(config['recipients'])
-            config['recipients'] = approver_emails  # All emails go to approvers in dry-run
+            config['recipients'] = approver_emails  # Replace with approvers for sending
+            # config['original_recipients'] remains unchanged for reference
         
         final_cc_recipients = []  # No CC/BCC in dry-run
         final_bcc_recipients = []
-        original_cc_count = len(deduplicate_emails(cc_emails))
-        original_bcc_count = len(deduplicate_emails(bcc_emails))
         
-        # SAVE RECIPIENTS IN DRY-RUN MODE TOO (with original data)
-        # Temporarily restore original recipients for saving, then put back approvers
-        original_configs = []
+        # Save original recipient data using original_recipients field
+        original_configs_for_saving = []
         for config in email_configs:
-            # We need to restore original recipients for saving
             original_config = config.copy()
-            # Get the original recipients again
-            filter_recipients = apply_filter_logic([config['filter_line']], INVENTORY_PATH)
-            filter_recipients = deduplicate_emails(filter_recipients)
-            if additional_recipients:
-                filter_recipients = merge_recipients(filter_recipients, additional_recipients)
-            original_config['recipients'] = filter_recipients
-            original_configs.append(original_config)
+            # Use the preserved original_recipients for saving
+            original_config['recipients'] = config['original_recipients']
+            original_configs_for_saving.append(original_config)
         
         # Save original recipient data
-        save_multi_mode_recipients(base_folder, original_configs, cc_emails, bcc_emails)
+        save_multi_mode_recipients(base_folder, original_configs_for_saving, cc_emails, bcc_emails)
         
         log_and_print("draft", f"DRY-RUN MODE: Will send {len(email_configs)} draft emails to {len(approver_emails)} approvers")
         log_and_print("draft", f"Original campaign would send to {total_original_recipients_count} total recipients")
@@ -1398,18 +1921,17 @@ def get_recipients_for_multi_mode(base_folder: Path, dry_run: bool) -> Tuple[Lis
         # Live mode - use actual CC/BCC
         final_cc_recipients = deduplicate_emails(cc_emails)
         final_bcc_recipients = deduplicate_emails(bcc_emails)
-        original_cc_count = len(final_cc_recipients)
-        original_bcc_count = len(final_bcc_recipients)
         
-        # Add original count for each config
-        for config in email_configs:
-            config['original_recipients_count'] = len(config['recipients'])
-        
-        # SAVE RECIPIENTS IN LIVE MODE
+        # Save recipients in live mode
         save_multi_mode_recipients(base_folder, email_configs, final_cc_recipients, final_bcc_recipients)
     
+    # Return original counts regardless of dry-run mode
     return (email_configs, final_cc_recipients, final_bcc_recipients, 
-            total_original_recipients_count, original_cc_count, original_bcc_count)
+            total_original_recipients_count, original_cc_count, original_bcc_count)   
+    
+
+
+
 
 
 def save_multi_mode_recipients(base_folder: Path, email_configs: List[Dict], 
@@ -1817,6 +2339,9 @@ def send_multi_mode_emails(email_configs: List[Dict], subject_template: str, bod
     successful_batches = 0
     failed_batches = 0
     
+    # Track which configs were successful for final calculation
+    successful_configs = []
+    
     log_and_print("info", f"MULTI MODE: Processing {len(email_configs)} filter conditions with batch-size {batch_size}")
     
     for config_num, config in enumerate(email_configs, 1):
@@ -1853,6 +2378,7 @@ def send_multi_mode_emails(email_configs: List[Dict], subject_template: str, bod
                                filter_info):
                 successful_emails += 1
                 successful_batches += 1
+                successful_configs.append(config)  # Track successful config
                 log_and_print("success", f"Filter {config_num} CC/BCC-only email sent successfully")
             else:
                 failed_emails += 1
@@ -1882,7 +2408,7 @@ def send_multi_mode_emails(email_configs: List[Dict], subject_template: str, bod
                 # Send current batch with CC/BCC included
                 filter_info = filter_line if dry_run else None
                 if send_via_sendmail(batch, personalized_subject, personalized_body, from_address,
-                                   attachment_folder, dry_run, len(batch), base_folder,
+                                   attachment_folder, dry_run, original_count, base_folder,
                                    current_cc, current_bcc, original_cc_count, original_bcc_count,
                                    filter_info):
                     filter_successful_batches += 1
@@ -1901,6 +2427,7 @@ def send_multi_mode_emails(email_configs: List[Dict], subject_template: str, bod
             # Determine if this filter was successful (at least one batch succeeded)
             if filter_successful_batches > 0:
                 successful_emails += 1
+                successful_configs.append(config)  # Track successful config
                 log_and_print("success", f"Filter {config_num} completed: {filter_successful_batches}/{filter_successful_batches + filter_failed_batches} batches successful")
             else:
                 failed_emails += 1
@@ -1925,17 +2452,15 @@ def send_multi_mode_emails(email_configs: List[Dict], subject_template: str, bod
         if successful_batches > 0:
             # Calculate total emails delivered across all successful batches
             total_emails_delivered = 0
-            for config in email_configs:
-                if config_num <= successful_emails:  # Only count successful filters
-                    recipients_count = len(config['recipients'])
-                    filter_batches = (recipients_count + batch_size - 1) // batch_size if recipients_count > 0 else 1
-                    # Each batch includes CC/BCC
-                    total_emails_delivered += recipients_count + (original_cc_count + original_bcc_count) * filter_batches
+            for config in successful_configs:  # Use successful_configs instead
+                recipients_count = len(config['recipients'])
+                filter_batches = (recipients_count + batch_size - 1) // batch_size if recipients_count > 0 else 1
+                # Each batch includes CC/BCC
+                total_emails_delivered += recipients_count + (original_cc_count + original_bcc_count) * filter_batches
             
             log_and_print("info", f"Total individual emails delivered: {total_emails_delivered}")
             if (original_cc_count > 0 or original_bcc_count > 0):
                 log_and_print("info", f"Note: CC/BCC recipients received multiple emails (one per batch per filter)")
-
 
 
 
@@ -2011,10 +2536,120 @@ def embed_images_in_html(html_content: str, base_folder: Path) -> Tuple[str, Lis
     
     return modified_html, embedded_images
 
+def get_inventory_fields_for_help() -> str:
+    """
+    Get available fields from inventory.csv for CLI help display.
+    Returns a formatted string of available fields or error message.
+    """
+    try:
+        if not INVENTORY_PATH.exists():
+            return "  [Inventory file not found at /notifybot/inventory/inventory.csv]"
+        
+        with open(INVENTORY_PATH, mode="r", newline="", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            available_fields = reader.fieldnames or []
+            
+        if not available_fields:
+            return "  [No headers found in inventory.csv]"
+        
+        # Format fields in a nice column layout
+        field_list = sorted(available_fields)
+        formatted_fields = []
+        
+        # Group fields in rows of 4 for better readability
+        for i in range(0, len(field_list), 4):
+            row_fields = field_list[i:i+4]
+            formatted_row = "  " + " | ".join(f"{field:<15}" for field in row_fields)
+            formatted_fields.append(formatted_row)
+        
+        result = f"  Available fields in inventory.csv ({len(field_list)} total):\n"
+        result += "\n".join(formatted_fields)
+        return result
+        
+    except Exception as exc:
+        return f"  [Error reading inventory.csv: {exc}]"
+
+
+
 def main():
     """Enhanced main function with single/multi mode support and signature functionality"""
-    parser = argparse.ArgumentParser(description="Send batch emails with single/multi mode support and signature.")
-    parser.add_argument("--base-folder", required=True, help="Base folder name inside /notifybot/basefolder.")
+    
+    # Get inventory fields for help text
+    inventory_fields_help = get_inventory_fields_for_help()
+    
+    parser = argparse.ArgumentParser(
+        description="Send batch emails with single/multi mode support and signature.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=f"""
+PRECHECK REQUIREMENTS:
+======================
+
+SINGLE MODE Requirements:
+  Required files: subject.txt, body.html, from.txt, approver.txt
+  Recipient sources (at least ONE required):
+    - to.txt (direct recipient list)
+    - filter.txt + inventory.csv (filtered recipients)
+    - additional_to.txt (additional recipients)
+    - cc.txt (CC recipients)
+    - bcc.txt (BCC recipients)
+  Optional files: cc.txt, bcc.txt, field.txt, mode.txt
+  Optional folders: attachment/, images/
+
+MULTI MODE Requirements:
+  Required files: subject.txt, body.html, from.txt, approver.txt, filter.txt
+  Optional files: field.txt, cc.txt, bcc.txt, additional_to.txt, mode.txt
+  Optional folders: attachment/, images/
+
+INVENTORY FIELDS & VALIDATION:
+==============================
+
+Priority-based Field Validation:
+  1. filter.txt fields → validated against /notifybot/inventory/inventory.csv (ALWAYS)
+  2. field.txt fields → validated with priority system:
+     - If <base-folder>/field-inventory.csv exists: use it for field.txt validation
+     - If local field-inventory.csv exists: filter.txt fields ALSO validated against it
+     - If no local field-inventory.csv: field.txt validated against global inventory.csv
+
+Global Inventory Location: /notifybot/inventory/inventory.csv
+Local Field Inventory: <base-folder>/field-inventory.csv (optional)
+
+{inventory_fields_help}
+
+Field Validation Rules:
+  - All field names in filter.txt must exist in global inventory.csv headers
+  - If local field-inventory.csv exists: filter.txt fields must also exist there
+  - field.txt validation priority: local field-inventory.csv > global inventory.csv
+  - Filter syntax supports: =, !=, =~, !~, wildcards (*, ?, [])
+
+FILTER SYNTAX EXAMPLES:
+=======================
+  department="sales"                    # Exact match
+  region!="europe"                      # Not equal  
+  name=~".*Manager.*"                   # Regex match
+  email!~".*(test|demo).*"              # Regex not match
+  status=active*                        # Wildcard match
+  department="sales",region="north"     # AND condition
+  department="sales"                    # OR condition
+  department="marketing"                # (on separate lines)
+
+File Locations:
+  - Base folder: /notifybot/basefolder/<your-folder>/
+  - Global inventory: /notifybot/inventory/inventory.csv
+  - Local field inventory: /notifybot/basefolder/<your-folder>/field-inventory.csv (optional)
+  - Logs: /notifybot/logs/notifybot.log
+
+Examples:
+  python notifybot.py --base-folder email --dry-run
+  python notifybot.py --base-folder email --force --mode single
+  python notifybot.py --base-folder email --batch-size 300 --delay 10 --mode multi
+        """
+    )
+    
+    # Updated argument with clearer help text
+    parser.add_argument("--base-folder", 
+                       required=True, 
+                       metavar="BASE_FOLDER",
+                       help="Base folder name inside /notifybot/basefolder/ [REQUIRED]")
     parser.add_argument("--mode", choices=['single', 'multi'], help="Force mode: 'single' or 'multi' (overrides mode.txt)")
     parser.add_argument("--dry-run", action="store_true", help="Send emails only to approvers with DRAFT prefix.")
     parser.add_argument("--force", action="store_true", help="Skip confirmation prompt.")
@@ -2124,7 +2759,7 @@ def main():
             (email_configs, final_cc_recipients, final_bcc_recipients, 
              total_original_recipients_count, original_cc_count, original_bcc_count) = get_recipients_for_multi_mode(base_folder, args.dry_run)
             
-            # Show summary
+# Show summary - FIXED VERSION
             log_and_print("confirmation", f"MULTI MODE Email Summary:")
             log_and_print("confirmation", f"From: {from_address}")
             log_and_print("confirmation", f"Subject Template: {subject}")
@@ -2134,8 +2769,10 @@ def main():
             
             if args.dry_run:
                 total_cc_bcc_original = original_cc_count + original_bcc_count
+                # FIXED: Get approver count from the first config's current recipients (which are now approvers)
                 approver_count = len(email_configs[0]['recipients']) if email_configs else 0
                 total_draft_emails = len(email_configs)
+                
                 log_and_print("confirmation", f"Mode: DRY-RUN (DRAFT emails to approvers)")
                 log_and_print("confirmation", f"Will send {total_draft_emails} draft emails to {approver_count} approver(s)")
                 log_and_print("confirmation", f"Original campaign breakdown:")
@@ -2146,6 +2783,19 @@ def main():
                 if len(email_configs) > 1 and total_cc_bcc_original > 0:
                     total_cc_bcc_emails = (original_cc_count + original_bcc_count) * len(email_configs)
                     log_and_print("confirmation", f"  - Total CC/BCC emails: {total_cc_bcc_emails} ({original_cc_count + original_bcc_count} × {len(email_configs)} emails)")
+                
+                # FIXED: Show breakdown of original recipients per filter for better clarity
+                log_and_print("confirmation", f"Original filter breakdown:")
+                for i, config in enumerate(email_configs[:3], 1):
+                    original_count = config.get('original_recipients_count', 0)
+                    filter_line = config['filter_line']
+                    # Truncate long filter lines for display
+                    display_filter = filter_line[:50] + "..." if len(filter_line) > 50 else filter_line
+                    log_and_print("confirmation", f"  {i}. {display_filter} → {original_count} recipient(s)")
+                if len(email_configs) > 3:
+                    remaining_total = sum(config.get('original_recipients_count', 0) for config in email_configs[3:])
+                    log_and_print("confirmation", f"  ... and {len(email_configs) - 3} more filters → {remaining_total} additional recipient(s)")
+                
             else:
                 total_cc_bcc_per_email = len(final_cc_recipients) + len(final_bcc_recipients)
                 log_and_print("confirmation", f"Mode: LIVE")
@@ -2156,6 +2806,16 @@ def main():
                 if len(email_configs) > 1 and total_cc_bcc_per_email > 0:
                     total_cc_bcc_emails = total_cc_bcc_per_email * len(email_configs)
                     log_and_print("confirmation", f"Total CC/BCC emails: {total_cc_bcc_emails} ({total_cc_bcc_per_email} × {len(email_configs)} emails)")
+                
+                # Show filter examples for live mode
+                log_and_print("confirmation", f"Filter examples:")
+                for i, config in enumerate(email_configs[:3], 1):
+                    recipient_count = len(config.get('recipients', []))
+                    filter_line = config['filter_line']
+                    display_filter = filter_line[:50] + "..." if len(filter_line) > 50 else filter_line
+                    log_and_print("confirmation", f"  {i}. {display_filter} → {recipient_count} recipient(s)")
+                if len(email_configs) > 3:
+                    log_and_print("confirmation", f"  ... and {len(email_configs) - 3} more")
             
             log_and_print("confirmation", f"Email delay: {args.delay}s")
             
@@ -2204,6 +2864,8 @@ def main():
         log_and_print("error", f"Unexpected error: {e}")
         log_and_print("error", f"Traceback: {traceback.format_exc()}")
         sys.exit(1)
+
+
 
 if __name__ == "__main__":
     main()
