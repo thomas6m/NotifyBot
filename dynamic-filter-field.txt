@@ -1,0 +1,9 @@
+field.txt
+applicationid
+sector
+region
+microservice_table_rows
+
+filter.txt
+applicationid=1001
+applicationid=2003
