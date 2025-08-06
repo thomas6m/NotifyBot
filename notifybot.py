@@ -3,9 +3,9 @@
 NotifyBot: Automated email batch sender with single/multi mode support, filtering, logging, signature support, and dry-run.
 
 Usage:
-    python notifybot.py --base-folder emails --dry-run
-    python notifybot.py --base-folder emails --force --mode single
-    python notifybot.py --base-folder emails --batch-size 500 --delay 5.0 --mode multi
+    python notifybot.py --base-folder email --dry-run
+    python notifybot.py --base-folder email --force --mode single
+    python notifybot.py --base-folder email --batch-size 500 --delay 5.0 --mode multi
 
 CLI Options:
     --base-folder         Base directory containing email input files [REQUIRED]. 
