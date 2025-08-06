@@ -7,3 +7,41 @@ microservice_table_rows
 filter.txt
 applicationid=1001
 applicationid=2003
+
+
+
+[user1@workstation email]$ cat filter.txt
+applicationid=12346
+applicationid=13546
+[user1@workstation email]$
+
+
+
+cat field.txt
+applicationid
+sector
+region
+microservice_table_rows
+
+
+
+
+cat field-inventory.csv
+region,sector,env,clustername,namespace,applicationid
+apac,sec1,dev,cluster1,ns1,12346
+nam,sec2,uat,cluster2,ns2,12346
+nam,sec3,uat,cluster3,ns3,13546
+
+
+
+cat /notifybot/inventory/inventory.csv
+region,sector,env,clustername,namespace,microservice,applicationid,email
+apac,sec1,dev,cluster1,ns1,ms1,12346,"user1@example.com;user2@example.com;user3@example.com"
+nam,sec2,uat,cluster2,ns2,ms2,12346,"user3@example.com;user5@example.com;user6@example.com"
+nam,sec3,uat,cluster3,ns3,ms3,13546,"user1@example.com;user2@example.com;user7@example.com"
+
+
+
+
+
+
