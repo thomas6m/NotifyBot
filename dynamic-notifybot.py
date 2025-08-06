@@ -3,9 +3,9 @@
 NotifyBot: Automated email batch sender with single/multi mode support, filtering, logging, signature support, and dry-run.
 
 Usage:
-    python notifybot.py --base-folder email --dry-run
-    python notifybot.py --base-folder email --force --mode single
-    python notifybot.py --base-folder email --batch-size 500 --delay 5.0 --mode multi
+    python notifybot.py --base-folder emails --dry-run
+    python notifybot.py --base-folder emails --force --mode single
+    python notifybot.py --base-folder emails --batch-size 500 --delay 5.0 --mode multi
 
 CLI Options:
     --base-folder         Base directory containing email input files [REQUIRED]. 
@@ -166,23 +166,14 @@ def validate_fields_against_inventory(base_folder: Path, inventory_path: Path, m
 
 def validate_fields_with_priority(base_folder: Path, mode: str = "single") -> Tuple[bool, List[str]]:
     """
-    Enhanced field validation with priority-based inventory checking.
-    
-    Priority rules:
-    1. All fields in filter.txt should exist in /notifybot/inventory/inventory.csv
-    2. All fields in field.txt should exist in <base-folder>/field-inventory.csv if it exists,
-       AND all fields in filter.txt should also exist in <base-folder>/field-inventory.csv
-    3. If <base-folder>/field-inventory.csv doesn't exist, then all fields in field.txt 
-       should exist in /notifybot/inventory/inventory.csv
-    
-    Args:
-        base_folder: Base folder containing filter.txt and field.txt
-        mode: Operating mode ("single" or "multi") - field.txt only validated in multi mode
-    
-    Returns:
-        Tuple of (is_valid, error_messages)
     """
     errors = []
+    
+    # Define dynamically generated fields that don't exist in CSV files
+    DYNAMIC_FIELDS = {
+        'microservice_table_rows',  # Generated HTML table rows for microservices data
+        # Add other dynamic fields here as needed
+    }
     
     # Check if global inventory exists
     if not INVENTORY_PATH.exists():
@@ -308,17 +299,36 @@ def validate_fields_with_priority(base_folder: Path, mode: str = "single") -> Tu
                         log_and_print("info", f"Validating field.txt against global inventory.csv (fallback)")
                     
                     invalid_fields = []
+                    dynamic_fields_found = []
+                    
                     for line_num, field_name in enumerate(field_names, 1):
                         # Strip whitespace from field name from field.txt as well
                         field_name = field_name.strip()
+                        
+                        # FIXED: Check if it's a dynamic field first
+                        if field_name in DYNAMIC_FIELDS:
+                            dynamic_fields_found.append(field_name)
+                            log_and_print("info", f"field.txt line {line_num}: '{field_name}' is a dynamic field (will be generated at runtime)")
+                            continue
+                        
+                        # Check if field exists in inventory
                         if field_name not in inventory_to_use:
                             invalid_fields.append(field_name)
                             errors.append(f"field.txt line {line_num}: Field '{field_name}' not found in {inventory_name}")
                     
+                    if dynamic_fields_found:
+                        log_and_print("info", f"Found {len(dynamic_fields_found)} dynamic field(s): {', '.join(dynamic_fields_found)}")
+                    
                     if invalid_fields:
                         log_and_print("error", f"Invalid fields in field.txt ({inventory_name}): {', '.join(invalid_fields)}")
                     else:
-                        log_and_print("info", f"All field.txt field names validated successfully against {inventory_name}")
+                        csv_fields_count = len(field_names) - len(dynamic_fields_found)
+                        if csv_fields_count > 0:
+                            log_and_print("info", f"All {csv_fields_count} CSV field names in field.txt validated successfully against {inventory_name}")
+                        if dynamic_fields_found:
+                            log_and_print("info", f"All {len(dynamic_fields_found)} dynamic field names in field.txt are valid")
+                        if not field_names:
+                            log_and_print("info", "field.txt validation completed successfully")
                 else:
                     log_and_print("info", "field.txt is empty - no fields to validate")
                     
@@ -333,11 +343,10 @@ def validate_fields_with_priority(base_folder: Path, mode: str = "single") -> Tu
         log_and_print("info", f"Global inventory.csv: {', '.join(sorted(global_available_fields))}")
         if has_local_field_inventory:
             log_and_print("info", f"Local field-inventory.csv: {', '.join(sorted(local_available_fields))}")
+        if DYNAMIC_FIELDS:
+            log_and_print("info", f"Dynamic fields: {', '.join(sorted(DYNAMIC_FIELDS))}")
     
     return len(errors) == 0, errors
-
-
-
 
 
 def check_required_files(base: Path, required: List[str], dry_run: bool = True, mode: str = "single") -> None:
