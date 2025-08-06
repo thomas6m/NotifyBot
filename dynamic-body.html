@@ -1,0 +1,25 @@
+<h2>Application ID: {applicationid} - Deployment Details</h2>
+
+<p>Dear Team,</p>
+
+<p>Please find below the deployment details for Application ID <strong>{applicationid}</strong>:</p>
+
+<table style="border-collapse: collapse; width: 100%; margin: 20px 0; border: 1px solid #ddd;">
+    <thead style="background-color: #f2f2f2;">
+        <tr>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Sector</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Region</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Cluster Name</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Namespace</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Microservice Name</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Replica Count</th>
+        </tr>
+    </thead>
+    <tbody>
+{microservice_table_rows}
+    </tbody>
+</table>
+
+<p>Please review the deployment configuration and take necessary actions.</p>
+
+<p>Best regards,<br>DevOps Team</p>
