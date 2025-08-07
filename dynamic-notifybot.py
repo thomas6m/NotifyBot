@@ -1501,11 +1501,20 @@ def get_recipients_for_single_mode(base_folder: Path, dry_run: bool) -> Tuple[Li
     return (final_recipients, final_cc_recipients, final_bcc_recipients, 
             original_recipients_count, original_cc_count, original_bcc_count)
    
-def extract_field_values_from_matched_rows(filter_line: str, field_names: List[str], inventory_path: Path, base_folder: Path) -> Dict[str, str]:
-    field_values = {field: "" for field in field_names}
-    matched_rows = []
 
-    # Priority: use local field-inventory.csv if present
+def extract_field_values_from_matched_rows(filter_line: str, field_names: List[str], inventory_path: Path, base_folder: Path) -> Dict[str, str]:
+    """
+    Extract field values and generate dynamic table fields based on matched rows.
+    Supports smart fallback to use all CSV columns in the table if none specified.
+    """
+    field_values = {field: "" for field in field_names}
+
+    # Auto-include 'table_rows' if 'microservice_table_rows' is requested
+    if "microservice_table_rows" in field_names and "table_rows" not in field_names:
+        field_names.append("table_rows")
+        log_and_print("info", "Auto-added table_rows because microservice_table_rows was requested")
+
+    # Priority: local field-inventory.csv > global inventory
     local_inventory = base_folder / "field-inventory.csv"
     actual_inventory = local_inventory if local_inventory.exists() else inventory_path
     inventory_source = "local field-inventory.csv" if local_inventory.exists() else "global inventory.csv"
@@ -1515,15 +1524,21 @@ def extract_field_values_from_matched_rows(filter_line: str, field_names: List[s
         return field_values
 
     try:
-        with open(actual_inventory, newline='', encoding='utf-8') as csvfile:
-            reader = csv.DictReader(csvfile)
-            headers = [h.strip() for h in reader.fieldnames or []]
+        with open(actual_inventory, newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            headers = [h.strip() for h in (reader.fieldnames or [])]
+            matched_rows = []
+
             for row in reader:
                 cleaned_row = {k.strip(): v.strip() for k, v in row.items() if k}
                 if matches_filter_conditions(cleaned_row, [filter_line]):
                     matched_rows.append(cleaned_row)
 
-        # Extract regular field values
+        if not matched_rows:
+            log_and_print("warning", f"No rows matched filter: {filter_line}")
+            return field_values
+
+        # Extract regular field values (non-table fields)
         for field in field_names:
             if field in headers and not field.endswith("_table_rows") and field != "table_headers":
                 values = set()
@@ -1533,60 +1548,62 @@ def extract_field_values_from_matched_rows(filter_line: str, field_names: List[s
                         values.update([v.strip() for v in val.split(",") if v.strip()])
                 field_values[field] = ",".join(sorted(values))
 
-        # Determine which fields to use in the table
+        # Determine table columns
         requested_fields = [
-            f for f in field_names 
-            if not f.endswith("_table_rows") and f != "table_headers" and f in headers
+            f for f in field_names
+            if f in headers and not f.endswith("_table_rows") and f != "table_headers"
         ]
         table_fields = requested_fields if requested_fields else headers
+        log_and_print("info", f"Table will use columns: {', '.join(table_fields)}")
 
-        # Generate dynamic tables
-        if matched_rows and table_fields:
-            def escape(val): return str(val).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        # Escape HTML
+        def escape(val): return str(val).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-            def generate_table_rows(style: str = "default") -> str:
-                rows = ""
-                for i, row in enumerate(matched_rows):
-                    bg = "#f9f9f9" if style == "striped" and i % 2 == 0 else "#ffffff"
-                    tr_style = f' style="background-color: {bg};"' if style == "striped" else ""
-                    rows += f"        <tr{tr_style}>\n"
-                    for col in table_fields:
-                        val = escape(row.get(col, ""))
-                        cell_style = ' style="padding: 10px; border: 1px solid #ddd;"' if style != "simple" else ""
-                        rows += f"            <td{cell_style}>{val}</td>\n"
-                    rows += "        </tr>\n"
-                return rows.strip()
-
-            def generate_headers() -> str:
-                headers_html = ""
+        def generate_table_rows(style: str = "default") -> str:
+            rows = ""
+            for i, row in enumerate(matched_rows):
+                bg = "#f9f9f9" if style == "striped" and i % 2 == 0 else "#ffffff"
+                tr_style = f' style="background-color: {bg};"' if style == "striped" else ""
+                rows += f"        <tr{tr_style}>\n"
                 for col in table_fields:
-                    display = col.replace("_", " ").title()
-                    headers_html += f'            <th style="padding: 10px; border: 1px solid #ddd; background-color: #f5f5f5;">{display}</th>\n'
-                return headers_html.strip()
+                    val = escape(row.get(col, ""))
+                    cell_style = ' style="padding: 10px; border: 1px solid #ddd;"' if style != "simple" else ""
+                    rows += f"            <td{cell_style}>{val}</td>\n"
+                rows += "        </tr>\n"
+            return rows.strip()
 
-            if "table_rows" in field_names:
-                field_values["table_rows"] = generate_table_rows("default")
-            if "simple_table_rows" in field_names:
-                field_values["simple_table_rows"] = generate_table_rows("simple")
-            if "styled_table_rows" in field_names:
-                field_values["styled_table_rows"] = generate_table_rows("striped")
-            if "csv_table_rows" in field_names:
-                field_values["csv_table_rows"] = "\n".join(
-                    " | ".join(row.get(col, "") for col in table_fields) for row in matched_rows
-                ).strip()
-            if "table_headers" in field_names:
-                field_values["table_headers"] = generate_headers()
-            if "microservice_table_rows" in field_names:
-                field_values["microservice_table_rows"] = field_values.get("table_rows", "")
+        def generate_headers() -> str:
+            headers_html = ""
+            for col in table_fields:
+                display = col.replace("_", " ").title()
+                headers_html += f'            <th style="padding: 10px; border: 1px solid #ddd; background-color: #f5f5f5;">{display}</th>\n'
+            return headers_html.strip()
 
-            log_and_print("info", f"Generated dynamic table for {len(matched_rows)} row(s) using {len(table_fields)} column(s) from {inventory_source}")
-        else:
-            log_and_print("warning", f"No matched rows or columns for table generation from {inventory_source}")
+        # Generate tables based on requested dynamic fields
+        if "table_rows" in field_names:
+            field_values["table_rows"] = generate_table_rows()
+        if "styled_table_rows" in field_names:
+            field_values["styled_table_rows"] = generate_table_rows("striped")
+        if "simple_table_rows" in field_names:
+            field_values["simple_table_rows"] = generate_table_rows("simple")
+        if "csv_table_rows" in field_names:
+            field_values["csv_table_rows"] = "\n".join(
+                " | ".join(row.get(col, "") for col in table_fields)
+                for row in matched_rows
+            ).strip()
+        if "table_headers" in field_names:
+            field_values["table_headers"] = generate_headers()
+        if "microservice_table_rows" in field_names:
+            field_values["microservice_table_rows"] = field_values.get("table_rows", "")
+
+        log_and_print("info", f"Generated dynamic table with {len(matched_rows)} rows from {inventory_source}")
 
     except Exception as e:
-        log_and_print("error", f"Failed to extract field values from inventory: {e}")
+        log_and_print("error", f"Failed to extract field values: {e}")
 
     return field_values
+
+
 
 
 
