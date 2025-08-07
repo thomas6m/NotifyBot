@@ -1501,20 +1501,13 @@ def get_recipients_for_single_mode(base_folder: Path, dry_run: bool) -> Tuple[Li
     return (final_recipients, final_cc_recipients, final_bcc_recipients, 
             original_recipients_count, original_cc_count, original_bcc_count)
    
-
 def extract_field_values_from_matched_rows(filter_line: str, field_names: List[str], inventory_path: Path, base_folder: Path) -> Dict[str, str]:
-    """
-    Extract field values and generate dynamic table fields based on matched rows.
-    Supports smart fallback to use all CSV columns in the table if none specified.
-    """
     field_values = {field: "" for field in field_names}
 
-    # Auto-include 'table_rows' if 'microservice_table_rows' is requested
     if "microservice_table_rows" in field_names and "table_rows" not in field_names:
         field_names.append("table_rows")
         log_and_print("info", "Auto-added table_rows because microservice_table_rows was requested")
 
-    # Priority: local field-inventory.csv > global inventory
     local_inventory = base_folder / "field-inventory.csv"
     actual_inventory = local_inventory if local_inventory.exists() else inventory_path
     inventory_source = "local field-inventory.csv" if local_inventory.exists() else "global inventory.csv"
@@ -1538,7 +1531,7 @@ def extract_field_values_from_matched_rows(filter_line: str, field_names: List[s
             log_and_print("warning", f"No rows matched filter: {filter_line}")
             return field_values
 
-        # Extract regular field values (non-table fields)
+        # Extract normal substitution fields
         for field in field_names:
             if field in headers and not field.endswith("_table_rows") and field != "table_headers":
                 values = set()
@@ -1548,15 +1541,15 @@ def extract_field_values_from_matched_rows(filter_line: str, field_names: List[s
                         values.update([v.strip() for v in val.split(",") if v.strip()])
                 field_values[field] = ",".join(sorted(values))
 
-        # Determine table columns
-        requested_fields = [
-            f for f in field_names
-            if f in headers and not f.endswith("_table_rows") and f != "table_headers"
-        ]
-        table_fields = requested_fields if requested_fields else headers
-        log_and_print("info", f"Table will use columns: {', '.join(table_fields)}")
+        # Load separate table field list from table-columns.txt
+        table_columns_file = base_folder / "table-columns.txt"
+        if table_columns_file.exists():
+            table_fields = [line.strip() for line in table_columns_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+            log_and_print("info", f"Using table-columns.txt for dynamic table: {', '.join(table_fields)}")
+        else:
+            table_fields = headers
+            log_and_print("info", f"No table-columns.txt found. Using all headers: {', '.join(table_fields)}")
 
-        # Escape HTML
         def escape(val): return str(val).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
         def generate_table_rows(style: str = "default") -> str:
@@ -1573,13 +1566,11 @@ def extract_field_values_from_matched_rows(filter_line: str, field_names: List[s
             return rows.strip()
 
         def generate_headers() -> str:
-            headers_html = ""
-            for col in table_fields:
-                display = col.replace("_", " ").title()
-                headers_html += f'            <th style="padding: 10px; border: 1px solid #ddd; background-color: #f5f5f5;">{display}</th>\n'
-            return headers_html.strip()
+            return "\n".join([
+                f'            <th style="padding: 10px; border: 1px solid #ddd; background-color: #f5f5f5;">{col.replace("_", " ").title()}</th>'
+                for col in table_fields
+            ])
 
-        # Generate tables based on requested dynamic fields
         if "table_rows" in field_names:
             field_values["table_rows"] = generate_table_rows()
         if "styled_table_rows" in field_names:
@@ -1596,13 +1587,12 @@ def extract_field_values_from_matched_rows(filter_line: str, field_names: List[s
         if "microservice_table_rows" in field_names:
             field_values["microservice_table_rows"] = field_values.get("table_rows", "")
 
-        log_and_print("info", f"Generated dynamic table with {len(matched_rows)} rows from {inventory_source}")
+        log_and_print("info", f"Generated dynamic table with {len(matched_rows)} rows using {len(table_fields)} columns")
 
     except Exception as e:
         log_and_print("error", f"Failed to extract field values: {e}")
 
     return field_values
-
 
 
 
