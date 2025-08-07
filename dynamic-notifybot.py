@@ -1500,514 +1500,92 @@ def get_recipients_for_single_mode(base_folder: Path, dry_run: bool) -> Tuple[Li
     
     return (final_recipients, final_cc_recipients, final_bcc_recipients, 
             original_recipients_count, original_cc_count, original_bcc_count)
+   
+def extract_field_values_from_matched_rows(filter_line: str, field_names: List[str], inventory_path: Path, base_folder: Path) -> Dict[str, str]:
+    field_values = {field: "" for field in field_names}
+    matched_rows = []
 
-def extract_field_values_from_matched_rows(filter_line: str, field_names: List[str], inventory_path: Path, base_folder: Path) -> Dict[str, str]:
-    """
-    Extract field values from rows that match the given filter condition.
-    FIXED: Multiple issues that were preventing dynamic table generation.
-    """
-    field_values = {}
-    
-    # Initialize all fields to empty
-    for field in field_names:
-        field_values[field] = ""
-    
-    # PRIORITY-BASED INVENTORY SELECTION
-    local_field_inventory_path = base_folder / "field-inventory.csv"
-    
-    # Priority 1: Check for local field-inventory.csv 
-    if local_field_inventory_path.exists():
-        actual_inventory_path = local_field_inventory_path
-        inventory_source = "local field-inventory.csv"
-        log_and_print("info", f"Using local field-inventory.csv for field extraction (priority): {actual_inventory_path}")
-    else:
-        actual_inventory_path = inventory_path  # Use the global inventory
-        inventory_source = "global inventory.csv"
-        log_and_print("info", f"Using global inventory.csv for field extraction (fallback): {actual_inventory_path}")
-        log_and_print("info", f"Local field-inventory.csv not found at: {local_field_inventory_path}")
-    
-    if not actual_inventory_path.exists():
-        log_and_print("warning", f"Inventory file not found: {actual_inventory_path}")
+    # Priority: use local field-inventory.csv if present
+    local_inventory = base_folder / "field-inventory.csv"
+    actual_inventory = local_inventory if local_inventory.exists() else inventory_path
+    inventory_source = "local field-inventory.csv" if local_inventory.exists() else "global inventory.csv"
+
+    if not actual_inventory.exists():
+        log_and_print("warning", f"Inventory file not found: {actual_inventory}")
         return field_values
-    
+
     try:
-        # Dictionary to store unique values for each field
-        field_unique_values = {field: set() for field in field_names}
-        matched_rows_count = 0
-        total_rows_processed = 0
-        matched_rows_data = []  # Store all matched rows for table generation
-        
-        with open(actual_inventory_path, mode="r", newline="", encoding="utf-8") as file:
-            reader = csv.DictReader(file)
-            
-            # Get headers and strip whitespace - CRITICAL FIX
-            raw_headers = reader.fieldnames or []
-            clean_headers = [header.strip() for header in raw_headers]
-            
-            # Verify that all requested field names exist in CSV headers
-            available_fields = set(clean_headers)
-            
-            # FIXED: Don't warn about missing dynamic table fields
-            non_dynamic_fields = [field for field in field_names if not field.endswith('_table_rows') and field != 'table_headers']
-            missing_fields = [field for field in non_dynamic_fields if field not in available_fields]
-            
-            if missing_fields:
-                log_and_print("warning", f"Fields not found in {inventory_source}: {', '.join(missing_fields)}")
-                log_and_print("info", f"Available fields: {', '.join(sorted(available_fields))}")
-            
-            # Find ALL rows that match this filter and extract their actual field values
+        with open(actual_inventory, newline='', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            headers = [h.strip() for h in reader.fieldnames or []]
             for row in reader:
-                total_rows_processed += 1
-                
-                # Create cleaned row for filter matching (clean keys AND values)
-                cleaned_row = {}
-                for raw_header, raw_value in row.items():
-                    clean_header = raw_header.strip() if raw_header else raw_header
-                    clean_value = raw_value.strip() if raw_value else raw_value
-                    cleaned_row[clean_header] = clean_value
-                
-                # Check if this row matches the filter condition
+                cleaned_row = {k.strip(): v.strip() for k, v in row.items() if k}
                 if matches_filter_conditions(cleaned_row, [filter_line]):
-                    matched_rows_count += 1
-                    matched_rows_data.append(cleaned_row)  # Store the matched row
-                    
-                    # Extract ACTUAL values from this matched row (not the filter pattern)
-                    for field in non_dynamic_fields:  # Only process non-dynamic fields here
-                        if field in cleaned_row:
-                            raw_value = cleaned_row[field]
-                            if raw_value:  # Only process non-empty values
-                                raw_value_str = str(raw_value).strip()
-                                if raw_value_str:  # Double-check it's not just whitespace
-                                    # Handle comma-separated values within a single CSV cell
-                                    if ',' in raw_value_str:
-                                        # Split comma-separated values and add each one
-                                        for sub_value in raw_value_str.split(','):
-                                            clean_sub_value = sub_value.strip()
-                                            if clean_sub_value:
-                                                field_unique_values[field].add(clean_sub_value)
-                                    else:
-                                        # Single value in the cell
-                                        field_unique_values[field].add(raw_value_str)
-        
-        # Convert sets to comma-separated strings, sorted for consistency
-        for field in non_dynamic_fields:
-            if field_unique_values.get(field):
-                # Sort values for consistent output
-                sorted_values = sorted(list(field_unique_values[field]))
-                field_values[field] = ",".join(sorted_values)
-            else:
-                # Keep empty string for fields with no values
-                field_values[field] = ""
-        
-        # DYNAMIC TABLE GENERATION - FIXED LOGIC
-        if matched_rows_data and field_names:
-            # FIXED: Filter out table row fields and empty fields to get actual CSV fields for table
-            # Get all CSV fields that are available AND requested (not just the ones in field_names)
-            csv_fields_from_fieldnames = [field for field in field_names 
-                                        if not field.endswith('_table_rows') 
-                                        and field != 'table_headers' 
-                                        and field in available_fields]
-            
-            # FIXED: If no specific CSV fields requested, use ALL available fields for table generation
-            if not csv_fields_from_fieldnames:
-                csv_fields = list(available_fields)  # Use all available fields
-                log_and_print("info", f"No specific CSV fields requested for table, using all available fields: {', '.join(csv_fields[:5])}{'...' if len(csv_fields) > 5 else ''}")
-            else:
-                csv_fields = csv_fields_from_fieldnames
-                log_and_print("info", f"Using requested CSV fields for table: {', '.join(csv_fields)}")
-            
-            if csv_fields:
-                # Generate different table formats based on requested dynamic fields
-                
-                # Standard HTML table with styling
-                if 'table_rows' in field_names:
-                    table_rows_html = ""
-                    for row in matched_rows_data:
-                        table_rows_html += "        <tr>\n"
-                        for field in csv_fields:
-                            cell_value = row.get(field, '')
-                            # FIXED: HTML escape cell values to prevent HTML injection
-                            escaped_value = str(cell_value).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                            table_rows_html += f'            <td style="padding: 8px; border: 1px solid #ddd;">{escaped_value}</td>\n'
-                        table_rows_html += "        </tr>\n"
-                    
-                    field_values['table_rows'] = table_rows_html.rstrip('\n')
-                    log_and_print("info", f"Generated HTML table with {len(matched_rows_data)} rows using fields: {', '.join(csv_fields)}")
-                
-                # CSV-style table rows (pipe-separated)
-                if 'csv_table_rows' in field_names:
-                    csv_table_rows = ""
-                    for row in matched_rows_data:
-                        row_values = [str(row.get(field, '')) for field in csv_fields]
-                        csv_table_rows += " | ".join(row_values) + "\n"
-                    
-                    field_values['csv_table_rows'] = csv_table_rows.rstrip('\n')
-                    log_and_print("info", f"Generated CSV-style table with {len(matched_rows_data)} rows")
-                
-                # Simple HTML table without styling
-                if 'simple_table_rows' in field_names:
-                    simple_table_rows = ""
-                    for row in matched_rows_data:
-                        simple_table_rows += "        <tr>\n"
-                        for field in csv_fields:
-                            cell_value = row.get(field, '')
-                            escaped_value = str(cell_value).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                            simple_table_rows += f'            <td>{escaped_value}</td>\n'
-                        simple_table_rows += "        </tr>\n"
-                    
-                    field_values['simple_table_rows'] = simple_table_rows.rstrip('\n')
-                    log_and_print("info", f"Generated simple HTML table with {len(matched_rows_data)} rows")
-                
-                # Table with alternating row colors
-                if 'styled_table_rows' in field_names:
-                    styled_table_rows = ""
-                    for i, row in enumerate(matched_rows_data):
-                        bg_color = "#f9f9f9" if i % 2 == 0 else "#ffffff"
-                        styled_table_rows += f'        <tr style="background-color: {bg_color};">\n'
-                        for field in csv_fields:
-                            cell_value = row.get(field, '')
-                            escaped_value = str(cell_value).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                            styled_table_rows += f'            <td style="padding: 10px; border: 1px solid #ddd; text-align: left;">{escaped_value}</td>\n'
-                        styled_table_rows += "        </tr>\n"
-                    
-                    field_values['styled_table_rows'] = styled_table_rows.rstrip('\n')
-                    log_and_print("info", f"Generated styled HTML table with {len(matched_rows_data)} rows")
-                
-                # Generate table headers based on the CSV fields
-                if 'table_headers' in field_names:
-                    header_html = ""
-                    for field in csv_fields:
-                        # Convert field names to more readable format
-                        display_name = field.replace('_', ' ').title()
-                        header_html += f'            <th style="padding: 10px; border: 1px solid #ddd; background-color: #f5f5f5; font-weight: bold; text-align: left;">{display_name}</th>\n'
-                    
-                    field_values['table_headers'] = header_html.rstrip('\n')
-                    log_and_print("info", f"Generated table headers for {len(csv_fields)} columns")
-                
-                # Backward compatibility: keep microservice_table_rows for existing templates
-                if 'microservice_table_rows' in field_names:
-                    field_values['microservice_table_rows'] = field_values.get('table_rows', '')
-                    log_and_print("info", f"Generated microservice_table_rows (backward compatibility)")
-            
-            else:
-                log_and_print("warning", f"No valid CSV fields found for table generation")
-                # FIXED: Still initialize dynamic fields to empty strings even if no CSV fields
-                for field in field_names:
-                    if field.endswith('_table_rows') or field == 'table_headers':
-                        field_values[field] = ""
-        
-        # Enhanced logging with better details
-        if matched_rows_count > 0:
-            log_and_print("info", f"Field extraction from filter: '{filter_line}' using {inventory_source}")
-            log_and_print("info", f"  - Processed {total_rows_processed} total rows")
-            log_and_print("info", f"  - Found {matched_rows_count} matching rows")
-            
-            # Log regular field extractions
-            extracted_fields = []
-            table_fields = []
-            
-            for field_name in field_names:
-                if field_name.endswith('_table_rows') or field_name == 'table_headers':
-                    if field_values.get(field_name):
-                        table_fields.append(field_name)
-                    continue
-                    
-                field_value = field_values.get(field_name, "")
-                if field_value:
-                    unique_count = len(field_value.split(','))
-                    # Show first few values for preview
-                    preview_values = field_value.split(',')[:3]
-                    preview = ','.join(preview_values)
-                    if unique_count > 3:
-                        preview += f"...+{unique_count-3} more"
-                    extracted_fields.append(f"{field_name}=[{preview}] ({unique_count} unique)")
-                else:
-                    extracted_fields.append(f"{field_name}=[] (no values found)")
-            
-            if extracted_fields:
-                log_and_print("info", f"  - Extracted: {'; '.join(extracted_fields)}")
-            
-            if table_fields:
-                log_and_print("info", f"  - Generated dynamic tables: {', '.join(table_fields)}")
-                
-        else:
-            log_and_print("warning", f"No rows matched filter for field extraction: {filter_line}")
-            log_and_print("info", f"  - Processed {total_rows_processed} total rows from {inventory_source}")
-            log_and_print("info", f"  - Available headers: {', '.join(sorted(available_fields))}")
-            # FIXED: Initialize all dynamic fields to empty even when no matches
-            for field in field_names:
-                if field.endswith('_table_rows') or field == 'table_headers':
-                    field_values[field] = ""
-    
-    except Exception as exc:
-        log_and_print("error", f"Error extracting field values from {inventory_source}: {exc}")
-        log_and_print("error", f"Filter: {filter_line}")
-        log_and_print("error", f"Fields requested: {field_names}")
-        # Additional debug info
-        try:
-            log_and_print("error", f"Inventory path: {actual_inventory_path}")
-            log_and_print("error", f"Inventory exists: {actual_inventory_path.exists()}")
-        except:
-            pass
-        
-        # FIXED: Initialize all fields to empty on error
+                    matched_rows.append(cleaned_row)
+
+        # Extract regular field values
         for field in field_names:
-            field_values[field] = ""
-    
-    return field_values
-def extract_field_values_from_matched_rows(filter_line: str, field_names: List[str], inventory_path: Path, base_folder: Path) -> Dict[str, str]:
-    """
-    Extract field values from rows that match the given filter condition.
-    FIXED: Multiple issues that were preventing dynamic table generation.
-    """
-    field_values = {}
-    
-    # Initialize all fields to empty
-    for field in field_names:
-        field_values[field] = ""
-    
-    # PRIORITY-BASED INVENTORY SELECTION
-    local_field_inventory_path = base_folder / "field-inventory.csv"
-    
-    # Priority 1: Check for local field-inventory.csv 
-    if local_field_inventory_path.exists():
-        actual_inventory_path = local_field_inventory_path
-        inventory_source = "local field-inventory.csv"
-        log_and_print("info", f"Using local field-inventory.csv for field extraction (priority): {actual_inventory_path}")
-    else:
-        actual_inventory_path = inventory_path  # Use the global inventory
-        inventory_source = "global inventory.csv"
-        log_and_print("info", f"Using global inventory.csv for field extraction (fallback): {actual_inventory_path}")
-        log_and_print("info", f"Local field-inventory.csv not found at: {local_field_inventory_path}")
-    
-    if not actual_inventory_path.exists():
-        log_and_print("warning", f"Inventory file not found: {actual_inventory_path}")
-        return field_values
-    
-    try:
-        # Dictionary to store unique values for each field
-        field_unique_values = {field: set() for field in field_names}
-        matched_rows_count = 0
-        total_rows_processed = 0
-        matched_rows_data = []  # Store all matched rows for table generation
-        
-        with open(actual_inventory_path, mode="r", newline="", encoding="utf-8") as file:
-            reader = csv.DictReader(file)
-            
-            # Get headers and strip whitespace - CRITICAL FIX
-            raw_headers = reader.fieldnames or []
-            clean_headers = [header.strip() for header in raw_headers]
-            
-            # Verify that all requested field names exist in CSV headers
-            available_fields = set(clean_headers)
-            
-            # FIXED: Don't warn about missing dynamic table fields
-            non_dynamic_fields = [field for field in field_names if not field.endswith('_table_rows') and field != 'table_headers']
-            missing_fields = [field for field in non_dynamic_fields if field not in available_fields]
-            
-            if missing_fields:
-                log_and_print("warning", f"Fields not found in {inventory_source}: {', '.join(missing_fields)}")
-                log_and_print("info", f"Available fields: {', '.join(sorted(available_fields))}")
-            
-            # Find ALL rows that match this filter and extract their actual field values
-            for row in reader:
-                total_rows_processed += 1
-                
-                # Create cleaned row for filter matching (clean keys AND values)
-                cleaned_row = {}
-                for raw_header, raw_value in row.items():
-                    clean_header = raw_header.strip() if raw_header else raw_header
-                    clean_value = raw_value.strip() if raw_value else raw_value
-                    cleaned_row[clean_header] = clean_value
-                
-                # Check if this row matches the filter condition
-                if matches_filter_conditions(cleaned_row, [filter_line]):
-                    matched_rows_count += 1
-                    matched_rows_data.append(cleaned_row)  # Store the matched row
-                    
-                    # Extract ACTUAL values from this matched row (not the filter pattern)
-                    for field in non_dynamic_fields:  # Only process non-dynamic fields here
-                        if field in cleaned_row:
-                            raw_value = cleaned_row[field]
-                            if raw_value:  # Only process non-empty values
-                                raw_value_str = str(raw_value).strip()
-                                if raw_value_str:  # Double-check it's not just whitespace
-                                    # Handle comma-separated values within a single CSV cell
-                                    if ',' in raw_value_str:
-                                        # Split comma-separated values and add each one
-                                        for sub_value in raw_value_str.split(','):
-                                            clean_sub_value = sub_value.strip()
-                                            if clean_sub_value:
-                                                field_unique_values[field].add(clean_sub_value)
-                                    else:
-                                        # Single value in the cell
-                                        field_unique_values[field].add(raw_value_str)
-        
-        # Convert sets to comma-separated strings, sorted for consistency
-        for field in non_dynamic_fields:
-            if field_unique_values.get(field):
-                # Sort values for consistent output
-                sorted_values = sorted(list(field_unique_values[field]))
-                field_values[field] = ",".join(sorted_values)
-            else:
-                # Keep empty string for fields with no values
-                field_values[field] = ""
-        
-        # DYNAMIC TABLE GENERATION - FIXED LOGIC
-        if matched_rows_data and field_names:
-            # FIXED: Filter out table row fields and empty fields to get actual CSV fields for table
-            # Get all CSV fields that are available AND requested (not just the ones in field_names)
-            csv_fields_from_fieldnames = [field for field in field_names 
-                                        if not field.endswith('_table_rows') 
-                                        and field != 'table_headers' 
-                                        and field in available_fields]
-            
-            # FIXED: If no specific CSV fields requested, use ALL available fields for table generation
-            if not csv_fields_from_fieldnames:
-                csv_fields = list(available_fields)  # Use all available fields
-                log_and_print("info", f"No specific CSV fields requested for table, using all available fields: {', '.join(csv_fields[:5])}{'...' if len(csv_fields) > 5 else ''}")
-            else:
-                csv_fields = csv_fields_from_fieldnames
-                log_and_print("info", f"Using requested CSV fields for table: {', '.join(csv_fields)}")
-            
-            if csv_fields:
-                # Generate different table formats based on requested dynamic fields
-                
-                # Standard HTML table with styling
-                if 'table_rows' in field_names:
-                    table_rows_html = ""
-                    for row in matched_rows_data:
-                        table_rows_html += "        <tr>\n"
-                        for field in csv_fields:
-                            cell_value = row.get(field, '')
-                            # FIXED: HTML escape cell values to prevent HTML injection
-                            escaped_value = str(cell_value).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                            table_rows_html += f'            <td style="padding: 8px; border: 1px solid #ddd;">{escaped_value}</td>\n'
-                        table_rows_html += "        </tr>\n"
-                    
-                    field_values['table_rows'] = table_rows_html.rstrip('\n')
-                    log_and_print("info", f"Generated HTML table with {len(matched_rows_data)} rows using fields: {', '.join(csv_fields)}")
-                
-                # CSV-style table rows (pipe-separated)
-                if 'csv_table_rows' in field_names:
-                    csv_table_rows = ""
-                    for row in matched_rows_data:
-                        row_values = [str(row.get(field, '')) for field in csv_fields]
-                        csv_table_rows += " | ".join(row_values) + "\n"
-                    
-                    field_values['csv_table_rows'] = csv_table_rows.rstrip('\n')
-                    log_and_print("info", f"Generated CSV-style table with {len(matched_rows_data)} rows")
-                
-                # Simple HTML table without styling
-                if 'simple_table_rows' in field_names:
-                    simple_table_rows = ""
-                    for row in matched_rows_data:
-                        simple_table_rows += "        <tr>\n"
-                        for field in csv_fields:
-                            cell_value = row.get(field, '')
-                            escaped_value = str(cell_value).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                            simple_table_rows += f'            <td>{escaped_value}</td>\n'
-                        simple_table_rows += "        </tr>\n"
-                    
-                    field_values['simple_table_rows'] = simple_table_rows.rstrip('\n')
-                    log_and_print("info", f"Generated simple HTML table with {len(matched_rows_data)} rows")
-                
-                # Table with alternating row colors
-                if 'styled_table_rows' in field_names:
-                    styled_table_rows = ""
-                    for i, row in enumerate(matched_rows_data):
-                        bg_color = "#f9f9f9" if i % 2 == 0 else "#ffffff"
-                        styled_table_rows += f'        <tr style="background-color: {bg_color};">\n'
-                        for field in csv_fields:
-                            cell_value = row.get(field, '')
-                            escaped_value = str(cell_value).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                            styled_table_rows += f'            <td style="padding: 10px; border: 1px solid #ddd; text-align: left;">{escaped_value}</td>\n'
-                        styled_table_rows += "        </tr>\n"
-                    
-                    field_values['styled_table_rows'] = styled_table_rows.rstrip('\n')
-                    log_and_print("info", f"Generated styled HTML table with {len(matched_rows_data)} rows")
-                
-                # Generate table headers based on the CSV fields
-                if 'table_headers' in field_names:
-                    header_html = ""
-                    for field in csv_fields:
-                        # Convert field names to more readable format
-                        display_name = field.replace('_', ' ').title()
-                        header_html += f'            <th style="padding: 10px; border: 1px solid #ddd; background-color: #f5f5f5; font-weight: bold; text-align: left;">{display_name}</th>\n'
-                    
-                    field_values['table_headers'] = header_html.rstrip('\n')
-                    log_and_print("info", f"Generated table headers for {len(csv_fields)} columns")
-                
-                # Backward compatibility: keep microservice_table_rows for existing templates
-                if 'microservice_table_rows' in field_names:
-                    field_values['microservice_table_rows'] = field_values.get('table_rows', '')
-                    log_and_print("info", f"Generated microservice_table_rows (backward compatibility)")
-            
-            else:
-                log_and_print("warning", f"No valid CSV fields found for table generation")
-                # FIXED: Still initialize dynamic fields to empty strings even if no CSV fields
-                for field in field_names:
-                    if field.endswith('_table_rows') or field == 'table_headers':
-                        field_values[field] = ""
-        
-        # Enhanced logging with better details
-        if matched_rows_count > 0:
-            log_and_print("info", f"Field extraction from filter: '{filter_line}' using {inventory_source}")
-            log_and_print("info", f"  - Processed {total_rows_processed} total rows")
-            log_and_print("info", f"  - Found {matched_rows_count} matching rows")
-            
-            # Log regular field extractions
-            extracted_fields = []
-            table_fields = []
-            
-            for field_name in field_names:
-                if field_name.endswith('_table_rows') or field_name == 'table_headers':
-                    if field_values.get(field_name):
-                        table_fields.append(field_name)
-                    continue
-                    
-                field_value = field_values.get(field_name, "")
-                if field_value:
-                    unique_count = len(field_value.split(','))
-                    # Show first few values for preview
-                    preview_values = field_value.split(',')[:3]
-                    preview = ','.join(preview_values)
-                    if unique_count > 3:
-                        preview += f"...+{unique_count-3} more"
-                    extracted_fields.append(f"{field_name}=[{preview}] ({unique_count} unique)")
-                else:
-                    extracted_fields.append(f"{field_name}=[] (no values found)")
-            
-            if extracted_fields:
-                log_and_print("info", f"  - Extracted: {'; '.join(extracted_fields)}")
-            
-            if table_fields:
-                log_and_print("info", f"  - Generated dynamic tables: {', '.join(table_fields)}")
-                
+            if field in headers and not field.endswith("_table_rows") and field != "table_headers":
+                values = set()
+                for row in matched_rows:
+                    val = row.get(field, "").strip()
+                    if val:
+                        values.update([v.strip() for v in val.split(",") if v.strip()])
+                field_values[field] = ",".join(sorted(values))
+
+        # Determine which fields to use in the table
+        requested_fields = [
+            f for f in field_names 
+            if not f.endswith("_table_rows") and f != "table_headers" and f in headers
+        ]
+        table_fields = requested_fields if requested_fields else headers
+
+        # Generate dynamic tables
+        if matched_rows and table_fields:
+            def escape(val): return str(val).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+            def generate_table_rows(style: str = "default") -> str:
+                rows = ""
+                for i, row in enumerate(matched_rows):
+                    bg = "#f9f9f9" if style == "striped" and i % 2 == 0 else "#ffffff"
+                    tr_style = f' style="background-color: {bg};"' if style == "striped" else ""
+                    rows += f"        <tr{tr_style}>\n"
+                    for col in table_fields:
+                        val = escape(row.get(col, ""))
+                        cell_style = ' style="padding: 10px; border: 1px solid #ddd;"' if style != "simple" else ""
+                        rows += f"            <td{cell_style}>{val}</td>\n"
+                    rows += "        </tr>\n"
+                return rows.strip()
+
+            def generate_headers() -> str:
+                headers_html = ""
+                for col in table_fields:
+                    display = col.replace("_", " ").title()
+                    headers_html += f'            <th style="padding: 10px; border: 1px solid #ddd; background-color: #f5f5f5;">{display}</th>\n'
+                return headers_html.strip()
+
+            if "table_rows" in field_names:
+                field_values["table_rows"] = generate_table_rows("default")
+            if "simple_table_rows" in field_names:
+                field_values["simple_table_rows"] = generate_table_rows("simple")
+            if "styled_table_rows" in field_names:
+                field_values["styled_table_rows"] = generate_table_rows("striped")
+            if "csv_table_rows" in field_names:
+                field_values["csv_table_rows"] = "\n".join(
+                    " | ".join(row.get(col, "") for col in table_fields) for row in matched_rows
+                ).strip()
+            if "table_headers" in field_names:
+                field_values["table_headers"] = generate_headers()
+            if "microservice_table_rows" in field_names:
+                field_values["microservice_table_rows"] = field_values.get("table_rows", "")
+
+            log_and_print("info", f"Generated dynamic table for {len(matched_rows)} row(s) using {len(table_fields)} column(s) from {inventory_source}")
         else:
-            log_and_print("warning", f"No rows matched filter for field extraction: {filter_line}")
-            log_and_print("info", f"  - Processed {total_rows_processed} total rows from {inventory_source}")
-            log_and_print("info", f"  - Available headers: {', '.join(sorted(available_fields))}")
-            # FIXED: Initialize all dynamic fields to empty even when no matches
-            for field in field_names:
-                if field.endswith('_table_rows') or field == 'table_headers':
-                    field_values[field] = ""
-    
-    except Exception as exc:
-        log_and_print("error", f"Error extracting field values from {inventory_source}: {exc}")
-        log_and_print("error", f"Filter: {filter_line}")
-        log_and_print("error", f"Fields requested: {field_names}")
-        # Additional debug info
-        try:
-            log_and_print("error", f"Inventory path: {actual_inventory_path}")
-            log_and_print("error", f"Inventory exists: {actual_inventory_path.exists()}")
-        except:
-            pass
-        
-        # FIXED: Initialize all fields to empty on error
-        for field in field_names:
-            field_values[field] = ""
-    
+            log_and_print("warning", f"No matched rows or columns for table generation from {inventory_source}")
+
+    except Exception as e:
+        log_and_print("error", f"Failed to extract field values from inventory: {e}")
+
     return field_values
 
 
@@ -2193,9 +1771,6 @@ def get_recipients_for_multi_mode(base_folder: Path, dry_run: bool) -> Tuple[Lis
     return (email_configs, final_cc_recipients, final_bcc_recipients, 
             total_original_recipients_count, original_cc_count, original_bcc_count)   
     
-
-
-
 
 
 def save_multi_mode_recipients(base_folder: Path, email_configs: List[Dict], 
