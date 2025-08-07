@@ -42,6 +42,20 @@ nam,sec3,uat,cluster3,ns3,ms3,13546,"user1@example.com;user2@example.com;user7@e
 
 
 
+Usage Instructions:
 
+In your field.txt, list the columns you want in your table, plus microservice_table_rows:
+sector
+region
+clustername
+namespace
+microservicename
+replicacount
+microservice_table_rows
+
+The function will automatically generate table rows using all fields except microservice_table_rows as columns.
+Make sure your table headers in body.html match the order and names of fields in field.txt.
+
+This approach makes the table generation completely dynamic - you can change which columns appear in the table just by modifying field.txt, without needing to update the code.
 
 
