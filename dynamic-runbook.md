@@ -780,7 +780,18 @@ python notifybot.py --base-folder event-invite --batch-size 100
 
 ---
 
-## 📊 Monitoring & Logs
+## 📊 Enhanced Logging
+
+**UPDATED:** Logs are written to `/notifybot/logs/notifybot.log` in CSV format with expanded emoji categories for quick scanning.
+
+```
+ℹ️ Info, ⚠️ Warning, ❌ Error, ✅ Success, 📝 Draft, 🔧 Mode,
+⏳ Processing, 💾 Backup, 📂 File, ✋ Confirmation, ✍️ Signature
+```
+
+📡 All logs are also forwarded in real-time to **Splunk** for auditing and long-term reference.
+
+[📊 Open Splunk Dashboard](https://tinyurl/notifybot)
 
 ### Log Location
 - **File**: `/notifybot/logs/notifybot.log`
