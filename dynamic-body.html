@@ -23,3 +23,39 @@
 <p>Please review the deployment configuration and take necessary actions.</p>
 
 <p>Best regards,<br>DevOps Team</p>
+
+
+##################
+Ah, you want to add an outer border around the entire table! Here are several ways to enhance the outer boundary:
+Option 1: Thicker Outer Border
+html<table style="border-collapse: collapse; width: 100%; margin: 20px 0; border: 3px solid #333;">
+Option 2: Different Border Style
+html<table style="border-collapse: collapse; width: 100%; margin: 20px 0; border: 2px solid #000; box-shadow: 0 0 0 1px #666;">
+Option 3: Double Border Effect
+html<table style="border-collapse: collapse; width: 100%; margin: 20px 0; border: 4px double #333;">
+Option 4: Border with Shadow
+html<table style="border-collapse: collapse; width: 100%; margin: 20px 0; border: 2px solid #333; box-shadow: 2px 2px 5px rgba(0,0,0,0.3);">
+Option 5: Colored Outer Border
+html<table style="border-collapse: collapse; width: 100%; margin: 20px 0; border: 3px solid #0066cc;">
+Complete Example with Enhanced Outer Border
+html<h2>Application ID: {applicationid} - Deployment Details</h2>
+<p>Dear Team,</p>
+<p>Please find below the deployment details for Application ID <strong>{applicationid}</strong>:</p>
+<table style="border-collapse: collapse; width: 100%; margin: 20px 0; border: 3px solid #333; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <thead style="background-color: #f2f2f2;">
+        <tr>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Sector</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Region</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Cluster Name</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Namespace</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Microservice Name</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Replica Count</th>
+        </tr>
+    </thead>
+    <tbody>
+{dynamic_table}
+    </tbody>
+</table>
+<p>Please review the deployment configuration and take necessary actions.</p>
+<p>Best regards,<br>DevOps Team</p>
+The key change is in the table's main style attribute - just increase the border width or change the color in border: 3px solid #333; to make the outer boundary more prominent.
