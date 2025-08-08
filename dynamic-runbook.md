@@ -1,3 +1,32 @@
+# 🚀 NotifyBot User Runbook
+
+**NotifyBot**, our smart, scalable solution for email automation. Whether you're sending a handful of emails or thousands, NotifyBot makes it effortless, safe, and efficient. It supports both single and multi modes, with dry-run and signature capabilities.
+
+- 📧 **Batch Email Sending**: Deliver emails in customizable batches with controlled delays
+- 🖋️ **HTML Email Support**: Craft rich, styled messages (with attachments!)
+- 🎯 **Recipient Filtering**: Easily target the right audience with CSV filters
+- 🧪 **Dry Run Mode**: Test configurations safely without sending actual emails
+- ✅ **Email Validation**: Automatically validate addresses to reduce bounces
+- 📎 **Attachment Support**: Attach files up to 15MB each
+- 🔁 **Deduplication**: Automatically remove duplicate recipients
+- 📊 **Logging & Transparency**: Detailed logs with automatic log rotation
+- ✍️ **Global Signature Support**: Automatically append signature to all emails
+- 🖼️ **Image Embedding**: Embed images directly in emails to avoid blocking
+
+*Stay in control. Stay efficient. That's the NotifyBot way.*
+
+## ⚠️ Critical Disclaimer
+
+📧 Always run NotifyBot in `--dry-run` mode first to verify recipients and content.  
+❌ Do **not** use `--force` unless running in a fully automated script with prior approval.  
+⚠️ Running live without a dry-run review may result in unintended mass emails.  
+📂 The `<user-basefolder>` is the directory where you must maintain all required input files (e.g. `subject.txt`, `body.html`, `to.txt`).
+
+## 💡 Tip
+
+Always replace `<user-basefolder>` in the examples below with the name of your campaign folder inside `/notifybot/basefolder/`. Example: If your folder is `newsletter_august`, use:  
+`/notifybot/venv/bin/python notifybot.py --base-folder newsletter_august --dry-run`
+
 # NotifyBot Complete Runbook
 
 ## 📋 Table of Contents
