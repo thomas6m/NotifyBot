@@ -1,0 +1,3802 @@
+#!/usr/bin/env python3
+"""
+NotifyBot - Advanced Email Campaign Automation System
+=====================================================
+
+A comprehensive Python-based email automation system designed for sending personalized 
+batch emails with advanced filtering, template substitution, and dual-mode operation.
+
+OVERVIEW
+--------
+NotifyBot supports two primary operating modes:
+- SINGLE MODE: Send one email to multiple recipients (traditional bulk email)
+- MULTI MODE: Send multiple personalized emails based on CSV filter conditions
+
+KEY FEATURES
+------------
+✨ Dual Mode Operation:
+   • Single Mode: Traditional bulk email to multiple recipients
+   • Multi Mode: Personalized emails with CSV-based filtering and template substitution
+
+📊 Advanced CSV Integration:
+   • Dynamic recipient filtering using PromQL-style syntax
+   • Template placeholder substitution from CSV data  
+   • Support for local and global CSV inventories
+   • Dynamic table generation from filtered CSV rows
+
+🎯 Flexible Recipient Management:
+   • Multiple recipient sources (TO, CC, BCC, filters, additional lists)
+   • Automatic email deduplication and validation
+   • Support for semicolon-separated email lists
+   • Batch processing with configurable sizes and delays
+
+📧 Rich Email Features:
+   • HTML email support with embedded images
+   • Global signature integration from /notifybot/signature.html
+   • File attachments with size limit validation (15MB default)
+   • Proper MIME multipart message construction
+
+🛡️ Safety & Testing:
+   • Dry-run mode sends DRAFT emails to approvers only
+   • Comprehensive field validation against CSV inventories  
+   • Size limits and email format validation
+   • Detailed logging with CSV format for audit trails
+
+🔧 Enterprise-Ready:
+   • Priority-based field validation system
+   • Sendmail integration for reliable delivery
+   • Configurable batch processing and rate limiting
+   • Comprehensive error handling and recovery
+
+DIRECTORY STRUCTURE
+-------------------
+/notifybot/                          # Root directory
+├── basefolder/                      # Base folder for all campaigns
+│   └── <campaign-name>/             # Individual campaign folders
+│       ├── subject.txt              # Email subject (required)
+│       ├── body.html                # Email body HTML (required)  
+│       ├── from.txt                 # From address (required)
+│       ├── approver.txt             # Approver emails for dry-run (required)
+│       ├── to.txt                   # Direct recipient list (optional)
+│       ├── cc.txt                   # CC recipients (optional)
+│       ├── bcc.txt                  # BCC recipients (optional)
+│       ├── additional_to.txt        # Additional recipients (optional)
+│       ├── filter.txt               # CSV filter conditions (required for multi)
+│       ├── field.txt                # Fields for template substitution (optional)
+│       ├── table-columns.txt        # Columns for dynamic tables (optional)
+│       ├── mode.txt                 # Force mode: single|multi (optional)
+│       ├── field-inventory.csv      # Local field inventory (optional)
+│       ├── attachment/              # Email attachments folder (optional)
+│       ├── images/                  # Images for embedding (optional)
+│       └── recipients/              # Generated recipient files (auto-created)
+├── inventory/
+│   └── inventory.csv                # Global CSV inventory (required for filters)
+├── signature.html                   # Global email signature (optional)
+└── logs/
+    └── notifybot.log                # Execution logs
+
+OPERATING MODES
+---------------
+
+SINGLE MODE:
+- Sends ONE email to multiple recipients
+- Supports batching for large recipient lists
+- Recipients from: to.txt, filters, additional_to.txt, cc.txt, bcc.txt
+- Template substitution from first matching CSV row (if filters used)
+
+MULTI MODE:
+- Sends MULTIPLE personalized emails based on filter conditions
+- Each filter condition generates one unique email
+- Each email can have different recipients and personalized content
+- Template substitution from matching CSV rows per filter
+
+FILTER SYNTAX (PromQL-style)
+----------------------------
+- Exact match: field="value"
+- Not equal: field!="value"  
+- Regex match: field=~"pattern"
+- Regex not match: field!~"pattern"
+- Wildcard: field=value* or field=*value* or field=val?e
+- AND conditions: field1="value1",field2="value2"
+- OR conditions: Put each condition on separate lines
+
+Examples:
+  department="sales"                    # Exact match
+  region!="europe"                      # Not equal
+  name=~".*Manager.*"                   # Regex match  
+  email!~".*(test|demo).*"              # Regex not match
+  status=active*                        # Wildcard match
+  department="sales",region="north"     # AND condition (same line)
+  department="sales"                    # OR conditions
+  department="marketing"                # (separate lines)
+
+TEMPLATE SUBSTITUTION
+---------------------
+- Use {field_name} placeholders in subject.txt and body.html
+- Values automatically extracted from matching CSV rows
+- Comma-separated values are formatted nicely
+- Support for dynamic table generation:
+  • {table_rows} - HTML table rows with styling
+  • {simple_table_rows} - Basic HTML table rows  
+  • {styled_table_rows} - Alternating row colors
+  • {csv_table_rows} - Pipe-separated table data
+  • {table_headers} - HTML table headers
+  • {dynamic_table} - Complete styled table (legacy)
+
+FIELD VALIDATION PRIORITY
+--------------------------
+1. filter.txt fields → ALWAYS validated against /notifybot/inventory/inventory.csv
+2. field.txt validation priority:
+   - If <campaign-folder>/field-inventory.csv exists: use it for field.txt
+   - If local field-inventory.csv exists: filter.txt fields also validated against it  
+   - If no local field-inventory.csv: field.txt validated against global inventory
+
+USAGE EXAMPLES
+--------------
+# Dry-run single mode campaign
+python notifybot.py --base-folder my-campaign --dry-run
+
+# Live multi-mode with custom batch settings  
+python notifybot.py --base-folder newsletter --mode multi --batch-size 200 --delay 10
+
+# Force single mode without confirmation
+python notifybot.py --base-folder announcement --mode single --force
+
+# Dry-run with custom batch size
+python notifybot.py --base-folder survey --dry-run --batch-size 100
+
+SAFETY FEATURES
+---------------
+• Dry-run mode: Sends DRAFT emails to approvers only with original recipient counts
+• Email validation: Comprehensive syntax and deliverability checking
+• Field validation: Ensures all template fields exist in CSV inventories
+• Size limits: Attachment folder size validation (15MB default)  
+• Deduplication: Automatic removal of duplicate email addresses
+• Error handling: Graceful failure handling with detailed logging
+• Confirmation prompts: Interactive confirmation unless --force used
+
+LOGGING & MONITORING
+--------------------
+All operations logged to /notifybot/logs/notifybot.log in CSV format:
+- timestamp_epoch,username,emoji_level_message
+- Comprehensive audit trail for all operations
+- Color-coded console output with emoji indicators
+- Batch processing progress tracking
+- Detailed error reporting and troubleshooting info
+
+AUTHOR & MAINTENANCE
+--------------------
+This system is designed for enterprise email campaign management with
+emphasis on safety, auditability, and operational reliability.
+
+For support and documentation, see the built-in help:
+python notifybot.py --help
+
+Version: 3.0+ (Multi-mode with advanced CSV integration)
+Compatible with: Python 3.7+
+Dependencies: email_validator, standard library modules
+"""
+
+
+
+import base64
+import mimetypes
+from email.mime.image import MIMEImage
+from typing import List, Tuple, Dict, Set  
+import re  
+import argparse
+import csv
+import logging
+import shutil
+import sys
+import time
+import traceback
+import os
+import json
+import fnmatch
+import io
+from datetime import datetime
+from email.message import EmailMessage
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+from pathlib import Path
+import subprocess
+from email_validator import validate_email, EmailNotValidError
+
+# Path configurations
+NOTIFYBOT_ROOT = Path("/notifybot")  # Root directory
+BASEFOLDER_PATH = NOTIFYBOT_ROOT / "basefolder"  # Enforced base folder location
+LOG_FILENAME = NOTIFYBOT_ROOT / "logs" / "notifybot.log"  # Log file location
+INVENTORY_PATH = NOTIFYBOT_ROOT / "inventory" / "inventory.csv"  # New location of inventory.csv
+
+
+
+def validate_fields_with_priority(base_folder: Path, mode: str = "single") -> Tuple[bool, List[str]]:
+    """
+    Enhanced validation with table-columns.txt support following priority-based validation system.
+    
+    Priority Rules:
+    1. filter.txt fields → validated against global inventory.csv (ALWAYS)
+    2. field.txt/table-columns.txt → priority: local field-inventory.csv > global inventory.csv
+    3. If local field-inventory.csv exists, filter.txt fields ALSO validated against it
+    
+    Returns:
+        (is_valid, error_list): True if all validations pass, list of error messages
+    """
+    errors = []
+    
+    # Define dynamically generated fields that don't exist in CSV files
+    DYNAMIC_FIELDS = {
+        'dynamic_table',         # Original hardcoded microservice table (backward compatibility)
+        'table_rows',           # Standard HTML table with styling
+        'csv_table_rows',       # CSV-style table rows (pipe-separated)
+        'simple_table_rows',    # Simple HTML table without styling
+        'styled_table_rows',    # Table with alternating row colors
+        'table_headers',        # Table headers based on CSV fields
+    }
+    
+    # Validate global inventory exists
+    if not INVENTORY_PATH.exists():
+        errors.append(f"Global inventory file not found: {INVENTORY_PATH}")
+        return False, errors
+    
+    # Check for local field inventory
+    local_field_inventory_path = base_folder / "field-inventory.csv"
+    has_local_field_inventory = local_field_inventory_path.exists()
+    
+    # Read global inventory fields
+    try:
+        with open(INVENTORY_PATH, mode="r", newline="", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            global_available_fields = set(field.strip() for field in (reader.fieldnames or []))
+            
+        if not global_available_fields:
+            errors.append("No headers found in global inventory.csv")
+            return False, errors
+            
+        log_and_print("info", f"Global inventory fields: {', '.join(sorted(global_available_fields))}")
+        
+    except Exception as exc:
+        errors.append(f"Error reading global inventory.csv headers: {exc}")
+        return False, errors
+    
+    # Read local field inventory if it exists
+    local_available_fields = set()
+    if has_local_field_inventory:
+        try:
+            with open(local_field_inventory_path, mode="r", newline="", encoding="utf-8") as file:
+                reader = csv.DictReader(file)
+                local_available_fields = set(field.strip() for field in (reader.fieldnames or []))
+                
+            if not local_available_fields:
+                errors.append("No headers found in local field-inventory.csv")
+                return False, errors
+                
+            log_and_print("info", f"Local field-inventory.csv found with fields: {', '.join(sorted(local_available_fields))}")
+            
+        except Exception as exc:
+            errors.append(f"Error reading local field-inventory.csv headers: {exc}")
+            return False, errors
+    else:
+        log_and_print("info", "No local field-inventory.csv found, using global inventory only")
+    
+    # RULE 1: Validate filter.txt against global inventory (and local if exists)
+    filter_file = base_folder / "filter.txt"
+    if filter_file.is_file():
+        filter_content = read_file(filter_file)
+        filter_lines = [line.strip() for line in filter_content.splitlines() 
+                       if line.strip() and not line.strip().startswith('#')]
+        
+        # Extract field names from filter conditions
+        filter_fields = set()
+        for line_num, filter_line in enumerate(filter_lines, 1):
+            conditions = [condition.strip() for condition in filter_line.split(',')]
+            
+            for condition in conditions:
+                if not condition:
+                    continue
+                
+                # Extract field name from condition (before operator)
+                field_name = None
+                for op in ['=~', '!~', '!=', '=']:
+                    if op in condition:
+                        field_name = condition.split(op)[0].strip()
+                        break
+                
+                if field_name:
+                    filter_fields.add(field_name)
+                    
+                    # Check against global inventory
+                    if field_name not in global_available_fields:
+                        errors.append(f"filter.txt line {line_num}: Field '{field_name}' not found in global inventory.csv")
+                    
+                    # If local field inventory exists, also validate against it
+                    if has_local_field_inventory and field_name not in local_available_fields:
+                        errors.append(f"filter.txt line {line_num}: Field '{field_name}' not found in local field-inventory.csv")
+        
+        if filter_fields and not any("Field '" in error and "not found" in error for error in errors):
+            log_and_print("info", "All filter.txt field names validated successfully")
+    
+    # RULE 2 & 3: Validate field.txt (ONLY in multi mode)
+    if mode == "multi":
+        field_file = base_folder / "field.txt"
+        if field_file.is_file():
+            field_content = read_file(field_file)
+            field_names = [line.strip() for line in field_content.splitlines() if line.strip()]
+            
+            if field_names:
+                # Choose inventory based on priority
+                if has_local_field_inventory:
+                    inventory_to_use = local_available_fields
+                    inventory_name = "local field-inventory.csv"
+                    log_and_print("info", "Validating field.txt against local field-inventory.csv (priority)")
+                else:
+                    inventory_to_use = global_available_fields
+                    inventory_name = "global inventory.csv"
+                    log_and_print("info", "Validating field.txt against global inventory.csv (fallback)")
+                
+                invalid_fields = []
+                dynamic_fields_found = []
+                
+                for line_num, field_name in enumerate(field_names, 1):
+                    field_name = field_name.strip()
+                    
+                    # Check if it's a dynamic field
+                    if field_name in DYNAMIC_FIELDS:
+                        dynamic_fields_found.append(field_name)
+                        log_and_print("info", f"field.txt line {line_num}: '{field_name}' is dynamic")
+                        continue
+                    
+                    # Check if field exists in inventory
+                    if field_name not in inventory_to_use:
+                        invalid_fields.append(field_name)
+                        errors.append(f"field.txt line {line_num}: Field '{field_name}' not found in {inventory_name}")
+                
+                if not invalid_fields:
+                    csv_fields_count = len(field_names) - len(dynamic_fields_found)
+                    if csv_fields_count > 0:
+                        log_and_print("info", f"All {csv_fields_count} CSV field names validated successfully")
+                    if dynamic_fields_found:
+                        log_and_print("info", f"All {len(dynamic_fields_found)} dynamic field names are valid")
+    
+    # Validate table-columns.txt (when it exists)
+    table_columns_file = base_folder / "table-columns.txt"
+    if table_columns_file.is_file():
+        table_columns_content = read_file(table_columns_file)
+        table_column_names = [line.strip() for line in table_columns_content.splitlines() if line.strip()]
+        
+        if table_column_names:
+            # Use same priority logic as field.txt
+            if has_local_field_inventory:
+                inventory_to_use = local_available_fields
+                inventory_name = "local field-inventory.csv"
+                log_and_print("info", "Validating table-columns.txt against local field-inventory.csv")
+            else:
+                inventory_to_use = global_available_fields
+                inventory_name = "global inventory.csv"
+                log_and_print("info", "Validating table-columns.txt against global inventory.csv")
+            
+            invalid_table_fields = []
+            for line_num, field_name in enumerate(table_column_names, 1):
+                field_name = field_name.strip()
+                
+                if field_name not in inventory_to_use:
+                    invalid_table_fields.append(field_name)
+                    errors.append(f"table-columns.txt line {line_num}: Field '{field_name}' not found in {inventory_name}")
+            
+            if not invalid_table_fields:
+                log_and_print("info", f"All {len(table_column_names)} table column names validated successfully")
+    
+    # Provide helpful suggestions if there are errors
+    if errors:
+        log_and_print("info", "Field validation failed. Available fields:")
+        log_and_print("info", f"Global inventory.csv: {', '.join(sorted(global_available_fields))}")
+        if has_local_field_inventory:
+            log_and_print("info", f"Local field-inventory.csv: {', '.join(sorted(local_available_fields))}")
+        if DYNAMIC_FIELDS:
+            log_and_print("info", f"Dynamic fields: {', '.join(sorted(DYNAMIC_FIELDS))}")
+    
+    return len(errors) == 0, errors
+
+def check_attachment_size_limit(base_folder: Path, max_size_mb: int = 15) -> None:
+    """
+    Check if total attachment size exceeds the specified limit.
+    
+    Args:
+        base_folder: Path to the base folder containing attachment/ subdirectory
+        max_size_mb: Maximum total size in MB (default: 15MB)
+        
+    Raises:
+        MissingRequiredFilesError: If attachment size exceeds limit or access errors occur
+    """
+    attachment_folder = base_folder / "attachment"
+    
+    # Early return if no attachment folder exists
+    if not attachment_folder.exists():
+        log_and_print("info", "No attachment folder found - skipping size check")
+        return
+    
+    if not attachment_folder.is_dir():
+        log_and_print("warning", "Attachment path exists but is not a directory")
+        return
+    
+    total_size_bytes = 0
+    file_count = 0
+    file_details = []
+    
+    try:
+        # Process all files in attachment folder
+        for file_path in attachment_folder.iterdir():
+            if file_path.is_file():
+                try:
+                    file_size = file_path.stat().st_size
+                    total_size_bytes += file_size
+                    file_count += 1
+                    
+                    file_size_mb = file_size / (1024 * 1024)
+                    file_details.append({
+                        'name': file_path.name,
+                        'size_mb': file_size_mb,
+                        'size_bytes': file_size
+                    })
+                    
+                    log_and_print("info", f"Attachment: {file_path.name} ({file_size_mb:.2f} MB)")
+                    
+                except (OSError, PermissionError) as e:
+                    log_and_print("warning", f"Cannot access file {file_path.name}: {e}")
+                    continue
+            elif file_path.is_dir():
+                log_and_print("warning", f"Subdirectory found in attachments: {file_path.name} (ignored)")
+        
+        # Handle empty attachment folder
+        if file_count == 0:
+            log_and_print("info", "Attachment folder exists but contains no files")
+            return
+        
+        # Calculate total size and validate
+        total_size_mb = total_size_bytes / (1024 * 1024)
+        
+        # Log summary
+        log_and_print("info", f"Attachment summary: {file_count} file(s), {total_size_mb:.2f} MB total")
+        
+        # Sort files by size (largest first) for better reporting
+        file_details.sort(key=lambda x: x['size_bytes'], reverse=True)
+        
+        # Check size limit
+        if total_size_mb > max_size_mb:
+            # Provide detailed error with largest files
+            error_msg = (
+                f"Attachment size limit exceeded: {total_size_mb:.2f} MB > {max_size_mb} MB limit.\n"
+                f"Largest files:"
+            )
+            
+            # Show top 3 largest files
+            for file_info in file_details[:3]:
+                error_msg += f"\n  - {file_info['name']}: {file_info['size_mb']:.2f} MB"
+            
+            if len(file_details) > 3:
+                error_msg += f"\n  - ... and {len(file_details) - 3} more files"
+            
+            error_msg += f"\n\nPlease reduce the total size by removing or compressing files."
+            
+            log_and_print("error", f"Size limit exceeded: {total_size_mb:.2f} MB > {max_size_mb} MB")
+            raise MissingRequiredFilesError(error_msg)
+        else:
+            # Success message with percentage used
+            percentage_used = (total_size_mb / max_size_mb) * 100
+            log_and_print("success", 
+                         f"Attachment size check passed: {total_size_mb:.2f} MB / {max_size_mb} MB "
+                         f"({percentage_used:.1f}% of limit)")
+    
+    except MissingRequiredFilesError:
+        # Re-raise our custom errors
+        raise
+    except (OSError, PermissionError) as exc:
+        error_msg = f"Cannot access attachment folder: {exc}"
+        log_and_print("error", error_msg)
+        raise MissingRequiredFilesError(error_msg)
+    except Exception as exc:
+        error_msg = f"Unexpected error checking attachment sizes: {exc}"
+        log_and_print("error", error_msg)
+        raise MissingRequiredFilesError(error_msg)
+
+def check_required_files(base: Path, required: List[str], dry_run: bool = True, mode: str = "single") -> None:
+    """
+    Enhanced check_required_files function with improved validation and clearer error reporting.
+    
+    Args:
+        base: Base folder path containing the email configuration files
+        required: List of required file names (always required regardless of mode)
+        dry_run: Whether this is a dry run (affects logging but not validation)
+        mode: Operating mode ("single" or "multi")
+    
+    Raises:
+        MissingRequiredFilesError: When required files are missing or validation fails
+    """
+    
+    # 1. CHECK CORE REQUIRED FILES
+    missing_files = [f for f in required if not (base / f).is_file()]
+    if missing_files:
+        raise MissingRequiredFilesError(f"Missing required files: {', '.join(missing_files)}")
+    
+    log_and_print("success", f"All core required files found: {', '.join(required)}")
+    
+    # 2. MODE-SPECIFIC VALIDATIONS
+    if mode == "multi":
+        _validate_multi_mode_requirements(base)
+    elif mode == "single":
+        _validate_single_mode_requirements(base)
+    else:
+        raise MissingRequiredFilesError(f"Invalid mode: {mode}. Must be 'single' or 'multi'")
+    
+    # 3. FIELD VALIDATION (when inventory is needed)
+    if _requires_inventory_validation(base, mode):
+        log_and_print("info", "Validating field names with priority-based inventory checking...")
+        _perform_field_validation(base, mode)
+    
+    # 4. ATTACHMENT SIZE VALIDATION
+    _validate_attachment_size(base)
+    
+    log_and_print("success", "All file validations passed successfully")
+
+
+def _validate_multi_mode_requirements(base: Path) -> None:
+    """Validate requirements specific to multi mode."""
+    # Multi mode ALWAYS requires filter.txt
+    if not (base / "filter.txt").is_file():
+        raise MissingRequiredFilesError("Multi mode requires filter.txt")
+    
+    # Multi mode ALWAYS requires global inventory.csv
+    if not INVENTORY_PATH.is_file():
+        raise MissingRequiredFilesError(
+            f"Multi mode requires global inventory.csv at {INVENTORY_PATH}"
+        )
+    
+    log_and_print("info", "Multi mode requirements validated")
+
+
+def _validate_single_mode_requirements(base: Path) -> None:
+    """Validate requirements specific to single mode."""
+    # Single mode requires at least one recipient source
+    recipient_sources = _check_recipient_sources(base)
+    
+    if not recipient_sources['has_any']:
+        raise MissingRequiredFilesError(
+            "Single mode requires at least one recipient source: "
+            "'to.txt', 'filter.txt + inventory.csv', 'additional_to.txt', 'cc.txt', or 'bcc.txt'"
+        )
+    
+    # Log which sources were found
+    found_sources = [source for source, found in recipient_sources.items() 
+                    if found and source != 'has_any']
+    log_and_print("info", f"Single mode recipient sources found: {', '.join(found_sources)}")
+
+
+def _check_recipient_sources(base: Path) -> Dict[str, bool]:
+    """Check which recipient sources are available in single mode."""
+    return {
+        'to.txt': (base / "to.txt").is_file(),
+        'filter.txt + inventory.csv': (base / "filter.txt").is_file() and INVENTORY_PATH.is_file(),
+        'additional_to.txt': (base / "additional_to.txt").is_file(),
+        'cc.txt': (base / "cc.txt").is_file(),
+        'bcc.txt': (base / "bcc.txt").is_file(),
+        'has_any': any([
+            (base / "to.txt").is_file(),
+            (base / "filter.txt").is_file() and INVENTORY_PATH.is_file(),
+            (base / "additional_to.txt").is_file(),
+            (base / "cc.txt").is_file(),
+            (base / "bcc.txt").is_file()
+        ])
+    }
+
+
+def _requires_inventory_validation(base: Path, mode: str) -> bool:
+    """
+    Determine if inventory validation is required.
+    
+    Returns True if:
+    - Mode is "multi", OR
+    - Mode is "single" AND using filter.txt (no to.txt) AND inventory exists
+    """
+    if mode == "multi":
+        return True
+    
+    if mode == "single":
+        # Only validate if using filter.txt without to.txt
+        using_filter_without_to = (
+            not (base / "to.txt").is_file() and 
+            (base / "filter.txt").is_file()
+        )
+        return using_filter_without_to
+    
+    return False
+
+
+def _perform_field_validation(base: Path, mode: str) -> None:
+    """Perform field validation with proper error handling."""
+    try:
+        is_valid, validation_errors = validate_fields_with_priority(base, mode)
+        
+        if not is_valid:
+            # Log detailed error information
+            log_and_print("error", "Field validation failed:")
+            for error in validation_errors:
+                log_and_print("error", f"  • {error}")
+            
+            # Provide helpful summary
+            error_count = len(validation_errors)
+            raise MissingRequiredFilesError(
+                f"Field validation failed with {error_count} error(s). "
+                "Please check that all field names exist in the appropriate inventory files."
+            )
+        else:
+            log_and_print("success", "Field validation passed - all field names are valid")
+            
+    except Exception as exc:
+        if isinstance(exc, MissingRequiredFilesError):
+            raise  # Re-raise our custom error as-is
+        else:
+            # Wrap unexpected errors
+            log_and_print("error", f"Unexpected error during field validation: {exc}")
+            raise MissingRequiredFilesError(f"Field validation failed due to unexpected error: {exc}")
+
+
+def _validate_attachment_size(base: Path, max_size_mb: int = 15) -> None:
+    """
+    Validate attachment folder size with improved error handling.
+    
+    Args:
+        base: Base folder path
+        max_size_mb: Maximum allowed attachment size in MB
+    """
+    attachment_folder = base / "attachment"
+    
+    if not attachment_folder.exists():
+        log_and_print("info", "No attachment folder found - skipping size check")
+        return
+    
+    try:
+        total_size_bytes = 0
+        file_count = 0
+        file_details = []
+        
+        # Collect file information
+        for file_path in attachment_folder.iterdir():
+            if file_path.is_file():
+                file_size = file_path.stat().st_size
+                total_size_bytes += file_size
+                file_count += 1
+                
+                # Store details for logging
+                size_mb = file_size / (1024 * 1024)
+                file_details.append((file_path.name, size_mb))
+        
+        if file_count == 0:
+            log_and_print("info", "Attachment folder exists but contains no files")
+            return
+        
+        # Log file details
+        for filename, size_mb in file_details:
+            log_and_print("info", f"Attachment: {filename} ({size_mb:.2f} MB)")
+        
+        # Check total size
+        total_size_mb = total_size_bytes / (1024 * 1024)
+        log_and_print("info", f"Total attachment size: {total_size_mb:.2f} MB ({file_count} files)")
+        
+        if total_size_mb > max_size_mb:
+            raise MissingRequiredFilesError(
+                f"Attachment size limit exceeded: {total_size_mb:.2f} MB > {max_size_mb} MB limit. "
+                f"Please reduce the total size of files in the attachment folder."
+            )
+        else:
+            log_and_print("success", f"Attachment size check passed: {total_size_mb:.2f} MB / {max_size_mb} MB limit")
+    
+    except OSError as exc:
+        log_and_print("error", f"Error checking attachment folder: {exc}")
+        raise MissingRequiredFilesError(f"Cannot verify attachment sizes: {exc}")
+    except MissingRequiredFilesError:
+        raise  # Re-raise our custom error as-is
+    except Exception as exc:
+        log_and_print("error", f"Unexpected error during attachment validation: {exc}")
+        raise MissingRequiredFilesError(f"Attachment validation failed: {exc}")
+
+
+# ORIGINAL check_attachment_size_limit FUNCTION (for reference - can be removed)
+def check_attachment_size_limit(base_folder: Path, max_size_mb: int = 15) -> None:
+    """
+    Original function - now replaced by _validate_attachment_size.
+    This can be removed if no other code depends on it.
+    """
+    _validate_attachment_size(base_folder, max_size_mb)
+
+
+
+class MissingRequiredFilesError(Exception):
+    """Exception raised when required input files are missing."""
+
+def validate_base_folder(base_folder: str) -> Path:
+    """Ensure that the base folder is a valid relative path inside /notifybot/basefolder"""
+    base_folder_path = BASEFOLDER_PATH / base_folder
+    
+    # Ensure the base folder is inside /notifybot/basefolder
+    if not base_folder_path.is_dir():
+        raise ValueError(f"Invalid base folder: {base_folder}. It must be a directory inside '/notifybot/basefolder'.")
+
+    # Return the validated path
+    return base_folder_path
+
+def csv_log_entry(message: str) -> str:
+    """Generate log entry in CSV format with proper escaping."""
+    timestamp_epoch = time.time_ns() // 1_000_000  # Nanoseconds to milliseconds
+    try:
+        username = os.getlogin()  # Get the username of the executor
+    except OSError:
+        # Fallback for environments where getlogin() fails
+        username = os.getenv('USER', os.getenv('USERNAME', 'unknown'))
+    
+    # Use csv.writer to properly escape the message field
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([timestamp_epoch, username, message])
+    csv_line = output.getvalue().strip()  # Remove trailing newline
+    output.close()
+    
+    return csv_line
+
+def setup_logging() -> None:
+    """Configure logging to INFO+ level in LOG_FILENAME with structured CSV format."""
+    # Ensure log directory exists
+    LOG_FILENAME.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Configure logging
+    logging.basicConfig(
+        filename=LOG_FILENAME,
+        level=logging.INFO,
+        format='%(message)s',
+        filemode='a'
+    )
+    
+    def log_and_print(level: str, message: str) -> None:
+        """Log and color-print a message at INFO/WARNING/ERROR levels in CSV format."""
+        # Emoji mappings for log levels
+        emoji_mapping = {
+            "info": "ℹ️",
+            "warning": "⚠️",
+            "error": "❌",
+            "success": "✅",
+            "processing": "⏳",
+            "backup": "💾",
+            "file": "📂",
+            "confirmation": "✋",
+            "draft": "📝",
+            "mode": "🔧",
+            "signature": "✍️"
+        }
+
+        # Get emoji for level
+        emoji = emoji_mapping.get(level.lower(), "")
+        csv_log = csv_log_entry(f"{emoji} {message}")
+        log_func = getattr(logging, level.lower(), logging.info)
+        log_func(csv_log)
+        print(f"{csv_log}")  # Print to the console as well
+
+    globals()['log_and_print'] = log_and_print
+
+def determine_mode(base_folder: Path, cli_mode: str = None) -> str:
+    """
+    Determine operating mode with priority: CLI > mode.txt > default (single)
+    """
+    # Priority 1: CLI override
+    if cli_mode and cli_mode.lower() in ['single', 'multi']:
+        mode = cli_mode.lower()
+        log_and_print("mode", f"Mode determined by CLI argument: {mode}")
+        return mode
+    
+    # Priority 2: mode.txt file
+    mode_file = base_folder / "mode.txt"
+    if mode_file.is_file():
+        try:
+            mode_content = mode_file.read_text(encoding="utf-8").strip().lower()
+            if mode_content in ['single', 'multi']:
+                log_and_print("mode", f"Mode determined by mode.txt: {mode_content}")
+                return mode_content
+            else:
+                log_and_print("warning", f"Invalid mode in mode.txt: {mode_content}. Using default 'single'")
+        except Exception as exc:
+            log_and_print("warning", f"Error reading mode.txt: {exc}. Using default 'single'")
+    
+    # Priority 3: Default
+    log_and_print("mode", "Mode defaulted to: single")
+    return "single"
+
+def read_signature() -> str:
+    """
+    """
+    # Changed to use global signature location
+    signature_file = NOTIFYBOT_ROOT / "signature.html"  # /notifybot/signature.html
+    
+    if not signature_file.is_file():
+        log_and_print("info", "No signature.html found at /notifybot/signature.html, emails will be sent without signature")
+        return ""
+    
+    try:
+        signature_content = signature_file.read_text(encoding="utf-8").strip()
+        if signature_content:
+            log_and_print("signature", f"Loaded signature from /notifybot/signature.html ({len(signature_content)} characters)")
+            return signature_content
+        else:
+            log_and_print("warning", "/notifybot/signature.html is empty")
+            return ""
+    except Exception as exc:
+        log_and_print("error", f"Failed to read /notifybot/signature.html: {exc}")
+        return ""
+
+def combine_body_and_signature(body_html: str, signature_html: str) -> str:
+    """
+    """
+    if not signature_html:
+        return body_html
+    
+    # Add signature separator and signature
+    signature_separator = "\n<br><br>\n"  # Add some spacing before signature
+    combined_html = body_html + signature_separator + signature_html
+    
+    log_and_print("signature", "Combined body and signature successfully")
+    return combined_html
+
+def find_sendmail_path() -> str:
+    """Find sendmail executable path."""
+    common_paths = [
+        '/usr/sbin/sendmail',
+        '/usr/bin/sendmail',
+        '/sbin/sendmail',
+        '/usr/lib/sendmail'
+    ]
+    
+    for path in common_paths:
+        if Path(path).exists():
+            return path
+    
+    # Try to find in PATH
+    try:
+        result = subprocess.run(['which', 'sendmail'], capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except:
+        pass
+    
+    log_and_print("warning", "Sendmail not found in common locations")
+    return '/usr/sbin/sendmail'  # Default fallback
+
+def is_valid_email(email: str) -> bool:
+    """Check email syntax using email_validator with sendmail compatibility."""
+    try:
+        validate_email(email.strip(), check_deliverability=False)
+        
+        # Additional checks for sendmail compatibility
+        email = email.strip()
+        if len(email) > 320:  # RFC 5321 limit
+            log_and_print("warning", f"Email too long (>320 chars): {email}")
+            return False
+        
+        # Check for characters that might cause issues with sendmail
+        problematic_chars = ['|', '`', '$', '\\']
+        if any(char in email for char in problematic_chars):
+            log_and_print("warning", f"Email contains potentially problematic characters: {email}")
+            return False
+        
+        return True
+    except EmailNotValidError as exc:
+        log_and_print("error", f"Invalid email format: {email}. Error: {exc}")
+        return False
+
+def read_file(path: Path) -> str:
+    """Read text file content and strip, or log an error."""
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except Exception as exc:
+        log_and_print("error", f"Failed to read {path}: {exc}")
+        return ""
+
+def extract_emails(raw: str, delimiters: str = ";") -> List[str]:
+    """Split and trim emails from a raw string by delimiters."""
+    if not raw:
+        return []
+    return [e.strip() for e in re.split(f"[{re.escape(delimiters)}]", raw) if e.strip()]
+
+def read_recipients(path: Path, delimiters: str = ";") -> List[str]:
+    """Read and validate emails from a file (semicolon-separated)."""
+    valid = []
+    if not path.is_file():
+        log_and_print("warning", f"{path.name} missing, skipping.")
+        return valid
+    
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            for email in extract_emails(line.strip(), delimiters):
+                if is_valid_email(email):
+                    valid.append(email)
+                else:
+                    log_and_print("warning", f"Invalid email skipped: {email}")
+    except Exception as exc:
+        log_and_print("error", f"Error processing recipients in {path}: {exc}")
+    return valid
+
+def deduplicate_emails(emails: List[str]) -> List[str]:
+    """Deduplicate email addresses (case-insensitive) while preserving order."""
+    seen = set()
+    unique_emails = []
+    for email in emails:
+        email_lower = email.lower()
+        if email_lower not in seen:
+            seen.add(email_lower)
+            unique_emails.append(email)
+    return unique_emails
+
+def write_recipients_to_file(path: Path, recipients: List[str]) -> None:
+    """Write recipients list to a file, one per line, with deduplication."""
+    try:
+        # Deduplicate recipients
+        unique_recipients = deduplicate_emails(recipients)
+        
+        with path.open('w', encoding='utf-8') as f:
+            for email in unique_recipients:
+                f.write(f"{email}\n")
+        
+        if len(recipients) != len(unique_recipients):
+            duplicates_removed = len(recipients) - len(unique_recipients)
+            log_and_print("info", f"Removed {duplicates_removed} duplicate email(s)")
+        
+        log_and_print("file", f"Written {len(unique_recipients)} unique recipients to {path.name}")
+    except Exception as exc:
+        log_and_print("error", f"Error writing recipients to {path}: {exc}")
+
+def merge_recipients(base_recipients: List[str], additional_recipients: List[str]) -> List[str]:
+    """Merge two lists of recipients, removing duplicates while preserving order."""
+    # Combine all recipients and deduplicate
+    all_recipients = base_recipients + additional_recipients
+    return deduplicate_emails(all_recipients)
+
+
+def sanitize_filename(filename: str) -> str:
+    """Sanitize the filename to prevent issues with special characters."""
+    return re.sub(r"[^\w\s.-]", "", filename)
+
+def add_attachments(msg: MIMEMultipart, attachment_folder: Path) -> None:
+    """Add all files from attachment folder to the email message."""
+    if not attachment_folder or not attachment_folder.exists():
+        return
+        
+    try:
+        for file_path in attachment_folder.iterdir():
+            if file_path.is_file():
+                # Get MIME type
+                ctype, encoding = mimetypes.guess_type(str(file_path))
+                if ctype is None or encoding is not None:
+                    ctype = 'application/octet-stream'
+                
+                maintype, subtype = ctype.split('/', 1)
+                
+                with open(file_path, 'rb') as fp:
+                    attachment = MIMEBase(maintype, subtype)
+                    attachment.set_payload(fp.read())
+                    encoders.encode_base64(attachment)
+                    attachment.add_header(
+                        'Content-Disposition',
+                        f'attachment; filename="{sanitize_filename(file_path.name)}"'
+                    )
+                    msg.attach(attachment)
+                
+                log_and_print("info", f"Attached file: {file_path.name}")
+                
+    except Exception as exc:
+        log_and_print("error", f"Error adding attachments: {exc}")
+
+def create_email_message(recipients: List[str], subject: str, body_html: str, 
+                        from_address: str, attachment_folder: Path = None,
+                        base_folder: Path = None, cc_recipients: List[str] = None,
+                        bcc_recipients: List[str] = None) -> MIMEMultipart:
+    """
+    Create a properly formatted email message with enhanced error handling, 
+    image embedding, and attachment support.
+    
+    Args:
+        recipients: List of TO recipients
+        subject: Email subject line
+        body_html: HTML body content
+        from_address: Sender email address
+        attachment_folder: Path to folder containing attachments (optional)
+        base_folder: Base folder path for image embedding (optional)
+        cc_recipients: List of CC recipients (optional)
+        bcc_recipients: List of BCC recipients (optional)
+        
+    Returns:
+        MIMEMultipart: Properly constructed email message
+        
+    Raises:
+        ValueError: If essential parameters are invalid
+        Exception: If email construction fails
+    """
+    # Input validation
+    if not isinstance(recipients, list):
+        recipients = []
+    if not isinstance(cc_recipients, list):
+        cc_recipients = cc_recipients or []
+    if not isinstance(bcc_recipients, list):
+        bcc_recipients = bcc_recipients or []
+    
+    # Validate that we have at least one recipient
+    total_recipients = len(recipients) + len(cc_recipients) + len(bcc_recipients)
+    if total_recipients == 0:
+        raise ValueError("At least one recipient (TO, CC, or BCC) is required")
+    
+    # Validate essential fields
+    if not subject or not isinstance(subject, str):
+        raise ValueError("Subject is required and must be a non-empty string")
+    if not body_html or not isinstance(body_html, str):
+        raise ValueError("Body HTML is required and must be a non-empty string")
+    if not from_address or not isinstance(from_address, str):
+        raise ValueError("From address is required and must be a non-empty string")
+    
+    # Clean and validate email addresses
+    def clean_email_list(email_list: List[str], list_name: str) -> List[str]:
+        """Clean and validate a list of email addresses."""
+        if not email_list:
+            return []
+        
+        cleaned = []
+        for email in email_list:
+            if email and isinstance(email, str):
+                email_clean = email.strip()
+                if email_clean and is_valid_email(email_clean):
+                    cleaned.append(email_clean)
+                else:
+                    log_and_print("warning", f"Invalid {list_name} email skipped: {email_clean}")
+            
+        return cleaned
+    
+    # Clean all recipient lists
+    recipients = clean_email_list(recipients, "TO")
+    cc_recipients = clean_email_list(cc_recipients, "CC")
+    bcc_recipients = clean_email_list(bcc_recipients, "BCC")
+    
+    # Re-validate after cleaning
+    total_valid_recipients = len(recipients) + len(cc_recipients) + len(bcc_recipients)
+    if total_valid_recipients == 0:
+        raise ValueError("No valid email addresses found in recipient lists")
+    
+    try:
+        # Process HTML content and handle embedded images
+        embedded_images = []
+        processed_body_html = body_html
+        
+        if base_folder and isinstance(base_folder, Path) and base_folder.exists():
+            try:
+                processed_body_html, embedded_images = embed_images_in_html(body_html, base_folder)
+                if embedded_images:
+                    log_and_print("info", f"Successfully embedded {len(embedded_images)} image(s)")
+            except Exception as e:
+                log_and_print("warning", f"Image embedding failed: {e}. Continuing with original HTML.")
+                processed_body_html = body_html
+                embedded_images = []
+        
+        # Determine message structure based on content
+        if embedded_images:
+            # Use 'related' multipart for embedded images
+            msg = MIMEMultipart('related')
+            log_and_print("info", "Using 'related' multipart structure for embedded images")
+        else:
+            # Use 'mixed' multipart for attachments
+            msg = MIMEMultipart('mixed')
+            log_and_print("info", "Using 'mixed' multipart structure")
+        
+        # Set message headers with proper encoding
+        try:
+            msg['From'] = from_address
+            msg['Subject'] = subject
+            
+            # Handle TO recipients
+            if recipients:
+                # Limit header length to prevent issues with long recipient lists
+                if len(recipients) <= 50:  # Reasonable limit for TO header
+                    msg['To'] = ', '.join(recipients)
+                else:
+                    # For very large lists, just show count in header
+                    msg['To'] = f"undisclosed-recipients: {len(recipients)} recipients;"
+                    log_and_print("info", f"Large TO list ({len(recipients)} recipients) - using undisclosed format")
+            
+            # Handle CC recipients
+            if cc_recipients:
+                if len(cc_recipients) <= 50:
+                    msg['Cc'] = ', '.join(cc_recipients)
+                    log_and_print("info", f"CC: {len(cc_recipients)} recipient(s)")
+                else:
+                    msg['Cc'] = f"undisclosed-recipients: {len(cc_recipients)} cc-recipients;"
+                    log_and_print("info", f"Large CC list ({len(cc_recipients)} recipients) - using undisclosed format")
+            
+            # Note: BCC headers are intentionally NOT added to prevent disclosure
+            if bcc_recipients:
+                log_and_print("info", f"BCC: {len(bcc_recipients)} recipient(s) (hidden from headers)")
+            
+        except Exception as e:
+            log_and_print("error", f"Error setting email headers: {e}")
+            raise
+        
+        # Create HTML content structure
+        try:
+            if embedded_images:
+                # Create alternative multipart for HTML + embedded images
+                msg_alternative = MIMEMultipart('alternative')
+                msg.attach(msg_alternative)
+                
+                # Add HTML part
+                html_part = MIMEText(processed_body_html, 'html', 'utf-8')
+                msg_alternative.attach(html_part)
+                
+                # Add embedded images to main message
+                for img in embedded_images:
+                    msg.attach(img)
+                    
+                log_and_print("info", "Added HTML content with embedded images")
+            else:
+                # Simple HTML content without embedded images
+                html_part = MIMEText(processed_body_html, 'html', 'utf-8')
+                msg.attach(html_part)
+                log_and_print("info", "Added HTML content")
+                
+        except Exception as e:
+            log_and_print("error", f"Error creating HTML content: {e}")
+            raise
+        
+        # Add attachments if folder exists and contains files
+        if attachment_folder and isinstance(attachment_folder, Path):
+            try:
+                attachments_added = add_attachments_enhanced(msg, attachment_folder)
+                if attachments_added > 0:
+                    log_and_print("info", f"Successfully added {attachments_added} attachment(s)")
+                else:
+                    log_and_print("info", "No attachments to add")
+            except Exception as e:
+                log_and_print("warning", f"Error adding attachments: {e}. Email will be sent without attachments.")
+        
+        # Final validation
+        if not msg.get_payload():
+            raise ValueError("Email message has no content")
+        
+        # Log final email structure
+        log_and_print("info", f"Email created successfully:")
+        log_and_print("info", f"  - TO: {len(recipients)} recipients")
+        log_and_print("info", f"  - CC: {len(cc_recipients)} recipients") 
+        log_and_print("info", f"  - BCC: {len(bcc_recipients)} recipients")
+        log_and_print("info", f"  - Embedded images: {len(embedded_images)}")
+        log_and_print("info", f"  - Subject: {subject[:50]}{'...' if len(subject) > 50 else ''}")
+        
+        return msg
+        
+    except Exception as e:
+        log_and_print("error", f"Failed to create email message: {e}")
+        raise
+
+
+def add_attachments_enhanced(msg: MIMEMultipart, attachment_folder: Path) -> int:
+    """
+    Enhanced attachment handling with better error recovery and file type support.
+    
+    Args:
+        msg: Email message to attach files to
+        attachment_folder: Path to folder containing attachments
+        
+    Returns:
+        int: Number of attachments successfully added
+    """
+    if not attachment_folder or not attachment_folder.exists():
+        return 0
+    
+    if not attachment_folder.is_dir():
+        log_and_print("warning", f"Attachment path is not a directory: {attachment_folder}")
+        return 0
+    
+    attachments_added = 0
+    total_size = 0
+    max_single_file_size = 10 * 1024 * 1024  # 10MB per file
+    max_total_size = 25 * 1024 * 1024        # 25MB total
+    
+    # Get all files and sort for consistent ordering
+    try:
+        attachment_files = [f for f in attachment_folder.iterdir() 
+                          if f.is_file() and not f.name.startswith('.')]
+        attachment_files.sort(key=lambda x: x.name.lower())
+    except Exception as e:
+        log_and_print("error", f"Error reading attachment folder: {e}")
+        return 0
+    
+    if not attachment_files:
+        log_and_print("info", "Attachment folder is empty")
+        return 0
+    
+    for file_path in attachment_files:
+        try:
+            # Check file size
+            file_size = file_path.stat().st_size
+            
+            if file_size > max_single_file_size:
+                log_and_print("warning", f"File too large, skipping: {file_path.name} ({file_size / 1024 / 1024:.1f}MB)")
+                continue
+            
+            if total_size + file_size > max_total_size:
+                log_and_print("warning", f"Total attachment size limit reached. Skipping remaining files.")
+                break
+            
+            # Determine MIME type with better fallbacks
+            ctype, encoding = mimetypes.guess_type(str(file_path))
+            if ctype is None or encoding is not None:
+                ctype = 'application/octet-stream'
+            
+            try:
+                maintype, subtype = ctype.split('/', 1)
+            except ValueError:
+                maintype, subtype = 'application', 'octet-stream'
+            
+            # Read file content
+            try:
+                with open(file_path, 'rb') as fp:
+                    file_data = fp.read()
+            except Exception as e:
+                log_and_print("error", f"Cannot read file {file_path.name}: {e}")
+                continue
+            
+            # Create attachment
+            attachment = MIMEBase(maintype, subtype)
+            attachment.set_payload(file_data)
+            encoders.encode_base64(attachment)
+            
+            # Sanitize filename for email safety
+            safe_filename = sanitize_filename_enhanced(file_path.name)
+            
+            # Add headers
+            attachment.add_header(
+                'Content-Disposition',
+                'attachment',
+                filename=safe_filename
+            )
+            
+            # Optional: Add Content-ID for potential inline reference
+            attachment.add_header('Content-ID', f'<attachment_{attachments_added}>')
+            
+            # Attach to message
+            msg.attach(attachment)
+            attachments_added += 1
+            total_size += file_size
+            
+            log_and_print("info", f"Attached: {file_path.name} ({file_size / 1024:.1f}KB, {ctype})")
+            
+        except Exception as e:
+            log_and_print("error", f"Failed to attach {file_path.name}: {e}")
+            continue
+    
+    if attachments_added > 0:
+        log_and_print("info", f"Total attachments: {attachments_added} files ({total_size / 1024 / 1024:.2f}MB)")
+    
+    return attachments_added
+
+
+def sanitize_filename_enhanced(filename: str) -> str:
+    """
+    Enhanced filename sanitization for email attachments.
+    
+    Args:
+        filename: Original filename
+        
+    Returns:
+        str: Sanitized filename safe for email transmission
+    """
+    if not filename:
+        return "attachment"
+    
+    # Keep original extension if possible
+    name_part, ext_part = os.path.splitext(filename)
+    
+    # Remove or replace problematic characters
+    # Keep alphanumeric, spaces, dots, hyphens, underscores
+    safe_name = re.sub(r'[^\w\s.-]', '_', name_part)
+    safe_ext = re.sub(r'[^\w.-]', '', ext_part)
+    
+    # Clean up multiple spaces/underscores
+    safe_name = re.sub(r'[\s_]+', '_', safe_name.strip())
+    
+    # Ensure reasonable length
+    if len(safe_name) > 50:
+        safe_name = safe_name[:50]
+    
+    # Ensure we have a valid name
+    if not safe_name:
+        safe_name = "attachment"
+    
+    return safe_name + safe_ext
+
+
+def validate_email_content(subject: str, body_html: str) -> Tuple[bool, List[str]]:
+    """
+    Validate email content for common issues.
+    
+    Args:
+        subject: Email subject line
+        body_html: HTML body content
+        
+    Returns:
+        Tuple[bool, List[str]]: (is_valid, list_of_warnings)
+    """
+    warnings = []
+    
+    # Subject validation
+    if len(subject) > 998:  # RFC 5322 limit
+        warnings.append(f"Subject line very long ({len(subject)} chars) - may be truncated")
+    
+    if not subject.strip():
+        warnings.append("Subject line is empty")
+    
+    # Check for suspicious subject patterns
+    spam_indicators = ['urgent', 'act now', 'limited time', 'click here', '$$$']
+    subject_lower = subject.lower()
+    spam_found = [indicator for indicator in spam_indicators if indicator in subject_lower]
+    if spam_found:
+        warnings.append(f"Subject contains potential spam indicators: {', '.join(spam_found)}")
+    
+    # Body validation
+    if len(body_html) > 100000:  # 100KB
+        warnings.append(f"Email body is very large ({len(body_html)/1024:.1f}KB) - may cause delivery issues")
+    
+    if not body_html.strip():
+        warnings.append("Email body is empty")
+    
+    # Check for basic HTML structure
+    if '<html>' not in body_html.lower() and '<body>' not in body_html.lower():
+        warnings.append("Email body lacks basic HTML structure - may not display properly")
+    
+    # Check for unclosed HTML tags (basic check)
+    open_tags = len(re.findall(r'<[^/][^>]*>', body_html))
+    close_tags = len(re.findall(r'</[^>]*>', body_html))
+    if abs(open_tags - close_tags) > 5:  # Allow some variance for self-closing tags
+        warnings.append("Potential HTML tag mismatch - email may not display properly")
+    
+    return len(warnings) == 0, warnings
+
+
+
+
+
+
+def matches_filter_conditions(row: Dict, filters: List[str]) -> bool:
+    """
+    Enhanced filter matching with improved performance, error handling, and type safety.
+    
+    Args:
+        row: Dictionary representing a CSV row with field names as keys
+        filters: List of filter condition strings
+        
+    Returns:
+        bool: True if row matches any filter condition (OR logic between lines, AND within lines)
+    """
+    if not filters:
+        return True  # No filters means include all
+    
+    # Pre-compile regex patterns for better performance
+    _regex_cache = getattr(matches_filter_conditions, '_regex_cache', {})
+    if not hasattr(matches_filter_conditions, '_regex_cache'):
+        matches_filter_conditions._regex_cache = {}
+    
+    def get_compiled_regex(pattern: str, cache_key: str):
+        """Get compiled regex from cache or compile and cache it."""
+        if cache_key not in _regex_cache:
+            try:
+                _regex_cache[cache_key] = re.compile(pattern, re.IGNORECASE)
+            except re.error as e:
+                log_and_print("error", f"Invalid regex pattern '{pattern}': {e}")
+                return None
+        return _regex_cache[cache_key]
+    
+    def normalize_value(value) -> str:
+        """Normalize value to string and handle None/empty cases."""
+        if value is None:
+            return ""
+        return str(value).strip()
+    
+    def matches_exact(text: str, pattern: str) -> bool:
+        """Exact string match (case-insensitive)."""
+        return text.lower() == pattern.lower()
+    
+    def matches_not_equal(text: str, pattern: str) -> bool:
+        """Not equal match (case-insensitive)."""
+        return text.lower() != pattern.lower()
+    
+    def matches_regex(text: str, pattern: str) -> bool:
+        """Regex match with caching."""
+        cache_key = f"regex_{pattern}"
+        compiled_regex = get_compiled_regex(pattern, cache_key)
+        if compiled_regex is None:
+            return False  # Invalid regex treated as no match
+        return bool(compiled_regex.search(text))
+    
+    def matches_regex_not(text: str, pattern: str) -> bool:
+        """Regex not match with caching."""
+        cache_key = f"regex_{pattern}"
+        compiled_regex = get_compiled_regex(pattern, cache_key)
+        if compiled_regex is None:
+            return True  # Invalid regex treated as match for NOT operation
+        return not bool(compiled_regex.search(text))
+    
+    def matches_wildcard(text: str, pattern: str) -> bool:
+        """Enhanced wildcard match using fnmatch (case-insensitive)."""
+        try:
+            return fnmatch.fnmatch(text.lower(), pattern.lower())
+        except Exception:
+            return False
+    
+    def parse_condition(condition: str) -> Tuple[str, str, str]:
+        """
+        Parse a condition string into field, operator, and value.
+        
+        Returns:
+            Tuple[field_name, operator, value] or (None, '*', condition) for simple wildcard
+        """
+        condition = condition.strip()
+        
+        # Define operators in order of precedence (longer patterns first)
+        operators = [
+            ('=~', '=~'),  # Regex match
+            ('!~', '!~'),  # Regex not match  
+            ('!=', '!='),  # Not equal
+            ('=', '=')     # Equal (must be last to avoid conflicts)
+        ]
+        
+        for op_pattern, op_type in operators:
+            if op_pattern in condition:
+                parts = condition.split(op_pattern, 1)
+                if len(parts) == 2:
+                    key = parts[0].strip()
+                    value = parts[1].strip().strip('"\'')  # Remove quotes
+                    
+                    # Validate key is not empty
+                    if not key:
+                        log_and_print("warning", f"Empty field name in condition: {condition}")
+                        return None, None, None
+                    
+                    # For '=' operator, check if value contains wildcards
+                    if op_type == '=' and any(char in value for char in ['*', '?', '[']):
+                        return key, '*', value  # Treat as wildcard
+                    
+                    return key, op_type, value
+        
+        # No operator found - treat as simple wildcard search in all values
+        return None, '*', condition
+    
+    def evaluate_condition(key: str, operator: str, value: str, row: Dict) -> bool:
+        """
+        Evaluate a single condition against a row with enhanced error handling.
+        """
+        try:
+            if key is None:
+                # Simple wildcard search in all values (backward compatibility)
+                for row_value in row.values():
+                    normalized_value = normalize_value(row_value)
+                    if normalized_value and matches_wildcard(normalized_value, value):
+                        return True
+                return False
+            
+            # Check if field exists in row
+            if key not in row:
+                log_and_print("warning", f"Field '{key}' not found in row: {list(row.keys())[:5]}...")
+                return False
+            
+            # Get and normalize row value
+            row_value = normalize_value(row[key])
+            
+            # Handle empty values
+            if not row_value and value:
+                # Only '!=' and '!~' can match against empty values
+                return operator in ['!=', '!~']
+            elif not value:
+                # Empty pattern only matches empty values for '=' and '=~'
+                return (not row_value) if operator in ['=', '=~'] else bool(row_value)
+            
+            # Apply the appropriate matching function
+            if operator == '=':
+                return matches_exact(row_value, value)
+            elif operator == '!=':
+                return matches_not_equal(row_value, value)
+            elif operator == '=~':
+                return matches_regex(row_value, value)
+            elif operator == '!~':
+                return matches_regex_not(row_value, value)
+            elif operator == '*':
+                return matches_wildcard(row_value, value)
+            else:
+                log_and_print("warning", f"Unknown operator '{operator}' in condition")
+                return False
+                
+        except Exception as e:
+            log_and_print("error", f"Error evaluating condition '{key} {operator} {value}': {e}")
+            return False
+    
+    # Process each filter line (OR logic between lines)
+    for line_num, filter_line in enumerate(filters, 1):
+        filter_line = filter_line.strip()
+        
+        # Skip empty lines and comments
+        if not filter_line or filter_line.startswith('#'):
+            continue
+        
+        # Split the line into individual AND conditions
+        and_conditions = [cond.strip() for cond in filter_line.split(',') if cond.strip()]
+        
+        if not and_conditions:
+            continue  # Skip lines with no valid conditions
+        
+        # Check if ALL conditions in this line match (AND logic within line)
+        line_matches = True
+        
+        for condition in and_conditions:
+            try:
+                key, operator, value = parse_condition(condition)
+                
+                # Skip invalid conditions
+                if operator is None:
+                    log_and_print("warning", f"Line {line_num}: Invalid condition format '{condition}'")
+                    line_matches = False
+                    break
+                
+                # Evaluate the condition
+                if not evaluate_condition(key, operator, value, row):
+                    line_matches = False
+                    break  # This AND condition failed
+                    
+            except Exception as e:
+                log_and_print("error", f"Line {line_num}: Error parsing condition '{condition}': {e}")
+                line_matches = False
+                break
+        
+        # If this line matched completely (all AND conditions passed), return True
+        if line_matches:
+            return True
+    
+    # None of the OR conditions matched
+    return False
+
+
+# Optional: Clear regex cache function for memory management
+def clear_filter_regex_cache():
+    """Clear the regex pattern cache to free memory."""
+    if hasattr(matches_filter_conditions, '_regex_cache'):
+        matches_filter_conditions._regex_cache.clear()
+        log_and_print("info", "Filter regex cache cleared")   
+    
+    
+    
+    
+
+def validate_filter_syntax(filters: List[str], available_fields: Set[str] = None) -> Tuple[bool, List[str]]:
+    """
+    """
+    errors = []
+    
+    for i, filter_line in enumerate(filters, 1):
+        filter_line = filter_line.strip()
+        
+        # Skip comments and empty lines
+        if not filter_line or filter_line.startswith('#'):
+            continue
+        
+        # Split into AND conditions
+        and_conditions = [condition.strip() for condition in filter_line.split(',')]
+        
+        for condition in and_conditions:
+            if not condition:
+                continue
+            
+            # Check for valid operators
+            valid_operators = ['=~', '!~', '!=', '=']
+            has_valid_operator = False
+            field_name = None
+            
+            for op in valid_operators:
+                if op in condition:
+                    has_valid_operator = True
+                    parts = condition.split(op, 1)
+                    if len(parts) != 2:
+                        errors.append(f"Line {i}: Invalid condition syntax '{condition}'")
+                        break
+                    
+                    field_name, value = parts[0].strip(), parts[1].strip()
+                    
+                    if not field_name:
+                        errors.append(f"Line {i}: Empty field name in '{condition}'")
+                    
+                    if not value:
+                        errors.append(f"Line {i}: Empty value in '{condition}'")
+                    
+                    # NEW: Check if field exists in available fields
+                    if available_fields and field_name and field_name not in available_fields:
+                        errors.append(f"Line {i}: Field '{field_name}' not found in inventory.csv headers")
+                    
+                    # Validate regex patterns for regex operators
+                    if op in ['=~', '!~']:
+                        value_clean = value.strip('"\'')
+                        try:
+                            re.compile(value_clean)
+                        except re.error as e:
+                            errors.append(f"Line {i}: Invalid regex pattern '{value_clean}': {e}")
+                    
+                    break
+            
+            if not has_valid_operator:
+                # Check if it's a simple wildcard pattern (backward compatibility)
+                if not ('*' in condition or '?' in condition or '[' in condition):
+                    errors.append(f"Line {i}: No valid operator found in '{condition}'. Use =, !=, =~, !~, or wildcards (*,?,[])")
+    
+    return len(errors) == 0, errors
+
+   
+
+def apply_filter_logic(filters: List[str], inventory_path: Path) -> List[str]:
+    """
+    """
+    filtered_recipients = []
+    
+    if not inventory_path.exists():
+        log_and_print("error", f"Inventory file not found: {inventory_path}")
+        return filtered_recipients
+    
+    # Read available fields from inventory
+    try:
+        with open(inventory_path, mode="r", newline="", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            available_fields = set(reader.fieldnames or [])
+    except Exception as exc:
+        log_and_print("error", f"Error reading inventory headers: {exc}")
+        return filtered_recipients
+    
+    # Validate filter syntax WITH field name checking
+    is_valid, errors = validate_filter_syntax(filters, available_fields)
+    if not is_valid:
+        log_and_print("error", "Filter syntax/field validation failed:")
+        for error in errors:
+            log_and_print("error", f"  {error}")
+        print_filter_syntax_help()
+        log_and_print("info", f"Available fields in inventory.csv: {', '.join(sorted(available_fields))}")
+        return filtered_recipients
+    
+    # Count total non-comment filter lines for logging
+    active_filters = [f.strip() for f in filters if f.strip() and not f.strip().startswith('#')]
+    if not active_filters:
+        log_and_print("warning", "No active filter conditions found (only comments/empty lines)")
+        return filtered_recipients
+    
+    log_and_print("info", f"Applying {len(active_filters)} filter condition(s) with PromQL-style syntax")
+    
+    # Log filter conditions for debugging
+    for i, filter_line in enumerate(active_filters, 1):
+        log_and_print("info", f"Filter {i}: {filter_line}")
+    
+    try:
+        matched_rows = 0
+        total_rows = 0
+        
+        with open(inventory_path, mode="r", newline="", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            
+            for row in reader:
+                total_rows += 1
+                
+                if matches_filter_conditions(row, filters):
+                    matched_rows += 1
+                    
+                    if 'email' in row:
+                        # Extract and validate each email from semicolon-separated string
+                        email_string = row['email']
+                        individual_emails = extract_emails(email_string, ";")
+                        
+                        for email in individual_emails:
+                            if is_valid_email(email):
+                                filtered_recipients.append(email)
+                            else:
+                                log_and_print("warning", f"Invalid email skipped: {email}")
+                        
+                        if not individual_emails:
+                            log_and_print("warning", f"Row has empty email field: {row}")
+                    else:
+                        log_and_print("warning", f"Row missing email column: {row}")
+        
+        # Deduplicate filtered recipients
+        original_count = len(filtered_recipients)
+        filtered_recipients = deduplicate_emails(filtered_recipients)
+        
+        if original_count != len(filtered_recipients):
+            log_and_print("info", f"Removed {original_count - len(filtered_recipients)} duplicate emails from filter results")
+        
+        # Enhanced logging with statistics
+        log_and_print("info", f"Filter processing complete:")
+        log_and_print("info", f"  - Total rows in inventory: {total_rows}")
+        log_and_print("info", f"  - Rows matching filters: {matched_rows}")
+        log_and_print("info", f"  - Unique email recipients: {len(filtered_recipients)}")
+        
+        if matched_rows > 0:
+            match_percentage = (matched_rows / total_rows) * 100
+            log_and_print("info", f"  - Match rate: {match_percentage:.1f}%")
+        
+    except Exception as exc:
+        log_and_print("error", f"Error applying filter logic: {exc}")
+        log_and_print("error", f"Make sure inventory.csv has proper headers and format")
+    
+    return filtered_recipients
+
+
+    
+def substitute_placeholders(template: str, field_values: Dict[str, str]) -> str:
+    """
+    """
+    result = template
+    substitutions_made = 0
+    
+    for field, value in field_values.items():
+        placeholder = f"{{{field}}}"
+        
+        if placeholder in result:
+            # Clean up comma-separated values for better readability
+            if value and ',' in value:
+                # For comma-separated values, format them nicely
+                values = [v.strip() for v in value.split(',') if v.strip()]
+                if len(values) == 1:
+                    clean_value = values[0]
+                elif len(values) == 2:
+                    clean_value = f"{values[0]} and {values[1]}"
+                elif len(values) <= 5:
+                    # For small lists, show all with proper formatting
+                    clean_value = f"{', '.join(values[:-1])}, and {values[-1]}"
+                else:
+                    # For large lists, show first few and add "and X more"
+                    remaining = len(values) - 3
+                    clean_value = f"{', '.join(values[:3])}, and {remaining} more"
+            else:
+                clean_value = value if value else f"{{{field}}}" # ← HERE'S THE PROBLEM
+            
+            # Perform the substitution
+            result = result.replace(placeholder, clean_value)
+            substitutions_made += 1
+    
+    # Log substitution details if any were made
+    if substitutions_made > 0:
+        log_and_print("info", f"Template substitution: {substitutions_made} placeholder(s) replaced")
+    
+    return result
+
+
+
+def get_recipients_for_single_mode(base_folder: Path, dry_run: bool) -> Tuple[List[str], List[str], List[str], int, int, int]:
+    """
+    Get recipients for single mode operation with enhanced error handling and logging.
+    
+    Args:
+        base_folder: Base folder path containing recipient files
+        dry_run: If True, returns approvers instead of actual recipients
+        
+    Returns:
+        Tuple of (final_recipients, final_cc_recipients, final_bcc_recipients, 
+                 original_recipients_count, original_cc_count, original_bcc_count)
+    """
+    
+    # File paths
+    to_file_path = base_folder / "to.txt"
+    additional_to_file_path = base_folder / "additional_to.txt"
+    filter_file_path = base_folder / "filter.txt"
+    cc_file_path = base_folder / "cc.txt"
+    bcc_file_path = base_folder / "bcc.txt"
+    
+    # Read CC and BCC recipients first (used in both modes)
+    cc_emails = read_recipients(cc_file_path)
+    bcc_emails = read_recipients(bcc_file_path)
+    original_cc_count = len(deduplicate_emails(cc_emails))
+    original_bcc_count = len(deduplicate_emails(bcc_emails))
+    
+    if cc_emails:
+        log_and_print("info", f"Loaded {len(cc_emails)} CC recipients from cc.txt")
+    if bcc_emails:
+        log_and_print("info", f"Loaded {len(bcc_emails)} BCC recipients from bcc.txt")
+    
+    # Handle dry-run mode
+    if dry_run:
+        return _handle_dry_run_mode(
+            base_folder, to_file_path, additional_to_file_path, filter_file_path,
+            cc_emails, bcc_emails, original_cc_count, original_bcc_count
+        )
+    
+    # Handle live mode
+    return _handle_live_mode(
+        base_folder, to_file_path, additional_to_file_path, filter_file_path,
+        cc_emails, bcc_emails, original_cc_count, original_bcc_count
+    )
+
+
+def _handle_dry_run_mode(base_folder: Path, to_file_path: Path, additional_to_file_path: Path, 
+                        filter_file_path: Path, cc_emails: List[str], bcc_emails: List[str],
+                        original_cc_count: int, original_bcc_count: int) -> Tuple[List[str], List[str], List[str], int, int, int]:
+    """Handle dry-run mode recipient processing."""
+    
+    # Get approver emails for dry-run
+    approver_emails = read_recipients(base_folder / "approver.txt")
+    final_recipients = deduplicate_emails(approver_emails)
+    
+    if not final_recipients:
+        log_and_print("error", "No valid approver emails found in approver.txt for dry-run mode")
+        sys.exit(1)
+    
+    # No CC/BCC in dry-run mode
+    final_cc_recipients = []
+    final_bcc_recipients = []
+    
+    # Calculate what would be the original recipients for display
+    original_recipients = _calculate_original_recipients(
+        base_folder, to_file_path, additional_to_file_path, filter_file_path
+    )
+    
+    original_recipients_count = len(deduplicate_emails(original_recipients))
+    total_original = original_recipients_count + original_cc_count + original_bcc_count
+    
+    log_and_print("draft", f"DRY-RUN MODE: Will send to {len(final_recipients)} approvers instead of {total_original} actual recipients")
+    log_and_print("draft", f"Original breakdown - TO: {original_recipients_count}, CC: {original_cc_count}, BCC: {original_bcc_count}")
+    
+    return (final_recipients, final_cc_recipients, final_bcc_recipients, 
+            original_recipients_count, original_cc_count, original_bcc_count)
+
+
+def _handle_live_mode(base_folder: Path, to_file_path: Path, additional_to_file_path: Path,
+                     filter_file_path: Path, cc_emails: List[str], bcc_emails: List[str],
+                     original_cc_count: int, original_bcc_count: int) -> Tuple[List[str], List[str], List[str], int, int, int]:
+    """Handle live mode recipient processing."""
+    
+    final_cc_recipients = deduplicate_emails(cc_emails)
+    final_bcc_recipients = deduplicate_emails(bcc_emails)
+    
+    # Determine TO recipients using priority system
+    recipients = _get_to_recipients_with_priority(
+        base_folder, to_file_path, additional_to_file_path, filter_file_path
+    )
+    
+    # Validate that we have at least one recipient source
+    if not recipients and not final_cc_recipients and not final_bcc_recipients:
+        log_and_print("error", "No valid recipient source found (no TO, CC, or BCC recipients)")
+        sys.exit(1)
+    
+    final_recipients = deduplicate_emails(recipients)
+    original_recipients_count = len(final_recipients)
+    
+    # Log final recipient summary
+    if final_recipients:
+        log_and_print("info", f"Final TO recipients: {len(final_recipients)}")
+    else:
+        log_and_print("info", "No TO recipients found, but CC/BCC recipients available")
+    
+    return (final_recipients, final_cc_recipients, final_bcc_recipients, 
+            original_recipients_count, original_cc_count, original_bcc_count)
+
+
+def _calculate_original_recipients(base_folder: Path, to_file_path: Path, 
+                                 additional_to_file_path: Path, filter_file_path: Path) -> List[str]:
+    """Calculate what the original recipients would be for dry-run display purposes."""
+    
+    # Check if to.txt already exists
+    if to_file_path.is_file():
+        _show_existing_to_file_disclaimer(to_file_path)
+        recipients = read_recipients(to_file_path)
+        log_and_print("info", f"DRY-RUN: Using existing to.txt with {len(recipients)} recipients")
+        
+        # Merge with additional_to.txt if it exists
+        if additional_to_file_path.is_file():
+            additional_recipients = read_recipients(additional_to_file_path)
+            if additional_recipients:
+                original_count = len(recipients)
+                recipients = merge_recipients(recipients, additional_recipients)
+                added_count = len(recipients) - original_count
+                log_and_print("info", f"DRY-RUN: Would merge {len(additional_recipients)} additional recipients")
+                if added_count > 0:
+                    log_and_print("info", f"DRY-RUN: Would add {added_count} new recipients (total: {len(recipients)})")
+                else:
+                    log_and_print("info", f"DRY-RUN: No new recipients to add (all already exist)")
+        
+        return recipients
+    
+    # Generate recipients using filter logic
+    if filter_file_path.is_file() and INVENTORY_PATH.is_file():
+        filters = read_file(filter_file_path).splitlines()
+        recipients = apply_filter_logic(filters, INVENTORY_PATH)
+        log_and_print("info", f"DRY-RUN: Filter logic would generate {len(recipients)} recipients")
+        
+        # Merge with additional_to.txt if it exists
+        if additional_to_file_path.is_file():
+            recipients = _merge_additional_recipients(recipients, additional_to_file_path, "DRY-RUN")
+        
+        # Create to.txt for future reference
+        if recipients:
+            write_recipients_to_file(to_file_path, recipients)
+            log_and_print("info", f"DRY-RUN: Created to.txt with {len(recipients)} recipients")
+        
+        return recipients
+    
+    # Use only additional_to.txt if available
+    if additional_to_file_path.is_file():
+        recipients = read_recipients(additional_to_file_path)
+        if recipients:
+            log_and_print("info", f"DRY-RUN: Would use {len(recipients)} recipients from additional_to.txt only")
+            write_recipients_to_file(to_file_path, recipients)
+            log_and_print("info", f"DRY-RUN: Created to.txt from additional_to.txt")
+        else:
+            log_and_print("warning", "Found additional_to.txt but it contains no valid recipients")
+        return recipients
+    
+    # No recipient sources found
+    log_and_print("warning", "DRY-RUN: No TO recipient sources found")
+    return []
+
+
+def _get_to_recipients_with_priority(base_folder: Path, to_file_path: Path, 
+                                   additional_to_file_path: Path, filter_file_path: Path) -> List[str]:
+    """Get TO recipients using priority system: to.txt > filter.txt > additional_to.txt"""
+    
+    # Priority 1: Use existing to.txt
+    if to_file_path.is_file():
+        recipients = read_recipients(to_file_path)
+        log_and_print("info", f"Loaded {len(recipients)} recipients from to.txt")
+        
+        # Merge with additional_to.txt if it exists
+        if additional_to_file_path.is_file():
+            recipients = _merge_additional_recipients(recipients, additional_to_file_path, "LIVE")
+        
+        return recipients
+    
+    # Priority 2: Generate from filter logic
+    if filter_file_path.is_file() and INVENTORY_PATH.is_file():
+        filters = read_file(filter_file_path).splitlines()
+        recipients = apply_filter_logic(filters, INVENTORY_PATH)
+        log_and_print("info", f"Filter logic generated {len(recipients)} recipients")
+        
+        # Merge with additional_to.txt if it exists
+        if additional_to_file_path.is_file():
+            recipients = _merge_additional_recipients(recipients, additional_to_file_path, "LIVE")
+        
+        # Save merged results to to.txt for future reference
+        if recipients:
+            write_recipients_to_file(to_file_path, recipients)
+            source_desc = "filter + additional" if additional_to_file_path.is_file() and read_recipients(additional_to_file_path) else "filter"
+            log_and_print("file", f"Created to.txt with {len(recipients)} {source_desc} recipients")
+        
+        return recipients
+    
+    # Priority 3: Use only additional_to.txt
+    if additional_to_file_path.is_file():
+        recipients = read_recipients(additional_to_file_path)
+        if recipients:
+            log_and_print("info", f"No to.txt or filter.txt found - using {len(recipients)} recipients from additional_to.txt only")
+            write_recipients_to_file(to_file_path, recipients)
+            log_and_print("file", f"Created to.txt from additional_to.txt with {len(recipients)} recipients")
+        else:
+            log_and_print("warning", "Found additional_to.txt but it contains no valid recipients")
+        return recipients
+    
+    # No TO recipient sources found
+    log_and_print("info", "No TO recipient sources found")
+    return []
+
+
+def _merge_additional_recipients(base_recipients: List[str], additional_to_file_path: Path, mode_prefix: str) -> List[str]:
+    """Merge additional recipients with base recipients and log the operation."""
+    
+    additional_recipients = read_recipients(additional_to_file_path)
+    if not additional_recipients:
+        log_and_print("info", f"{mode_prefix}: Found empty additional_to.txt - no recipients to merge")
+        return base_recipients
+    
+    original_count = len(base_recipients)
+    merged_recipients = merge_recipients(base_recipients, additional_recipients)
+    added_count = len(merged_recipients) - original_count
+    
+    log_and_print("info", f"{mode_prefix}: Found additional_to.txt with {len(additional_recipients)} recipients")
+    
+    if added_count > 0:
+        log_and_print("info", f"{mode_prefix}: Added {added_count} new recipients from additional_to.txt")
+        log_and_print("info", f"{mode_prefix}: Total recipients after merge: {len(merged_recipients)} (was {original_count})")
+    else:
+        log_and_print("info", f"{mode_prefix}: No new recipients added - all {len(additional_recipients)} already exist")
+        log_and_print("info", f"{mode_prefix}: Total recipients remain: {len(merged_recipients)}")
+    
+    return merged_recipients
+
+
+def _show_existing_to_file_disclaimer(to_file_path: Path) -> None:
+    """Show disclaimer about existing to.txt in dry-run mode."""
+    
+    recipient_count = len(read_recipients(to_file_path))
+    
+    print()
+    print(f"\033[1m\033[91m{'=' * 80}\033[0m")
+    print(f"\033[1m\033[91m                            ⚠️  IMPORTANT DISCLAIMER ⚠️\033[0m")
+    print(f"\033[1m\033[91m{'=' * 80}\033[0m")
+    print()
+    print(f"\033[1m\033[93m⚠️  DISCLAIMER: Existing to.txt found - dry-run will NOT overwrite it\033[0m")
+    print(f"\033[1m\033[94m💡 To see fresh filter results, delete to.txt and run dry-run again\033[0m")
+    print(f"\033[1mCurrent to.txt contains {recipient_count} recipients (preserving existing list)\033[0m")
+    print()
+    print(f"\033[1m\033[91m{'=' * 80}\033[0m")
+    print()
+    
+    log_and_print("info", "⚠️  DISCLAIMER: Existing to.txt found - dry-run will NOT overwrite it")
+    log_and_print("info", "💡 To see fresh filter results, delete to.txt and run dry-run again")
+    log_and_print("info", f"Current to.txt contains {recipient_count} recipients (preserving existing list)")
+
+
+
+
+ 
+def extract_field_values_from_matched_rows(filter_line: str, field_names: List[str], inventory_path: Path, base_folder: Path) -> Dict[str, str]:
+    field_values = {field: "" for field in field_names}
+
+    if "dynamic_table" in field_names and "table_rows" not in field_names:
+        field_names.append("table_rows")
+        log_and_print("info", "Auto-added table_rows because dynamic_table was requested")
+
+    local_inventory = base_folder / "field-inventory.csv"
+    actual_inventory = local_inventory if local_inventory.exists() else inventory_path
+    inventory_source = "local field-inventory.csv" if local_inventory.exists() else "global inventory.csv"
+
+    if not actual_inventory.exists():
+        log_and_print("warning", f"Inventory file not found: {actual_inventory}")
+        return field_values
+
+    try:
+        with open(actual_inventory, newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            headers = [h.strip() for h in (reader.fieldnames or [])]
+            matched_rows = []
+
+            for row in reader:
+                cleaned_row = {k.strip(): v.strip() for k, v in row.items() if k}
+                if matches_filter_conditions(cleaned_row, [filter_line]):
+                    matched_rows.append(cleaned_row)
+
+        if not matched_rows:
+            log_and_print("warning", f"No rows matched filter: {filter_line}")
+            return field_values
+
+        # Extract normal substitution fields
+        for field in field_names:
+            if field in headers and not field.endswith("_table_rows") and field != "table_headers":
+                values = set()
+                for row in matched_rows:
+                    val = row.get(field, "").strip()
+                    if val:
+                        values.update([v.strip() for v in val.split(",") if v.strip()])
+                field_values[field] = ",".join(sorted(values))
+
+        # Load separate table field list from table-columns.txt
+        table_columns_file = base_folder / "table-columns.txt"
+        if table_columns_file.exists():
+            table_fields = [line.strip() for line in table_columns_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+            log_and_print("info", f"Using table-columns.txt for dynamic table: {', '.join(table_fields)}")
+        else:
+            table_fields = headers
+            log_and_print("info", f"No table-columns.txt found. Using all headers: {', '.join(table_fields)}")
+
+        def escape(val): return str(val).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        def generate_table_rows(style: str = "default") -> str:
+            rows = ""
+            for i, row in enumerate(matched_rows):
+                bg = "#f9f9f9" if style == "striped" and i % 2 == 0 else "#ffffff"
+                tr_style = f' style="background-color: {bg};"' if style == "striped" else ""
+                rows += f"        <tr{tr_style}>\n"
+                for col in table_fields:
+                    val = escape(row.get(col, ""))
+                    cell_style = ' style="padding: 10px; border: 1px solid #ddd;"' if style != "simple" else ""
+                    rows += f"            <td{cell_style}>{val}</td>\n"
+                rows += "        </tr>\n"
+            return rows.strip()
+
+        def generate_headers() -> str:
+            return "\n".join([
+                f'            <th style="padding: 10px; border: 1px solid #ddd; background-color: #f5f5f5;">{col.replace("_", " ").title()}</th>'
+                for col in table_fields
+            ])
+
+        if "table_rows" in field_names:
+            field_values["table_rows"] = generate_table_rows()
+        if "styled_table_rows" in field_names:
+            field_values["styled_table_rows"] = generate_table_rows("striped")
+        if "simple_table_rows" in field_names:
+            field_values["simple_table_rows"] = generate_table_rows("simple")
+        if "csv_table_rows" in field_names:
+            field_values["csv_table_rows"] = "\n".join(
+                " | ".join(row.get(col, "") for col in table_fields)
+                for row in matched_rows
+            ).strip()
+        if "table_headers" in field_names:
+            field_values["table_headers"] = generate_headers()
+        if "dynamic_table" in field_names:
+            field_values["dynamic_table"] = field_values.get("table_rows", "")
+
+        log_and_print("info", f"Generated dynamic table with {len(matched_rows)} rows using {len(table_fields)} columns")
+
+    except Exception as e:
+        log_and_print("error", f"Failed to extract field values: {e}")
+
+    return field_values
+
+
+
+
+def get_recipients_for_multi_mode(base_folder: Path, dry_run: bool = False) -> Tuple[List[Dict], List[str], List[str], int, int, int]:
+    """
+    Get recipients for multi mode operation with enhanced validation and error handling.
+    
+    This function processes multiple filter conditions to create individual email configurations,
+    each with its own recipient list and field substitutions.
+    
+    Args:
+        base_folder: Path to the base folder containing configuration files
+        dry_run: If True, replaces recipients with approvers for testing
+    
+    Returns:
+        Tuple containing:
+        - email_configs: List of email configuration dictionaries
+        - final_cc_recipients: List of CC recipients (empty in dry-run mode)
+        - final_bcc_recipients: List of BCC recipients (empty in dry-run mode)
+        - total_original_recipients_count: Total unique recipients across all filters
+        - original_cc_count: Original CC recipient count
+        - original_bcc_count: Original BCC recipient count
+    
+    Raises:
+        SystemExit: On critical errors that prevent email processing
+    """
+    
+    # === STEP 1: Load and validate filter conditions ===
+    log_and_print("processing", "Loading filter conditions for multi-mode processing...")
+    
+    filter_file_path = base_folder / "filter.txt"
+    if not filter_file_path.exists():
+        log_and_print("error", "filter.txt is required for multi mode but not found")
+        sys.exit(1)
+    
+    try:
+        filter_content = read_file(filter_file_path)
+        if not filter_content.strip():
+            log_and_print("error", "filter.txt is empty")
+            sys.exit(1)
+            
+        # Parse filters and remove comments/empty lines
+        raw_filters = filter_content.splitlines()
+        active_filters = []
+        
+        for line_num, line in enumerate(raw_filters, 1):
+            stripped_line = line.strip()
+            if stripped_line and not stripped_line.startswith('#'):
+                active_filters.append({
+                    'line_number': line_num,
+                    'filter_line': stripped_line,
+                    'original_line': line
+                })
+        
+        if not active_filters:
+            log_and_print("error", "No valid filter conditions found in filter.txt (only comments/empty lines)")
+            sys.exit(1)
+            
+        log_and_print("info", f"Loaded {len(active_filters)} active filter conditions from {len(raw_filters)} total lines")
+        
+    except Exception as exc:
+        log_and_print("error", f"Failed to read filter.txt: {exc}")
+        sys.exit(1)
+    
+    # === STEP 2: Load field names for template substitution ===
+    field_names = []
+    field_file_path = base_folder / "field.txt"
+    
+    if field_file_path.exists():
+        try:
+            field_content = read_file(field_file_path)
+            if field_content.strip():
+                field_names = [line.strip() for line in field_content.splitlines() if line.strip()]
+                log_and_print("info", f"Loaded {len(field_names)} field names for template substitution")
+                log_and_print("info", f"Fields: {', '.join(field_names[:5])}{'...' if len(field_names) > 5 else ''}")
+            else:
+                log_and_print("info", "field.txt found but is empty - no template substitution will be performed")
+        except Exception as exc:
+            log_and_print("warning", f"Error reading field.txt: {exc} - continuing without field substitution")
+    else:
+        log_and_print("info", "No field.txt found - emails will be sent without template substitution")
+    
+    # === STEP 3: Load CC/BCC recipients and preserve original counts ===
+    log_and_print("processing", "Loading CC and BCC recipients...")
+    
+    cc_emails = read_recipients(base_folder / "cc.txt")
+    bcc_emails = read_recipients(base_folder / "bcc.txt")
+    
+    # Store original counts immediately (before any dry-run modifications)
+    original_cc_count = len(deduplicate_emails(cc_emails))
+    original_bcc_count = len(deduplicate_emails(bcc_emails))
+    
+    if cc_emails:
+        log_and_print("info", f"Loaded {len(cc_emails)} CC recipients (will be added to each email)")
+    if bcc_emails:
+        log_and_print("info", f"Loaded {len(bcc_emails)} BCC recipients (will be added to each email)")
+    
+    # === STEP 4: Load additional recipients (once for all filters) ===
+    additional_recipients = []
+    additional_to_file_path = base_folder / "additional_to.txt"
+    
+    if additional_to_file_path.exists():
+        try:
+            additional_recipients = read_recipients(additional_to_file_path)
+            if additional_recipients:
+                log_and_print("info", f"Loaded {len(additional_recipients)} additional recipients (will be added to each filter)")
+            else:
+                log_and_print("info", "Found additional_to.txt but it contains no valid recipients")
+        except Exception as exc:
+            log_and_print("warning", f"Error reading additional_to.txt: {exc} - continuing without additional recipients")
+    
+    # === STEP 5: Process each filter condition ===
+    log_and_print("processing", f"Processing {len(active_filters)} filter conditions...")
+    
+    email_configs = []
+    total_original_recipients_count = 0
+    processing_errors = []
+    
+    for filter_info in active_filters:
+        filter_line = filter_info['filter_line']
+        line_number = filter_info['line_number']
+        
+        log_and_print("processing", f"Processing filter {len(email_configs) + 1}/{len(active_filters)} (line {line_number}): {filter_line}")
+        
+        try:
+            # Get recipients for this specific filter
+            filter_recipients = apply_filter_logic([filter_line], INVENTORY_PATH)
+            
+            if not filter_recipients:
+                log_and_print("warning", f"Filter {len(email_configs) + 1} matched no recipients: {filter_line}")
+                processing_errors.append(f"Line {line_number}: No recipients matched")
+                continue
+            
+            # Deduplicate filter recipients
+            filter_recipients = deduplicate_emails(filter_recipients)
+            log_and_print("info", f"Filter {len(email_configs) + 1}: Found {len(filter_recipients)} unique recipients from inventory")
+            
+            # Merge with additional recipients if available
+            if additional_recipients:
+                original_count = len(filter_recipients)
+                filter_recipients = merge_recipients(filter_recipients, additional_recipients)
+                added_count = len(filter_recipients) - original_count
+                
+                if added_count > 0:
+                    log_and_print("info", f"Filter {len(email_configs) + 1}: Added {added_count} additional recipients (total: {len(filter_recipients)})")
+                else:
+                    log_and_print("info", f"Filter {len(email_configs) + 1}: No new recipients from additional_to.txt (all already matched)")
+            
+            # Store original recipient count before any dry-run modifications
+            original_recipients_count = len(filter_recipients)
+            
+            # Extract field values for template substitution
+            field_values = {}
+            if field_names:
+                log_and_print("info", f"Filter {len(email_configs) + 1}: Extracting field values for template substitution...")
+                
+                try:
+                    field_values = extract_field_values_from_matched_rows(
+                        filter_line, field_names, INVENTORY_PATH, base_folder
+                    )
+                    
+                    # Validate and report field extraction results
+                    extracted_fields = []
+                    empty_fields = []
+                    
+                    for field_name in field_names:
+                        field_value = field_values.get(field_name, "")
+                        if field_value:
+                            # Create display-friendly preview
+                            value_parts = field_value.split(',') if ',' in field_value else [field_value]
+                            value_count = len(value_parts)
+                            
+                            if value_count <= 2:
+                                display_value = field_value
+                            else:
+                                preview = ','.join(value_parts[:2])
+                                display_value = f"{preview}...+{value_count-2} more"
+                            
+                            extracted_fields.append(f"{field_name}=[{display_value}]")
+                        else:
+                            empty_fields.append(field_name)
+                    
+                    if extracted_fields:
+                        log_and_print("info", f"Filter {len(email_configs) + 1}: Extracted {len(extracted_fields)} fields: {', '.join(extracted_fields)}")
+                    
+                    if empty_fields:
+                        log_and_print("warning", f"Filter {len(email_configs) + 1}: No values found for: {', '.join(empty_fields)}")
+                        log_and_print("info", "  Check if these fields exist in inventory and have data in matched rows")
+                    
+                    if not any(field_values.values()):
+                        log_and_print("warning", f"Filter {len(email_configs) + 1}: No field values extracted - template placeholders will remain unchanged")
+                
+                except Exception as exc:
+                    log_and_print("error", f"Filter {len(email_configs) + 1}: Failed to extract field values: {exc}")
+                    processing_errors.append(f"Line {line_number}: Field extraction failed - {exc}")
+                    # Continue with empty field values
+            
+            # Create email configuration
+            email_config = {
+                'filter_line': filter_line,
+                'line_number': line_number,
+                'recipients': filter_recipients.copy(),  # Will be modified for dry-run
+                'original_recipients': filter_recipients.copy(),  # Never modified
+                'original_recipients_count': original_recipients_count,
+                'field_values': field_values,
+                'filter_number': len(email_configs) + 1,
+                'has_field_substitution': bool(field_values and any(field_values.values()))
+            }
+            
+            email_configs.append(email_config)
+            total_original_recipients_count += original_recipients_count
+            
+            log_and_print("success", f"Filter {len(email_configs)}: Ready - {original_recipients_count} recipients, {len(field_values)} field(s)")
+            
+        except Exception as exc:
+            log_and_print("error", f"Filter processing failed for line {line_number}: {exc}")
+            processing_errors.append(f"Line {line_number}: Processing error - {exc}")
+            continue
+    
+    # === STEP 6: Validate processing results ===
+    if not email_configs:
+        log_and_print("error", "No filters generated valid email configurations")
+        if processing_errors:
+            log_and_print("error", "Processing errors encountered:")
+            for error in processing_errors[:5]:  # Show first 5 errors
+                log_and_print("error", f"  {error}")
+            if len(processing_errors) > 5:
+                log_and_print("error", f"  ... and {len(processing_errors) - 5} more errors")
+        sys.exit(1)
+    
+    # Log processing summary
+    log_and_print("info", f"Multi-mode processing summary:")
+    log_and_print("info", f"  - Successful filters: {len(email_configs)}")
+    log_and_print("info", f"  - Failed filters: {len(processing_errors)}")
+    log_and_print("info", f"  - Total unique recipients: {total_original_recipients_count}")
+    log_and_print("info", f"  - Will generate {len(email_configs)} individual emails")
+    
+    if processing_errors:
+        log_and_print("warning", "Some filters had issues (emails will still be sent for successful filters)")
+    
+    # === STEP 7: Handle dry-run mode ===
+    if dry_run:
+        log_and_print("processing", "Dry-run mode: Replacing all recipients with approvers...")
+        
+        approver_emails = read_recipients(base_folder / "approver.txt")
+        if not approver_emails:
+            log_and_print("error", "Dry-run mode requires valid approver emails in approver.txt")
+            sys.exit(1)
+        
+        approver_emails = deduplicate_emails(approver_emails)
+        log_and_print("info", f"Loaded {len(approver_emails)} approvers for dry-run mode")
+        
+        # Save original recipient data before modification
+        original_configs = []
+        for config in email_configs:
+            original_config = config.copy()
+            original_config['recipients'] = config['original_recipients']  # Use preserved original data
+            original_configs.append(original_config)
+        
+        # Replace recipients with approvers for dry-run (keep original_recipients intact)
+        for config in email_configs:
+            config['recipients'] = approver_emails
+        
+        # Save original data for reference
+        save_multi_mode_recipients(base_folder, original_configs, cc_emails, bcc_emails)
+        
+        # Set empty CC/BCC for dry-run
+        final_cc_recipients = []
+        final_bcc_recipients = []
+        
+        log_and_print("draft", f"DRY-RUN: Will send {len(email_configs)} draft emails to {len(approver_emails)} approver(s)")
+        log_and_print("draft", f"Original campaign would target {total_original_recipients_count} recipients across {len(email_configs)} emails")
+        
+    else:
+        # === STEP 8: Handle live mode ===
+        log_and_print("processing", "Live mode: Using actual recipients...")
+        
+        # Use actual CC/BCC recipients
+        final_cc_recipients = deduplicate_emails(cc_emails)
+        final_bcc_recipients = deduplicate_emails(bcc_emails)
+        
+        # Save recipient data for live mode
+        save_multi_mode_recipients(base_folder, email_configs, final_cc_recipients, final_bcc_recipients)
+        
+        log_and_print("info", f"LIVE MODE: Will send {len(email_configs)} emails to {total_original_recipients_count} total recipients")
+        if final_cc_recipients or final_bcc_recipients:
+            cc_bcc_per_email = len(final_cc_recipients) + len(final_bcc_recipients)
+            total_cc_bcc = cc_bcc_per_email * len(email_configs)
+            log_and_print("info", f"Plus {total_cc_bcc} CC/BCC emails ({cc_bcc_per_email} per email × {len(email_configs)} emails)")
+    
+    # === STEP 9: Return results ===
+    return (
+        email_configs,
+        final_cc_recipients, 
+        final_bcc_recipients,
+        total_original_recipients_count,
+        original_cc_count,
+        original_bcc_count
+    )
+
+def save_multi_mode_recipients(base_folder: Path, email_configs: List[Dict], 
+                               cc_recipients: List[str] = None, bcc_recipients: List[str] = None) -> None:
+    """
+    Save comprehensive multi-mode recipient data with enhanced organization and reporting.
+    
+    Creates a structured recipients/ subfolder containing:
+    - Individual filter recipient files with metadata
+    - CC/BCC recipient files  
+    - Comprehensive summary with statistics
+    - Consolidated unique recipient list
+    - JSON metadata for programmatic access
+    
+    Args:
+        base_folder: Campaign base folder path
+        email_configs: List of email configuration dictionaries
+        cc_recipients: Optional list of CC email addresses
+        bcc_recipients: Optional list of BCC email addresses
+    
+    Raises:
+        Exception: Logs errors but continues processing other files
+    """
+    cc_recipients = cc_recipients or []
+    bcc_recipients = bcc_recipients or []
+    
+    if not email_configs:
+        log_and_print("warning", "No email configurations to save")
+        return
+    
+    try:
+        # Create recipients subfolder with timestamp for better organization
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        recipients_folder = base_folder / "recipients"
+        recipients_folder.mkdir(exist_ok=True)
+        
+        log_and_print("backup", f"Creating multi-mode recipient files in {recipients_folder.name}/")
+        
+        # Initialize tracking variables
+        all_unique_recipients = set()
+        filter_summaries = []
+        total_files_created = 0
+        total_recipients_saved = 0
+        failed_operations = []
+        
+        # Process individual filter recipient files
+        log_and_print("processing", f"Processing {len(email_configs)} filter configurations...")
+        
+        for i, config in enumerate(email_configs, 1):
+            filter_line = config.get('filter_line', f'Filter_{i}')
+            recipients = config.get('recipients', [])
+            original_recipients = config.get('original_recipients', recipients)
+            field_values = config.get('field_values', {})
+            original_count = config.get('original_recipients_count', len(recipients))
+            
+            # Create safe filename from filter line
+            safe_filter_name = _create_safe_filename(filter_line, max_length=50)
+            filter_file = recipients_folder / f"filter_{i:03d}_{safe_filter_name}.txt"
+            
+            try:
+                success = _save_individual_filter_file(
+                    filter_file, i, filter_line, recipients, original_recipients, 
+                    field_values, original_count
+                )
+                
+                if success:
+                    total_files_created += 1
+                    total_recipients_saved += len(recipients)
+                    
+                    # Track unique recipients (case-insensitive)
+                    for email in recipients:
+                        all_unique_recipients.add(email.lower())
+                    
+                    # Add to summary with enhanced metadata
+                    filter_summaries.append({
+                        'filter_number': i,
+                        'filter_line': filter_line,
+                        'filename': filter_file.name,
+                        'recipient_count': len(recipients),
+                        'original_recipient_count': original_count,
+                        'field_values': field_values,
+                        'has_field_substitution': bool(field_values and any(field_values.values())),
+                        'unique_values_count': {
+                            field: len(set(value.split(',')) if value else set()) 
+                            for field, value in field_values.items()
+                        } if field_values else {}
+                    })
+                    
+                    log_and_print("file", f"✓ Filter {i}/{len(email_configs)}: {len(recipients)} recipients → {filter_file.name}")
+                else:
+                    failed_operations.append(f"filter_{i}_recipients")
+                    
+            except Exception as exc:
+                error_msg = f"Failed to save recipients for filter {i}: {exc}"
+                log_and_print("error", error_msg)
+                failed_operations.append(f"filter_{i}_recipients")
+        
+        # Save CC recipients with enhanced metadata
+        cc_file_created = _save_recipient_list(
+            recipients_folder / "cc_recipients.txt", 
+            cc_recipients, 
+            "CC Recipients",
+            "These recipients will be CC'd on ALL emails in multi-mode"
+        )
+        if cc_file_created:
+            total_files_created += 1
+        else:
+            failed_operations.append("cc_recipients")
+        
+        # Save BCC recipients with enhanced metadata  
+        bcc_file_created = _save_recipient_list(
+            recipients_folder / "bcc_recipients.txt",
+            bcc_recipients,
+            "BCC Recipients", 
+            "These recipients will be BCC'd on ALL emails in multi-mode"
+        )
+        if bcc_file_created:
+            total_files_created += 1
+        else:
+            failed_operations.append("bcc_recipients")
+        
+        # Save consolidated unique recipient list
+        unique_file_created = _save_consolidated_recipients(
+            recipients_folder / "all_unique_recipients.txt",
+            all_unique_recipients,
+            len(email_configs)
+        )
+        if unique_file_created:
+            total_files_created += 1
+        else:
+            failed_operations.append("consolidated_recipients")
+        
+        # Generate and save comprehensive summary
+        summary_file_created = _save_comprehensive_summary(
+            recipients_folder / "multi_mode_summary.txt",
+            email_configs, filter_summaries, cc_recipients, bcc_recipients,
+            all_unique_recipients, timestamp
+        )
+        if summary_file_created:
+            total_files_created += 1
+        else:
+            failed_operations.append("summary")
+        
+        # Generate JSON metadata for programmatic access
+        json_file_created = _save_json_metadata(
+            recipients_folder / "campaign_metadata.json",
+            email_configs, filter_summaries, cc_recipients, bcc_recipients,
+            all_unique_recipients, timestamp
+        )
+        if json_file_created:
+            total_files_created += 1
+        else:
+            failed_operations.append("json_metadata")
+        
+        # Final summary logging
+        _log_save_summary(
+            total_files_created, total_recipients_saved, len(all_unique_recipients),
+            len(email_configs), len(cc_recipients), len(bcc_recipients),
+            failed_operations, recipients_folder.name
+        )
+        
+    except Exception as exc:
+        log_and_print("error", f"Critical error in save_multi_mode_recipients: {exc}")
+        log_and_print("error", f"Traceback: {traceback.format_exc()}")
+
+
+def _create_safe_filename(filter_line: str, max_length: int = 50) -> str:
+    """Create a filesystem-safe filename from filter line."""
+    # Replace problematic characters and limit length
+    safe_name = re.sub(r'[^\w\s.-]', '_', filter_line)[:max_length]
+    safe_name = re.sub(r'\s+', '_', safe_name)  # Replace spaces with underscores
+    safe_name = re.sub(r'_+', '_', safe_name)   # Collapse multiple underscores
+    safe_name = safe_name.strip('_')            # Remove leading/trailing underscores
+    
+    # Ensure we have something meaningful
+    if not safe_name or len(safe_name) < 3:
+        safe_name = f"filter_condition_{hash(filter_line) % 10000:04d}"
+    
+    return safe_name
+
+
+def _save_individual_filter_file(filter_file: Path, filter_num: int, filter_line: str, 
+                                recipients: List[str], original_recipients: List[str],
+                                field_values: Dict[str, str], original_count: int) -> bool:
+    """Save individual filter recipients file with comprehensive metadata."""
+    try:
+        with filter_file.open('w', encoding='utf-8') as f:
+            # Enhanced header with more metadata
+            f.write(f"# NOTIFYBOT MULTI-MODE FILTER RECIPIENTS\n")
+            f.write(f"# ======================================\n")
+            f.write(f"# Filter Number: {filter_num}\n")
+            f.write(f"# Filter Condition: {filter_line}\n")
+            f.write(f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"# Current Recipients: {len(recipients)}\n")
+            f.write(f"# Original Recipients: {original_count}\n")
+            f.write(f"# Mode: {'DRY-RUN' if len(recipients) != original_count else 'LIVE'}\n")
+            
+            # Field substitution information
+            if field_values:
+                f.write(f"#\n# TEMPLATE SUBSTITUTION VALUES:\n")
+                for field, value in field_values.items():
+                    if value:
+                        value_preview = value[:100] + "..." if len(value) > 100 else value
+                        unique_count = len(set(value.split(',')) if value else set())
+                        f.write(f"# {field}: {value_preview} ({unique_count} unique)\n")
+                    else:
+                        f.write(f"# {field}: [empty]\n")
+            else:
+                f.write(f"# Template Substitution: None\n")
+            
+            f.write(f"#\n# RECIPIENTS:\n")
+            f.write(f"# ============\n")
+            
+            # Write recipients with optional numbering for large lists
+            if len(recipients) <= 20:
+                for email in recipients:
+                    f.write(f"{email}\n")
+            else:
+                for idx, email in enumerate(recipients, 1):
+                    f.write(f"{email}  # {idx}\n")
+        
+        return True
+        
+    except Exception as exc:
+        log_and_print("error", f"Failed to save filter file {filter_file.name}: {exc}")
+        return False
+
+
+def _save_recipient_list(file_path: Path, recipients: List[str], 
+                        title: str, description: str) -> bool:
+    """Save a recipient list file with metadata."""
+    if not recipients:
+        return True  # Not an error, just nothing to save
+    
+    try:
+        with file_path.open('w', encoding='utf-8') as f:
+            f.write(f"# NOTIFYBOT {title.upper()}\n")
+            f.write(f"# {'=' * (len(title) + 20)}\n") 
+            f.write(f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"# Recipients: {len(recipients)}\n")
+            f.write(f"# Description: {description}\n")
+            f.write(f"#\n")
+            
+            for email in recipients:
+                f.write(f"{email}\n")
+        
+        log_and_print("file", f"✓ Saved {len(recipients)} {title.lower()} to {file_path.name}")
+        return True
+        
+    except Exception as exc:
+        log_and_print("error", f"Failed to save {title.lower()}: {exc}")
+        return False
+
+
+def _save_consolidated_recipients(file_path: Path, unique_recipients: set, 
+                                 filter_count: int) -> bool:
+    """Save consolidated unique recipients list."""
+    if not unique_recipients:
+        return True
+    
+    try:
+        with file_path.open('w', encoding='utf-8') as f:
+            f.write(f"# NOTIFYBOT CONSOLIDATED UNIQUE RECIPIENTS\n")
+            f.write(f"# ========================================\n")
+            f.write(f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"# Total Unique Recipients: {len(unique_recipients)}\n")
+            f.write(f"# Source: {filter_count} filter conditions (multi-mode)\n")
+            f.write(f"# Note: This list contains all unique TO recipients across all filters\n")
+            f.write(f"#       (duplicates removed, case-insensitive matching)\n")
+            f.write(f"#\n")
+            
+            for email in sorted(unique_recipients):
+                f.write(f"{email}\n")
+        
+        log_and_print("file", f"✓ Saved {len(unique_recipients)} unique recipients to {file_path.name}")
+        return True
+        
+    except Exception as exc:
+        log_and_print("error", f"Failed to save consolidated recipients: {exc}")
+        return False
+
+
+def _save_comprehensive_summary(file_path: Path, email_configs: List[Dict], 
+                               filter_summaries: List[Dict], cc_recipients: List[str],
+                               bcc_recipients: List[str], unique_recipients: set,
+                               timestamp: str) -> bool:
+    """Generate comprehensive summary with statistics and insights."""
+    try:
+        with file_path.open('w', encoding='utf-8') as f:
+            f.write("NOTIFYBOT MULTI-MODE CAMPAIGN SUMMARY\n")
+            f.write("=" * 60 + "\n")
+            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Campaign ID: {timestamp}\n")
+            f.write(f"Mode: MULTI-MODE\n\n")
+            
+            # Executive Summary
+            f.write("EXECUTIVE SUMMARY\n")
+            f.write("-" * 20 + "\n")
+            total_individual_recipients = sum(s['recipient_count'] for s in filter_summaries)
+            total_cc_emails = len(cc_recipients) * len(email_configs) if cc_recipients else 0
+            total_bcc_emails = len(bcc_recipients) * len(email_configs) if bcc_recipients else 0
+            grand_total = total_individual_recipients + total_cc_emails + total_bcc_emails
+            
+            f.write(f"Total Filters: {len(email_configs)}\n")
+            f.write(f"Unique Recipients (TO): {len(unique_recipients)}\n")
+            f.write(f"Total Individual Emails: {total_individual_recipients}\n")
+            f.write(f"CC Recipients per Email: {len(cc_recipients)}\n")
+            f.write(f"BCC Recipients per Email: {len(bcc_recipients)}\n")
+            f.write(f"Total CC Emails: {total_cc_emails}\n")
+            f.write(f"Total BCC Emails: {total_bcc_emails}\n")
+            f.write(f"GRAND TOTAL EMAILS: {grand_total}\n\n")
+            
+            # Template Substitution Analysis
+            substitution_filters = [s for s in filter_summaries if s['has_field_substitution']]
+            f.write("TEMPLATE SUBSTITUTION ANALYSIS\n")
+            f.write("-" * 35 + "\n")
+            f.write(f"Filters with substitution: {len(substitution_filters)}/{len(filter_summaries)}\n")
+            if substitution_filters:
+                all_fields = set()
+                for summary in substitution_filters:
+                    all_fields.update(summary['field_values'].keys())
+                f.write(f"Template fields used: {', '.join(sorted(all_fields))}\n")
+            f.write("\n")
+            
+            # Detailed Filter Breakdown
+            f.write("DETAILED FILTER BREAKDOWN\n")
+            f.write("-" * 30 + "\n")
+            
+            for summary in filter_summaries:
+                f.write(f"\nFilter {summary['filter_number']}:\n")
+                f.write(f"  Condition: {summary['filter_line']}\n")
+                f.write(f"  Recipients: {summary['recipient_count']}")
+                if summary['recipient_count'] != summary['original_recipient_count']:
+                    f.write(f" (original: {summary['original_recipient_count']})")
+                f.write(f"\n  File: {summary['filename']}\n")
+                
+                if summary['has_field_substitution']:
+                    f.write(f"  Template Fields:\n")
+                    for field, value in summary['field_values'].items():
+                        if value:
+                            unique_count = summary['unique_values_count'].get(field, 0)
+                            preview = value[:60] + "..." if len(value) > 60 else value
+                            f.write(f"    {field}: {preview} ({unique_count} unique)\n")
+                        else:
+                            f.write(f"    {field}: [empty]\n")
+            
+            # Distribution Analysis
+            f.write(f"\nRECIPIENT DISTRIBUTION ANALYSIS\n")
+            f.write("-" * 35 + "\n")
+            recipient_counts = [s['recipient_count'] for s in filter_summaries]
+            if recipient_counts:
+                f.write(f"Average recipients per filter: {sum(recipient_counts)/len(recipient_counts):.1f}\n")
+                f.write(f"Min recipients per filter: {min(recipient_counts)}\n")
+                f.write(f"Max recipients per filter: {max(recipient_counts)}\n")
+                
+                # Distribution buckets
+                buckets = {
+                    "1-10": sum(1 for c in recipient_counts if 1 <= c <= 10),
+                    "11-50": sum(1 for c in recipient_counts if 11 <= c <= 50), 
+                    "51-100": sum(1 for c in recipient_counts if 51 <= c <= 100),
+                    "101+": sum(1 for c in recipient_counts if c > 100)
+                }
+                f.write(f"Size distribution: {', '.join(f'{k}: {v}' for k, v in buckets.items() if v > 0)}\n")
+            
+            # File Listing
+            f.write(f"\nGENERATED FILES\n")
+            f.write("-" * 20 + "\n")
+            f.write(f"Filter recipient files: {len(filter_summaries)}\n")
+            for summary in filter_summaries:
+                f.write(f"  {summary['filename']}\n")
+            
+            if cc_recipients:
+                f.write(f"  cc_recipients.txt\n")
+            if bcc_recipients:
+                f.write(f"  bcc_recipients.txt\n")
+            f.write(f"  all_unique_recipients.txt\n")
+            f.write(f"  multi_mode_summary.txt (this file)\n")
+            f.write(f"  campaign_metadata.json\n")
+        
+        log_and_print("file", f"✓ Comprehensive summary saved to {file_path.name}")
+        return True
+        
+    except Exception as exc:
+        log_and_print("error", f"Failed to save comprehensive summary: {exc}")
+        return False
+
+
+def _save_json_metadata(file_path: Path, email_configs: List[Dict], 
+                       filter_summaries: List[Dict], cc_recipients: List[str],
+                       bcc_recipients: List[str], unique_recipients: set,
+                       timestamp: str) -> bool:
+    """Save JSON metadata for programmatic access."""
+    try:
+        metadata = {
+            "campaign_info": {
+                "timestamp": timestamp,
+                "generated_at": datetime.now().isoformat(),
+                "mode": "multi",
+                "total_filters": len(email_configs),
+                "total_unique_recipients": len(unique_recipients)
+            },
+            "statistics": {
+                "total_individual_emails": sum(s['recipient_count'] for s in filter_summaries),
+                "cc_recipients_per_email": len(cc_recipients),
+                "bcc_recipients_per_email": len(bcc_recipients),
+                "total_cc_emails": len(cc_recipients) * len(email_configs),
+                "total_bcc_emails": len(bcc_recipients) * len(email_configs),
+                "grand_total_emails": (
+                    sum(s['recipient_count'] for s in filter_summaries) + 
+                    (len(cc_recipients) + len(bcc_recipients)) * len(email_configs)
+                )
+            },
+            "filters": filter_summaries,
+            "recipients": {
+                "cc_recipients": cc_recipients,
+                "bcc_recipients": bcc_recipients,
+                "unique_to_recipients": sorted(list(unique_recipients))
+            }
+        }
+        
+        with file_path.open('w', encoding='utf-8') as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        
+        log_and_print("file", f"✓ JSON metadata saved to {file_path.name}")
+        return True
+        
+    except Exception as exc:
+        log_and_print("error", f"Failed to save JSON metadata: {exc}")
+        return False
+
+
+def _log_save_summary(total_files_created: int, total_recipients_saved: int, 
+                     unique_recipients: int, filter_count: int, cc_count: int, 
+                     bcc_count: int, failed_operations: List[str], folder_name: str) -> None:
+    """Log comprehensive summary of save operations."""
+    log_and_print("backup", f"Multi-mode recipients saved to {folder_name}/")
+    log_and_print("info", f"Files created: {total_files_created}")
+    log_and_print("info", f"Filter configurations: {filter_count}")
+    log_and_print("info", f"Total recipients saved: {total_recipients_saved}")
+    log_and_print("info", f"Unique recipients: {unique_recipients}")
+    
+    if cc_count or bcc_count:
+        extras = []
+        if cc_count:
+            extras.append(f"CC: {cc_count}")
+        if bcc_count:
+            extras.append(f"BCC: {bcc_count}")
+        log_and_print("info", f"Additional recipients: {', '.join(extras)}")
+    
+    if failed_operations:
+        log_and_print("warning", f"Failed operations: {', '.join(failed_operations)}")
+    else:
+        log_and_print("success", "All recipient files saved successfully")
+
+
+
+def prompt_for_confirmation() -> bool:
+    """Prompt the user for a yes/no confirmation to proceed."""
+    response = input("Do you want to proceed with sending emails? (yes/no): ").strip().lower()
+    return response == 'yes'
+
+def send_via_sendmail(recipients: List[str], subject: str, body_html: str, 
+                     from_address: str, attachment_folder: Path = None, 
+                     dry_run: bool = False, original_recipients_count: int = 0,
+                     base_folder: Path = None, cc_recipients: List[str] = None,
+                     bcc_recipients: List[str] = None,
+                     original_cc_count: int = 0, original_bcc_count: int = 0,
+                     filter_info: str = None) -> bool:
+    """Send email using sendmail command. In dry-run mode, sends only to approvers with DRAFT prefix."""
+    
+    cc_recipients = cc_recipients or []
+    bcc_recipients = bcc_recipients or []
+    
+    # Prepare subject for dry-run mode
+    final_subject = subject
+    if dry_run:
+        # Add DRAFT prefix if not already present
+        if not subject.upper().startswith('DRAFT'):
+            final_subject = f"DRAFT - {subject}"
+        
+        # Add recipient count info to body for dry-run
+        filter_info_html = f"<p style=\"color: #333333; margin: 4px 0; font-size: 14px;\"><strong>Filter:</strong> {filter_info}</p>" if filter_info else ""
+        
+        draft_info = f"""
+        <div style="background-color: #f8f9fa; border: 2px solid #007BFF; padding: 12px; margin: 10px 0; border-radius: 6px; max-width: 500px; width: 100%; margin-left: 20px;">
+            <h3 style="color: #0056b3; margin: 0 0 8px 0; font-size: 16px;">📝 Draft Email – Internal Review 🔍</h3>
+            <p style="color: #333333; margin: 4px 0; font-size: 14px;"><strong>Status:</strong> This is a draft email shared for review and approval.</p>
+            {filter_info_html}
+            <p style="color: #333333; margin: 4px 0; font-size: 14px;"><strong>Original Recipient Count:</strong> {original_recipients_count}</p>
+            <p style="color: #333333; margin: 5px 0;"><strong>Original CC Recipients:</strong> {original_cc_count}</p>
+            <p style="color: #333333; margin: 5px 0;"><strong>Original BCC Recipients:</strong> {original_bcc_count}</p>
+            <p style="color: #333333; margin: 5px 0;"><strong>Once approved, this message will be delivered to all {original_recipients_count + original_cc_count + original_bcc_count} intended recipients.</strong></p>
+        </div>
+        <hr style="margin: 16px 0; border: 0; border-top: 1px solid #ddd;">
+        """
+        body_html = draft_info + body_html
+        
+        total_original = original_recipients_count + original_cc_count + original_bcc_count
+        log_and_print("draft", f"DRAFT mode: Sending to {len(recipients)} approver(s) instead of {total_original} original recipients")
+        log_and_print("draft", f"Original breakdown - TO: {original_recipients_count}, CC: {original_cc_count}, BCC: {original_bcc_count}")
+        log_and_print("draft", f"Subject: {final_subject}")
+        log_and_print("draft", f"Approvers: {', '.join(recipients[:3])}{'...' if len(recipients) > 3 else ''}")
+        
+        if attachment_folder and attachment_folder.exists():
+            attachments = [f.name for f in attachment_folder.iterdir() if f.is_file()]
+            if attachments:
+                log_and_print("draft", f"Attachments: {', '.join(attachments[:3])}{'...' if len(attachments) > 3 else ''}")
+    else:
+        total_recipients = len(recipients) + len(cc_recipients) + len(bcc_recipients)
+        log_and_print("info", f"LIVE mode: Sending to {total_recipients} total recipients")
+        log_and_print("info", f"TO: {len(recipients)}, CC: {len(cc_recipients)}, BCC: {len(bcc_recipients)}")
+        log_and_print("info", f"Subject: {final_subject}")
+        log_and_print("info", f"TO: {', '.join(recipients[:3])}{'...' if len(recipients) > 3 else ''}")
+        if cc_recipients:
+            log_and_print("info", f"CC: {', '.join(cc_recipients[:3])}{'...' if len(cc_recipients) > 3 else ''}")
+        if bcc_recipients:
+            log_and_print("info", f"BCC: {', '.join(bcc_recipients[:3])}{'...' if len(bcc_recipients) > 3 else ''}")
+            
+        if attachment_folder and attachment_folder.exists():
+            attachments = [f.name for f in attachment_folder.iterdir() if f.is_file()]
+            if attachments:
+                log_and_print("info", f"Attachments: {', '.join(attachments[:3])}{'...' if len(attachments) > 3 else ''}")
+    
+    try:
+        # Create the email message with base_folder for image embedding
+        msg = create_email_message(recipients, final_subject, body_html, from_address, 
+                                 attachment_folder, base_folder, cc_recipients, bcc_recipients)
+        
+        # Convert message to string
+        email_content = msg.as_string()
+        
+        # Find sendmail path
+        sendmail_path = find_sendmail_path()
+        
+        # All recipients (TO, CC, BCC) must be provided to sendmail for delivery
+        all_recipients_for_delivery = recipients + cc_recipients + bcc_recipients
+        
+        # Call sendmail with proper arguments
+        sendmail_cmd = [sendmail_path, '-f', from_address] + all_recipients_for_delivery
+        
+        process = subprocess.Popen(
+            sendmail_cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        stdout, stderr = process.communicate(input=email_content, timeout=60)
+        
+        if process.returncode == 0:
+            if dry_run:
+                log_and_print("success", f"DRAFT email sent successfully to {len(recipients)} approver(s)")
+            else:
+                log_and_print("success", f"Email sent successfully to {len(all_recipients_for_delivery)} total recipients")
+            return True
+        else:
+            log_and_print("error", f"Sendmail failed with return code {process.returncode}")
+            if stderr:
+                log_and_print("error", f"Sendmail stderr: {stderr}")
+            return False
+            
+    except FileNotFoundError:
+        log_and_print("error", f"Sendmail not found at {sendmail_path}. Please install sendmail.")
+        return False
+    except subprocess.TimeoutExpired:
+        log_and_print("error", "Sendmail timeout - operation took too long")
+        return False
+    except Exception as exc:
+        log_and_print("error", f"Error sending email via sendmail: {exc}")
+        return False
+
+def send_single_mode_emails(recipients: List[str], subject: str, body_html: str, 
+                           from_address: str, batch_size: int, dry_run: bool = False, 
+                           delay: float = 5.0, attachment_folder: Path = None,
+                           cc_recipients: List[str] = None, bcc_recipients: List[str] = None,
+                           original_recipients_count: int = 0, base_folder: Path = None,
+                           original_cc_count: int = 0, original_bcc_count: int = 0) -> None:
+    """Send emails in single mode with batching."""
+    
+    cc_recipients = cc_recipients or []
+    bcc_recipients = bcc_recipients or []
+    
+    # Initialize counters and totals
+    total_recipients = len(recipients)
+    total_batches = (total_recipients + batch_size - 1) // batch_size if total_recipients > 0 else 0
+    successful_batches = 0
+    failed_batches = 0
+    
+    # Handle edge case where no TO recipients but CC/BCC exist
+    if total_recipients == 0 and (cc_recipients or bcc_recipients):
+        # Create a single "batch" with just CC/BCC recipients
+        log_and_print("info", "No TO recipients, sending single email with CC/BCC only")
+        
+        if dry_run:
+            log_and_print("processing", f"Processing DRAFT email (CC/BCC only to approvers)")
+        else:
+            batch_total = len(cc_recipients) + len(bcc_recipients)
+            log_and_print("processing", f"Processing email with {batch_total} CC/BCC recipients only")
+        
+        # Send email with empty TO list but include CC/BCC
+        if send_via_sendmail([], subject, body_html, from_address, attachment_folder, 
+                           dry_run, original_recipients_count, base_folder, 
+                           cc_recipients, bcc_recipients, original_cc_count, original_bcc_count):
+            successful_batches = 1
+            log_and_print("success", "CC/BCC-only email completed successfully")
+        else:
+            failed_batches = 1
+            log_and_print("error", "CC/BCC-only email failed")
+    else:
+        # Process TO recipients in batches
+        for i in range(0, total_recipients, batch_size):
+            batch = recipients[i:i + batch_size]
+            batch_num = i // batch_size + 1
+            
+            # Include CC/BCC in ALL batches
+            current_cc = cc_recipients
+            current_bcc = bcc_recipients
+            
+            if dry_run:
+                log_and_print("processing", f"Processing DRAFT batch {batch_num}/{total_batches} ({len(batch)} approver(s))")
+            else:
+                batch_total = len(batch) + len(current_cc) + len(current_bcc)
+                log_and_print("processing", f"Processing batch {batch_num}/{total_batches} ({batch_total} recipients)")
+                if current_cc or current_bcc:
+                    log_and_print("info", f"CC/BCC included in this batch")
+            
+            # Send current batch with CC/BCC included
+            if send_via_sendmail(batch, subject, body_html, from_address, attachment_folder, 
+                               dry_run, original_recipients_count, base_folder, 
+                               current_cc, current_bcc, original_cc_count, original_bcc_count):
+                successful_batches += 1
+                log_and_print("success", f"Batch {batch_num} completed successfully")
+            else:
+                failed_batches += 1
+                log_and_print("error", f"Batch {batch_num} failed")
+            
+            # Add delay between batches (except for the last batch)
+            if i + batch_size < total_recipients and not dry_run:
+                log_and_print("info", f"Waiting {delay} seconds before next batch...")
+                time.sleep(delay)
+    
+    # Summary
+    if dry_run:
+        total_original = original_recipients_count + original_cc_count + original_bcc_count
+        log_and_print("info", f"SINGLE MODE DRAFT processing complete: {successful_batches} successful, {failed_batches} failed")
+        if total_original > 0:
+            log_and_print("info", f"DRAFT emails sent to approvers for campaign targeting {total_original} recipients")
+    else:
+        log_and_print("info", f"SINGLE MODE batch processing complete: {successful_batches} successful, {failed_batches} failed")
+        if successful_batches > 0:
+            total_sent = (original_recipients_count + 
+                         (original_cc_count * successful_batches) + 
+                         (original_bcc_count * successful_batches))
+            log_and_print("info", f"Total emails delivered: {total_sent}")
+            if successful_batches > 1 and (original_cc_count > 0 or original_bcc_count > 0):
+                log_and_print("info", f"Note: CC/BCC recipients received {successful_batches} copies (one per batch)")
+
+def send_multi_mode_emails(email_configs: List[Dict], subject_template: str, body_template: str,
+                          from_address: str, dry_run: bool = False, delay: float = 5.0,
+                          attachment_folder: Path = None, base_folder: Path = None,
+                          cc_recipients: List[str] = None, bcc_recipients: List[str] = None,
+                          original_cc_count: int = 0, original_bcc_count: int = 0,
+                          batch_size: int = 500) -> None:
+    """Send emails in multi mode - one personalized email per filter condition with batching support."""
+    
+    cc_recipients = cc_recipients or []
+    bcc_recipients = bcc_recipients or []
+    
+    successful_emails = 0
+    failed_emails = 0
+    total_batches = 0
+    successful_batches = 0
+    failed_batches = 0
+    
+    # Track which configs were successful for final calculation
+    successful_configs = []
+    
+    log_and_print("info", f"MULTI MODE: Processing {len(email_configs)} filter conditions with batch-size {batch_size}")
+    
+    for config_num, config in enumerate(email_configs, 1):
+        filter_line = config['filter_line']
+        recipients = config['recipients']
+        field_values = config.get('field_values', {})
+        original_count = config.get('original_recipients_count', len(recipients))
+        
+        # Personalize subject and body
+        personalized_subject = subject_template
+        personalized_body = body_template
+        
+        if field_values:
+            personalized_subject = substitute_placeholders(subject_template, field_values)
+            personalized_body = substitute_placeholders(body_template, field_values)
+            log_and_print("info", f"Filter {config_num}: Personalized subject: {personalized_subject}")
+        
+        # Calculate batches for this filter
+        total_recipients = len(recipients)
+        filter_batches = (total_recipients + batch_size - 1) // batch_size if total_recipients > 0 else 0
+        total_batches += filter_batches
+        
+        log_and_print("processing", f"Processing filter {config_num}/{len(email_configs)}: {filter_line}")
+        log_and_print("info", f"Recipients: {total_recipients}, Batches: {filter_batches}")
+        
+        # Handle case where no TO recipients but CC/BCC exist
+        if total_recipients == 0 and (cc_recipients or bcc_recipients):
+            log_and_print("info", f"Filter {config_num}: No TO recipients, sending single email with CC/BCC only")
+            
+            filter_info = filter_line if dry_run else None
+            if send_via_sendmail([], personalized_subject, personalized_body, from_address,
+                               attachment_folder, dry_run, original_count, base_folder,
+                               cc_recipients, bcc_recipients, original_cc_count, original_bcc_count,
+                               filter_info):
+                successful_emails += 1
+                successful_batches += 1
+                successful_configs.append(config)  # Track successful config
+                log_and_print("success", f"Filter {config_num} CC/BCC-only email sent successfully")
+            else:
+                failed_emails += 1
+                failed_batches += 1
+                log_and_print("error", f"Filter {config_num} CC/BCC-only email failed")
+        else:
+            # Process recipients in batches for this filter
+            filter_successful_batches = 0
+            filter_failed_batches = 0
+            
+            for i in range(0, total_recipients, batch_size):
+                batch = recipients[i:i + batch_size]
+                batch_num = i // batch_size + 1
+                
+                # Include CC/BCC in ALL batches for this filter
+                current_cc = cc_recipients
+                current_bcc = bcc_recipients
+                
+                if dry_run:
+                    log_and_print("processing", f"Filter {config_num}, Batch {batch_num}/{filter_batches}: DRAFT to {len(batch)} approver(s)")
+                else:
+                    batch_total = len(batch) + len(current_cc) + len(current_bcc)
+                    log_and_print("processing", f"Filter {config_num}, Batch {batch_num}/{filter_batches}: {batch_total} recipients")
+                    if current_cc or current_bcc:
+                        log_and_print("info", f"CC/BCC included in this batch")
+                
+                # Send current batch with CC/BCC included
+                filter_info = filter_line if dry_run else None
+                if send_via_sendmail(batch, personalized_subject, personalized_body, from_address,
+                                   attachment_folder, dry_run, original_count, base_folder,
+                                   current_cc, current_bcc, original_cc_count, original_bcc_count,
+                                   filter_info):
+                    filter_successful_batches += 1
+                    successful_batches += 1
+                    log_and_print("success", f"Filter {config_num}, Batch {batch_num} completed successfully")
+                else:
+                    filter_failed_batches += 1
+                    failed_batches += 1
+                    log_and_print("error", f"Filter {config_num}, Batch {batch_num} failed")
+                
+                # Add delay between batches within the same filter (except for the last batch)
+                if i + batch_size < total_recipients and not dry_run:
+                    log_and_print("info", f"Waiting {delay} seconds before next batch...")
+                    time.sleep(delay)
+            
+            # Determine if this filter was successful (at least one batch succeeded)
+            if filter_successful_batches > 0:
+                successful_emails += 1
+                successful_configs.append(config)  # Track successful config
+                log_and_print("success", f"Filter {config_num} completed: {filter_successful_batches}/{filter_successful_batches + filter_failed_batches} batches successful")
+            else:
+                failed_emails += 1
+                log_and_print("error", f"Filter {config_num} failed: all {filter_failed_batches} batches failed")
+        
+        # Add delay between filters (except for the last one)
+        if config_num < len(email_configs) and not dry_run:
+            log_and_print("info", f"Waiting {delay} seconds before next filter...")
+            time.sleep(delay)
+    
+    # Summary
+    if dry_run:
+        log_and_print("info", f"MULTI MODE DRAFT processing complete:")
+        log_and_print("info", f"  - Filters processed: {successful_emails} successful, {failed_emails} failed")
+        log_and_print("info", f"  - Batches processed: {successful_batches} successful, {failed_batches} failed")
+        log_and_print("info", f"DRAFT emails sent to approvers for {len(email_configs)} individual campaigns")
+    else:
+        log_and_print("info", f"MULTI MODE processing complete:")
+        log_and_print("info", f"  - Filters processed: {successful_emails} successful, {failed_emails} failed")
+        log_and_print("info", f"  - Batches processed: {successful_batches} successful, {failed_batches} failed")
+        
+        if successful_batches > 0:
+            # Calculate total emails delivered across all successful batches
+            total_emails_delivered = 0
+            for config in successful_configs:  # Use successful_configs instead
+                recipients_count = len(config['recipients'])
+                filter_batches = (recipients_count + batch_size - 1) // batch_size if recipients_count > 0 else 1
+                # Each batch includes CC/BCC
+                total_emails_delivered += recipients_count + (original_cc_count + original_bcc_count) * filter_batches
+            
+            log_and_print("info", f"Total individual emails delivered: {total_emails_delivered}")
+            if (original_cc_count > 0 or original_bcc_count > 0):
+                log_and_print("info", f"Note: CC/BCC recipients received multiple emails (one per batch per filter)")
+
+
+
+def embed_images_in_html(html_content: str, base_folder: Path) -> Tuple[str, List[MIMEImage]]:
+    """
+    Replace image src attributes with cid references and return embedded images.
+    """
+    images_folder = base_folder / "images"
+    embedded_images = []
+    
+    if not images_folder.exists():
+        log_and_print("info", "No images folder found, skipping image embedding")
+        return html_content, embedded_images
+    
+    # Find all img tags with src attributes
+    img_pattern = r'<img[^>]+src=["\']([^"\']+)["\'][^>]*>'
+    
+    def replace_img_src(match):
+        img_tag = match.group(0)
+        src = match.group(1)
+        
+        # Skip if already a cid: reference
+        if src.startswith('cid:'):
+            return img_tag
+            
+        # Skip external URLs (keep them as-is, but warn user)
+        if src.startswith(('http://', 'https://')):
+            log_and_print("warning", f"External image URL found: {src} - may be blocked by email clients")
+            return img_tag
+        
+        # Handle local file references
+        image_filename = Path(src).name
+        image_path = images_folder / image_filename
+        
+        if not image_path.exists():
+            log_and_print("warning", f"Image file not found: {image_path}")
+            return img_tag
+        
+        try:
+            # Read and encode image
+            with open(image_path, 'rb') as img_file:
+                img_data = img_file.read()
+            
+            # Create Content-ID
+            cid = f"image_{len(embedded_images)}_{image_filename.replace('.', '_')}"
+            
+            # Create MIME image
+            mime_type, _ = mimetypes.guess_type(str(image_path))
+            if mime_type and mime_type.startswith('image/'):
+                maintype, subtype = mime_type.split('/', 1)
+                mime_img = MIMEImage(img_data, subtype)
+                mime_img.add_header('Content-ID', f'<{cid}>')
+                mime_img.add_header('Content-Disposition', 'inline', filename=image_filename)
+                embedded_images.append(mime_img)
+                
+                # Replace src with cid reference
+                new_img_tag = re.sub(r'src=["\'][^"\']+["\']', f'src="cid:{cid}"', img_tag)
+                log_and_print("info", f"Embedded image: {image_filename} as {cid}")
+                return new_img_tag
+            else:
+                log_and_print("warning", f"Unsupported image type: {image_path}")
+                return img_tag
+                
+        except Exception as exc:
+            log_and_print("error", f"Failed to embed image {image_path}: {exc}")
+            return img_tag
+    
+    # Replace all img tags
+    modified_html = re.sub(img_pattern, replace_img_src, html_content)
+    
+    if embedded_images:
+        log_and_print("info", f"Embedded {len(embedded_images)} image(s) in email")
+    
+    return modified_html, embedded_images
+
+def get_inventory_fields_for_help() -> str:
+    """
+    Get available fields from inventory.csv for CLI help display.
+    Returns a formatted string of available fields or error message.
+    """
+    try:
+        if not INVENTORY_PATH.exists():
+            return "  [Inventory file not found at /notifybot/inventory/inventory.csv]"
+        
+        with open(INVENTORY_PATH, mode="r", newline="", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            available_fields = reader.fieldnames or []
+            
+        if not available_fields:
+            return "  [No headers found in inventory.csv]"
+        
+        # Format fields in a nice column layout
+        field_list = sorted(available_fields)
+        formatted_fields = []
+        
+        # Group fields in rows of 4 for better readability
+        for i in range(0, len(field_list), 4):
+            row_fields = field_list[i:i+4]
+            formatted_row = "  " + " | ".join(f"{field:<15}" for field in row_fields)
+            formatted_fields.append(formatted_row)
+        
+        result = f"  Available fields in inventory.csv ({len(field_list)} total):\n"
+        result += "\n".join(formatted_fields)
+        return result
+        
+    except Exception as exc:
+        return f"  [Error reading inventory.csv: {exc}]"
+
+
+
+def main():
+    """
+    Enhanced main function with improved structure, error handling, and maintainability.
+    Orchestrates the email sending process with proper separation of concerns.
+    """
+    setup_logging()
+    
+    try:
+        # 1. PARSE ARGUMENTS AND VALIDATE INPUT
+        args = _parse_command_line_arguments()
+        
+        # 2. INITIALIZE AND VALIDATE ENVIRONMENT
+        config = _initialize_email_config(args)
+        
+        # 3. PROCESS RECIPIENTS BASED ON MODE
+        email_data = _process_recipients(config, args)
+        
+        # 4. DISPLAY SUMMARY AND GET CONFIRMATION
+        _display_email_summary(email_data, args)
+        _get_user_confirmation(args)
+        
+        # 5. SEND EMAILS
+        _send_emails(email_data, args)
+        
+        # 6. LOG SUCCESS
+        mode = email_data.get('mode', 'unknown').upper()
+        log_and_print("success", f"NotifyBot {mode} MODE execution completed successfully")
+        
+    except MissingRequiredFilesError as e:
+        log_and_print("error", f"Configuration error: {e}")
+        sys.exit(1)
+    except ValueError as e:
+        log_and_print("error", f"Input validation error: {e}")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        log_and_print("warning", "Operation interrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        log_and_print("error", f"Unexpected error: {e}")
+        log_and_print("error", f"Traceback: {traceback.format_exc()}")
+        sys.exit(1)
+
+
+def _parse_command_line_arguments():
+    """Parse and validate command line arguments with comprehensive help."""
+    inventory_fields_help = get_inventory_fields_for_help()
+    
+    parser = argparse.ArgumentParser(
+        description="Send batch emails with single/multi mode support and signature.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=_get_help_text(inventory_fields_help)
+    )
+    
+    # Define arguments
+    parser.add_argument("--base-folder", 
+                       required=True, 
+                       metavar="BASE_FOLDER",
+                       help="Base folder name inside /notifybot/basefolder/ [REQUIRED]")
+    parser.add_argument("--mode", 
+                       choices=['single', 'multi'], 
+                       help="Force mode: 'single' or 'multi' (overrides mode.txt)")
+    parser.add_argument("--dry-run", 
+                       action="store_true", 
+                       help="Send emails only to approvers with DRAFT prefix")
+    parser.add_argument("--force", 
+                       action="store_true", 
+                       help="Skip confirmation prompt")
+    parser.add_argument("--batch-size", 
+                       type=int, 
+                       default=500, 
+                       help="Number of emails per batch (default: 500)")
+    parser.add_argument("--delay", 
+                       type=float, 
+                       default=5.0, 
+                       help="Delay in seconds between batches (default: 5.0)")
+    
+    args = parser.parse_args()
+    
+    # Validate argument combinations and values
+    _validate_arguments(args)
+    
+    return args
+
+
+def _validate_arguments(args):
+    """Validate command line arguments for logical consistency."""
+    if args.batch_size <= 0:
+        raise ValueError("Batch size must be greater than 0")
+    
+    if args.delay < 0:
+        raise ValueError("Delay cannot be negative")
+    
+    if args.batch_size > 1000:
+        log_and_print("warning", f"Large batch size ({args.batch_size}) may cause issues with some email servers")
+    
+    log_and_print("info", f"Arguments validated: base-folder={args.base_folder}, mode={args.mode}, dry-run={args.dry_run}")
+
+
+def _initialize_email_config(args):
+    """Initialize email configuration including file validation and content loading."""
+    # Validate and get base folder
+    base_folder = validate_base_folder(args.base_folder)
+    
+    # Determine operating mode
+    mode = determine_mode(base_folder, args.mode)
+    log_and_print("mode", f"Operating in {mode.upper()} mode")
+    
+    # Check required files based on mode
+    required_files = ["subject.txt", "body.html", "from.txt", "approver.txt"]
+    check_required_files(base_folder, required_files, args.dry_run, mode)
+    
+    # Load email content
+    config = _load_email_content(base_folder)
+    config.update({
+        'base_folder': base_folder,
+        'mode': mode,
+        'attachment_folder': _get_attachment_folder(base_folder)
+    })
+    
+    # Validate essential content
+    _validate_email_content(config)
+    
+    return config
+
+
+def _load_email_content(base_folder: Path) -> Dict[str, str]:
+    """Load and process email content including signature."""
+    content = {
+        'subject': read_file(base_folder / "subject.txt"),
+        'body_html': read_file(base_folder / "body.html"),
+        'from_address': read_file(base_folder / "from.txt"),
+    }
+    
+    # Load and combine signature
+    signature_html = read_signature()
+    content['final_body_html'] = combine_body_and_signature(content['body_html'], signature_html)
+    content['has_signature'] = bool(signature_html)
+    content['signature_length'] = len(signature_html) if signature_html else 0
+    
+    return content
+
+
+def _validate_email_content(config: Dict[str, str]) -> None:
+    """Validate essential email content."""
+    if not config['subject']:
+        raise MissingRequiredFilesError("Subject is empty")
+    
+    if not config['body_html']:
+        raise MissingRequiredFilesError("Body HTML is empty")
+    
+    if not config['from_address'] or not is_valid_email(config['from_address']):
+        raise MissingRequiredFilesError(f"Invalid from address: {config['from_address']}")
+    
+    log_and_print("success", "Email content validation passed")
+
+
+def _get_attachment_folder(base_folder: Path) -> Path:
+    """Get attachment folder if it exists, with logging."""
+    attachment_folder = base_folder / "attachment"
+    
+    if attachment_folder.exists():
+        attachment_count = len([f for f in attachment_folder.iterdir() if f.is_file()])
+        log_and_print("info", f"Found {attachment_count} attachment(s)")
+        return attachment_folder
+    else:
+        log_and_print("info", "No attachment folder found")
+        return None
+
+
+def _process_recipients(config: Dict, args) -> Dict:
+    """Process recipients based on operating mode."""
+    mode = config['mode']
+    base_folder = config['base_folder']
+    
+    if mode == "single":
+        return _process_single_mode_recipients(config, args)
+    elif mode == "multi":
+        return _process_multi_mode_recipients(config, args)
+    else:
+        raise ValueError(f"Invalid mode: {mode}")
+
+
+def _process_single_mode_recipients(config: Dict, args) -> Dict:
+    """Process recipients for single mode."""
+    (recipients, cc_recipients, bcc_recipients, 
+     original_to_count, original_cc_count, original_bcc_count) = get_recipients_for_single_mode(
+        config['base_folder'], args.dry_run
+    )
+    
+    return {
+        'mode': 'single',
+        'recipients': recipients,
+        'cc_recipients': cc_recipients,
+        'bcc_recipients': bcc_recipients,
+        'original_to_count': original_to_count,
+        'original_cc_count': original_cc_count,
+        'original_bcc_count': original_bcc_count,
+        'total_current': len(recipients) + len(cc_recipients) + len(bcc_recipients),
+        'total_original': original_to_count + original_cc_count + original_bcc_count,
+        **config
+    }
+
+
+def _process_multi_mode_recipients(config: Dict, args) -> Dict:
+    """Process recipients for multi mode."""
+    (email_configs, cc_recipients, bcc_recipients,
+     total_original_to_count, original_cc_count, original_bcc_count) = get_recipients_for_multi_mode(
+        config['base_folder'], args.dry_run
+    )
+    
+    return {
+        'mode': 'multi',
+        'email_configs': email_configs,
+        'cc_recipients': cc_recipients,
+        'bcc_recipients': bcc_recipients,
+        'total_original_to_count': total_original_to_count,
+        'original_cc_count': original_cc_count,
+        'original_bcc_count': original_bcc_count,
+        'email_count': len(email_configs),
+        **config
+    }
+
+
+def _display_email_summary(email_data: Dict, args) -> None:
+    """Display email summary based on mode."""
+    if email_data['mode'] == 'single':
+        _display_single_mode_summary(email_data, args)
+    elif email_data['mode'] == 'multi':
+        _display_multi_mode_summary(email_data, args)
+
+
+def _display_single_mode_summary(email_data: Dict, args) -> None:
+    """Display summary for single mode."""
+    log_and_print("confirmation", "SINGLE MODE Email Summary:")
+    log_and_print("confirmation", f"From: {email_data['from_address']}")
+    log_and_print("confirmation", f"Subject: {email_data['subject']}")
+    
+    if email_data['has_signature']:
+        log_and_print("confirmation", f"Signature: Loaded ({email_data['signature_length']} characters)")
+    
+    if args.dry_run:
+        log_and_print("confirmation", "Mode: DRY-RUN (DRAFT emails to approvers)")
+        log_and_print("confirmation", f"Approvers: {len(email_data['recipients'])}")
+        log_and_print("confirmation", f"Original campaign would target: {email_data['total_original']} recipients")
+        log_and_print("confirmation", f"  - TO: {email_data['original_to_count']}")
+        log_and_print("confirmation", f"  - CC: {email_data['original_cc_count']}")
+        log_and_print("confirmation", f"  - BCC: {email_data['original_bcc_count']}")
+    else:
+        log_and_print("confirmation", "Mode: LIVE")
+        log_and_print("confirmation", f"Total Recipients: {email_data['total_current']}")
+        log_and_print("confirmation", f"  - TO: {len(email_data['recipients'])}")
+        log_and_print("confirmation", f"  - CC: {len(email_data['cc_recipients'])}")
+        log_and_print("confirmation", f"  - BCC: {len(email_data['bcc_recipients'])}")
+        log_and_print("confirmation", f"Batch size: {args.batch_size}")
+        log_and_print("confirmation", f"Delay: {args.delay}s")
+
+
+def _display_multi_mode_summary(email_data: Dict, args) -> None:
+    """Display summary for multi mode."""
+    log_and_print("confirmation", "MULTI MODE Email Summary:")
+    log_and_print("confirmation", f"From: {email_data['from_address']}")
+    log_and_print("confirmation", f"Subject Template: {email_data['subject']}")
+    
+    if email_data['has_signature']:
+        log_and_print("confirmation", f"Signature: Loaded ({email_data['signature_length']} characters)")
+    
+    log_and_print("confirmation", f"Number of Individual Emails: {email_data['email_count']}")
+    
+    if args.dry_run:
+        _display_multi_mode_dry_run_summary(email_data, args)
+    else:
+        _display_multi_mode_live_summary(email_data, args)
+    
+    _display_filter_examples(email_data['email_configs'])
+
+
+def _display_multi_mode_dry_run_summary(email_data: Dict, args) -> None:
+    """Display dry-run specific summary for multi mode."""
+    approver_count = len(email_data['email_configs'][0]['recipients']) if email_data['email_configs'] else 0
+    
+    log_and_print("confirmation", "Mode: DRY-RUN (DRAFT emails to approvers)")
+    log_and_print("confirmation", f"Will send {email_data['email_count']} draft emails to {approver_count} approver(s)")
+    log_and_print("confirmation", "Original campaign breakdown:")
+    log_and_print("confirmation", f"  - Individual emails: {email_data['email_count']}")
+    log_and_print("confirmation", f"  - Total TO recipients across all emails: {email_data['total_original_to_count']}")
+    log_and_print("confirmation", f"  - CC per email: {email_data['original_cc_count']}")
+    log_and_print("confirmation", f"  - BCC per email: {email_data['original_bcc_count']}")
+    
+    if email_data['email_count'] > 1 and (email_data['original_cc_count'] + email_data['original_bcc_count']) > 0:
+        total_cc_bcc = (email_data['original_cc_count'] + email_data['original_bcc_count']) * email_data['email_count']
+        log_and_print("confirmation", f"  - Total CC/BCC emails: {total_cc_bcc}")
+    
+    # Show breakdown of original recipients per filter
+    log_and_print("confirmation", "Original filter breakdown:")
+    for i, config in enumerate(email_data['email_configs'][:3], 1):
+        original_count = config.get('original_recipients_count', 0)
+        display_filter = _truncate_filter_line(config['filter_line'])
+        log_and_print("confirmation", f"  {i}. {display_filter} → {original_count} recipient(s)")
+    
+    if len(email_data['email_configs']) > 3:
+        remaining = email_data['email_configs'][3:]
+        remaining_total = sum(config.get('original_recipients_count', 0) for config in remaining)
+        log_and_print("confirmation", f"  ... and {len(remaining)} more filters → {remaining_total} additional recipient(s)")
+
+
+def _display_multi_mode_live_summary(email_data: Dict, args) -> None:
+    """Display live mode specific summary for multi mode."""
+    total_cc_bcc_per_email = len(email_data['cc_recipients']) + len(email_data['bcc_recipients'])
+    
+    log_and_print("confirmation", "Mode: LIVE")
+    log_and_print("confirmation", f"Will send {email_data['email_count']} individual emails")
+    log_and_print("confirmation", f"Total TO recipients across all emails: {email_data['total_original_to_count']}")
+    log_and_print("confirmation", f"CC per email: {len(email_data['cc_recipients'])}")
+    log_and_print("confirmation", f"BCC per email: {len(email_data['bcc_recipients'])}")
+    
+    if email_data['email_count'] > 1 and total_cc_bcc_per_email > 0:
+        total_cc_bcc = total_cc_bcc_per_email * email_data['email_count']
+        log_and_print("confirmation", f"Total CC/BCC emails: {total_cc_bcc}")
+    
+    log_and_print("confirmation", f"Batch size: {args.batch_size}")
+    log_and_print("confirmation", f"Email delay: {args.delay}s")
+
+
+def _display_filter_examples(email_configs: List[Dict]) -> None:
+    """Display filter examples with recipient counts."""
+    log_and_print("confirmation", "Filter examples:")
+    
+    for i, config in enumerate(email_configs[:3], 1):
+        recipient_count = len(config.get('recipients', []))
+        display_filter = _truncate_filter_line(config['filter_line'])
+        log_and_print("confirmation", f"  {i}. {display_filter} → {recipient_count} recipient(s)")
+    
+    if len(email_configs) > 3:
+        log_and_print("confirmation", f"  ... and {len(email_configs) - 3} more")
+
+
+def _truncate_filter_line(filter_line: str, max_length: int = 50) -> str:
+    """Truncate filter line for display purposes."""
+    return filter_line[:max_length] + "..." if len(filter_line) > max_length else filter_line
+
+
+def _get_user_confirmation(args) -> None:
+    """Get user confirmation unless force flag is set."""
+    if not args.force:
+        if not prompt_for_confirmation():
+            log_and_print("info", "Email sending aborted by user.")
+            sys.exit(0)
+
+
+def _send_emails(email_data: Dict, args) -> None:
+    """Send emails based on mode."""
+    if email_data['mode'] == 'single':
+        _send_single_mode_emails(email_data, args)
+    elif email_data['mode'] == 'multi':
+        _send_multi_mode_emails(email_data, args)
+
+
+def _send_single_mode_emails(email_data: Dict, args) -> None:
+    """Send emails in single mode."""
+    send_single_mode_emails(
+        recipients=email_data['recipients'],
+        subject=email_data['subject'],
+        body_html=email_data['final_body_html'],
+        from_address=email_data['from_address'],
+        batch_size=args.batch_size,
+        dry_run=args.dry_run,
+        delay=args.delay,
+        attachment_folder=email_data['attachment_folder'],
+        cc_recipients=email_data['cc_recipients'],
+        bcc_recipients=email_data['bcc_recipients'],
+        original_recipients_count=email_data['original_to_count'],
+        base_folder=email_data['base_folder'],
+        original_cc_count=email_data['original_cc_count'],
+        original_bcc_count=email_data['original_bcc_count']
+    )
+
+
+def _send_multi_mode_emails(email_data: Dict, args) -> None:
+    """Send emails in multi mode."""
+    send_multi_mode_emails(
+        email_configs=email_data['email_configs'],
+        subject_template=email_data['subject'],
+        body_template=email_data['final_body_html'],
+        from_address=email_data['from_address'],
+        dry_run=args.dry_run,
+        delay=args.delay,
+        attachment_folder=email_data['attachment_folder'],
+        base_folder=email_data['base_folder'],
+        cc_recipients=email_data['cc_recipients'],
+        bcc_recipients=email_data['bcc_recipients'],
+        original_cc_count=email_data['original_cc_count'],
+        original_bcc_count=email_data['original_bcc_count'],
+        batch_size=args.batch_size
+    )
+
+
+def _get_help_text(inventory_fields_help: str) -> str:
+    """Generate comprehensive help text for the CLI."""
+    return f"""
+PRECHECK REQUIREMENTS:
+======================
+
+SINGLE MODE Requirements:
+  Required files: subject.txt, body.html, from.txt, approver.txt
+  Recipient sources (at least ONE required):
+    - to.txt (direct recipient list)
+    - filter.txt + inventory.csv (filtered recipients)
+    - additional_to.txt (additional recipients)
+    - cc.txt (CC recipients)
+    - bcc.txt (BCC recipients)
+  Optional files: cc.txt, bcc.txt, field.txt, mode.txt
+  Optional folders: attachment/, images/
+
+MULTI MODE Requirements:
+  Required files: subject.txt, body.html, from.txt, approver.txt, filter.txt
+  Optional files: field.txt, cc.txt, bcc.txt, additional_to.txt, mode.txt
+  Optional folders: attachment/, images/
+
+INVENTORY FIELDS & VALIDATION:
+==============================
+
+Priority-based Field Validation:
+  1. filter.txt fields → validated against /notifybot/inventory/inventory.csv (ALWAYS)
+  2. field.txt fields → validated with priority system:
+     - If <base-folder>/field-inventory.csv exists: use it for field.txt validation
+     - If local field-inventory.csv exists: filter.txt fields ALSO validated against it
+     - If no local field-inventory.csv: field.txt validated against global inventory.csv
+
+Global Inventory Location: /notifybot/inventory/inventory.csv
+Local Field Inventory: <base-folder>/field-inventory.csv (optional)
+
+{inventory_fields_help}
+
+Field Validation Rules:
+  - All field names in filter.txt must exist in global inventory.csv headers
+  - If local field-inventory.csv exists: filter.txt fields must also exist there
+  - field.txt validation priority: local field-inventory.csv > global inventory.csv
+  - Filter syntax supports: =, !=, =~, !~, wildcards (*, ?, [])
+
+FILTER SYNTAX EXAMPLES:
+=======================
+  department="sales"                    # Exact match
+  region!="europe"                      # Not equal  
+  name=~".*Manager.*"                   # Regex match
+  email!~".*(test|demo).*"              # Regex not match
+  status=active*                        # Wildcard match
+  department="sales",region="north"     # AND condition
+  department="sales"                    # OR condition
+  department="marketing"                # (on separate lines)
+
+File Locations:
+  - Base folder: /notifybot/basefolder/<your-folder>/
+  - Global inventory: /notifybot/inventory/inventory.csv
+  - Local field inventory: /notifybot/basefolder/<your-folder>/field-inventory.csv (optional)
+  - Logs: /notifybot/logs/notifybot.log
+
+Examples:
+  python notifybot.py --base-folder email --dry-run
+  python notifybot.py --base-folder email --force --mode single
+  python notifybot.py --base-folder email --batch-size 300 --delay 10 --mode multi
+"""
+
+
+if __name__ == "__main__":
+    main()
