@@ -58,4 +58,9 @@ Make sure your table headers in body.html match the order and names of fields in
 
 This approach makes the table generation completely dynamic - you can change which columns appear in the table just by modifying field.txt, without needing to update the code.
 
-
+* {dynamic_table}: Complete HTML table
+* {table_rows}: Table rows only (basic styling)
+* {styled_table_rows}: Table rows with striped styling
+* {simple_table_rows}: Plain table rows (no styling)
+* {csv_table_rows}: Pipe-separated text format
+* {table_headers}: Table headers with styling
