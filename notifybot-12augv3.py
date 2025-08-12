@@ -109,7 +109,7 @@ OPERATORS:
   =     Exact match (case-insensitive): department=Engineering  
   !=    Not equal: status!=inactive
   =~    Regex match: name=~"^John.*"
-  !~    Regex not match: email!~"@test\.com$"
+  !~    Regex not match
   *,?,[] Wildcard patterns: department=*Sales*
 
 LOGIC:
@@ -2975,7 +2975,6 @@ Examples:
   department=Engineering
   status!=inactive
   name=~"^John.*"
-  email!~"@test\.com$"
   location=*Office*
 
 Logic:
