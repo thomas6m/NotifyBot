@@ -1,0 +1,95 @@
+<table cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+    <tr>
+        <td style="padding: 20px; text-align: center;">
+            <div style="margin-bottom: 5px; text-align: center;">
+                <p style="margin: 0; color: #666666; font-size: 14px; line-height: 1.4; text-align: center;">
+                    Thanks,<br>
+                    <strong style="color: #666666;">NotifyBot Team</strong>
+                </p>
+            </div>
+            <div style="text-align: center;">
+                <p style="margin: 0; color: #666666; font-size: 13px; line-height: 1.4; font-style: italic; text-align: center;">
+                    🚀 Smarter emailing made simple
+                </p>
+            </div>
+        </td>
+    </tr>
+</table>
+#########################################################################################################################################
+<table cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse;">
+    <tr>
+        <td style="padding: 20px; text-align: center;">
+            <div style="margin-bottom: 5px; text-align: center;">
+                <p style="margin: 0; color: #666666; font-size: 14px; line-height: 1.4; text-align: center;">
+                    Thanks,<br>
+                    <strong style="color: #666666;">NotifyBot Team</strong>
+                </p>
+            </div>
+            <div style="text-align: center;">
+                <p style="margin: 0; color: #666666; font-size: 13px; line-height: 1.4; font-style: italic; text-align: center;">
+                    🚀 Smarter emailing made simple
+                </p>
+            </div>
+        </td>
+    </tr>
+</table>
+#########################################################################################################################################
+<table cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; margin-top: -5px;">
+    <tr>
+        <td style="padding: 20px; text-align: center;">
+            <div style="margin-bottom: 5px; text-align: center;">
+                <p style="margin: 0; color: #666666; font-size: 14px; line-height: 1.4; text-align: center;">
+                    Thanks,<br>
+                    <strong style="color: #666666;">NotifyBot Team</strong>
+                </p>
+            </div>
+            <div style="text-align: center;">
+                <p style="margin: 0; color: #666666; font-size: 13px; line-height: 1.4; font-style: italic; text-align: center;">
+                    🚀 Smarter emailing made simple
+                </p>
+            </div>
+        </td>
+    </tr>
+</table>
+#########################################################################################################################################
+
+<table cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; margin-top: -5px;">
+    <tr>
+        <td style="padding: 20px; text-align: center;">
+            <p style="margin: 0; color: #666666; font-size: 14px; line-height: 1.4; text-align: center;">
+                This email was sent by NotifyBot - <span style="font-size: 13px; font-style: italic;">🚀 Smarter emailing made simple</span>
+            </p>
+        </td>
+    </tr>
+</table>
+#########################################################################################################################################
+def combine_body_and_signature(body_html: str, signature_html: str) -> str:
+    """
+    Combine body HTML with signature HTML with minimal spacing.
+    """
+    if not signature_html:
+        return body_html
+    
+    # Add minimal signature separator - just a single line break
+    signature_separator = "\n<br>\n"  # Reduced from "\n<br><br>\n"
+    combined_html = body_html + signature_separator + signature_html
+    
+    log_and_print("signature", "Combined body and signature successfully")
+    return combined_html
+	
+#########################################################################################################################################	
+
+HTML Code Comparison
+Original:
+<p>...email content...</p>
+<br><br>
+<div class="signature">...signature...</div>
+
+Reduced Gap:
+<p>...email content...</p>
+<br>
+<div class="signature">...signature...</div>
+
+No Gap:
+<p>...email content...</p>
+<div class="signature">...signature...</div>
