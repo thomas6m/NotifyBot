@@ -1,21 +1,10 @@
-<dashboard>
-  <label>HTML Test Dashboard</label>
-  <description>Testing HTML in Splunk</description>
+xml<dashboard version="1.1">
+  <label>HTML Test</label>
   <row>
     <panel>
-      <title>Custom HTML Content</title>
       <html>
-        <![CDATA[
-          <div style="padding:15px; background-color:#f8f8f8; border:1px solid #ccc; border-radius:5px; margin:10px 0;">
-            <h2 style="color:#0072c6; margin-top:0;">Welcome to Splunk Dashboard!</h2>
-            <p style="margin-bottom:10px;">This is a custom HTML block. You can style it as needed.</p>
-            <ul style="color:#666;">
-              <li>Custom styling with CSS</li>
-              <li>Rich HTML content</li>
-              <li>Better visual presentation</li>
-            </ul>
-          </div>
-        ]]>
+        <h2 style="color: blue;">Test Header</h2>
+        <p>Test paragraph</p>
       </html>
     </panel>
   </row>
