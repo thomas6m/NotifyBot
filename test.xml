@@ -1,0 +1,20 @@
+✅ Option 1: Add HTML using <html> inside a dashboard panel
+
+You can embed custom HTML using <html> inside a panel using type="html".
+
+Example Dashboard Snippet:
+<dashboard>
+  <label>HTML Panel Example</label>
+  <row>
+    <panel>
+      <html>
+        <![CDATA[
+          <div style="padding:10px; background-color:#f8f8f8; border:1px solid #ccc;">
+            <h2 style="color:#0072c6;">Welcome to Splunk Dashboard!</h2>
+            <p>This is a custom HTML block. You can style it as needed.</p>
+          </div>
+        ]]>
+      </html>
+    </panel>
+  </row>
+</dashboard>
