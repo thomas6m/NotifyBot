@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🚀 NotifyBot Runbook</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Crimson+Pro:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --primary-dark:      #0d1b2a;
+        --highlight:         #1565c0;
+        --text-dark:         #1a2332;
+        --text-muted:        #4a6278;
+        --success:           #1a7a4a;
+        --warning:           #c87000;
+        --error:             #b71c1c;
+        --card-bg:           #ffffff;
+        --border-color:      #d0dce8;
+        --bg-light:          #f4f7fb;
+        --bg-gradient:       linear-gradient(135deg, #f0f4f9 0%, #e8eef6 100%);
+        --info:              #0d47a1;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body {
+        font-family:'Crimson Pro',serif;
+        background:var(--bg-gradient);
+        color:var(--text-dark);
+        line-height:1.6;
+        overflow-x:hidden;
+        position:relative;
+    }
+    body::before {
+        content:''; position:fixed; top:0; left:0; width:100%; height:100%;
+        background:
+            radial-gradient(circle at 20% 50%, rgba(21,101,192,0.04) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(13,27,42,0.03) 0%, transparent 50%);
+        pointer-events:none; z-index:0;
+    }
+    .container { max-width:1300px; margin:0 auto; padding:5px 20px; position:relative; z-index:1; }
+
+    /* NAV */
+    .nav-wrapper { position:sticky; top:0; z-index:1000; display:flex; justify-content:center; margin-bottom:36px; padding-top:12px; }
+    .nav-menu {
+        background:rgba(255,255,255,0.97); backdrop-filter:blur(10px);
+        border:1px solid var(--border-color); border-radius:15px;
+        padding:16px 25px; box-shadow:0 4px 12px rgba(13,27,42,0.12);
+        transition:all 0.3s ease; width:100%;
+    }
+    .nav-menu.scrolled { box-shadow:0 6px 20px rgba(13,27,42,0.18); }
+    .nav-title {
+        font-size:1.45rem; font-weight:700; text-align:center; margin-bottom:2px;
+        background:linear-gradient(135deg,#0d1b2a 0%,#1565c0 100%);
+        -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+        letter-spacing:-0.5px;
+    }
+    .nav-sub { text-align:center; font-size:0.78rem; color:#546e7a; font-weight:300; margin-bottom:12px; }
+    .nav-divider { border:none; border-top:1px solid var(--border-color); margin-bottom:12px; }
+    .nav-grid { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+    .nav-item {
+        padding:9px 13px; background:rgba(21,101,192,0.05); border:1px solid var(--border-color);
+        border-radius:8px; text-decoration:none; color:var(--text-dark);
+        transition:all 0.3s ease; display:flex; align-items:center; gap:6px;
+        cursor:pointer; font-size:0.82rem; white-space:nowrap;
+    }
+    .nav-item:hover { background:rgba(21,101,192,0.12); transform:translateX(4px); border-color:var(--highlight); box-shadow:0 2px 4px rgba(21,101,192,0.15); }
+    .nav-item::before { content:'▸'; color:var(--highlight); font-weight:bold; }
+
+    /* SECTIONS */
+    .section { background:var(--card-bg); border:1px solid var(--border-color); border-radius:15px; padding:40px; margin-bottom:36px; box-shadow:0 2px 8px rgba(13,27,42,0.07); animation:fadeInUp 0.6s ease-out both; scroll-margin-top:130px; }
+    h2 { font-size:2.2rem; margin-bottom:26px; color:var(--highlight); border-bottom:2px solid var(--border-color); padding-bottom:14px; font-weight:700; }
+    h3 { font-size:1.6rem; margin:28px 0 16px; color:#1a3a5c; font-weight:600; }
+    h4 { font-size:1.2rem; margin:18px 0 12px; color:var(--success); font-weight:600; }
+    p { margin-bottom:14px; font-size:1.1rem; line-height:1.8; }
+    ul,ol { margin:12px 0; padding-left:36px; }
+    li { margin:8px 0; line-height:1.6; font-size:1.05rem; }
+
+    /* TABLES */
+    table { width:100%; border-collapse:collapse; margin:18px 0; font-size:0.97rem; }
+    thead { background:var(--highlight); color:white; }
+    th { padding:13px 15px; text-align:left; font-weight:600; }
+    td { padding:11px 15px; border-bottom:1px solid var(--border-color); vertical-align:top; word-break:break-word; }
+    tbody tr:hover { background:rgba(21,101,192,0.03); }
+
+    /* CODE */
+    code { background:rgba(21,101,192,0.08); padding:2px 8px; border-radius:4px; font-family:'Space Mono',monospace; font-size:0.88em; color:#0d47a1; }
+    pre { background:#0d1b2a; color:#cdd9e5; padding:22px; border-radius:8px; overflow-x:auto; line-height:1.65; font-family:'Space Mono',monospace; font-size:0.85rem; margin:16px 0; white-space:pre; }
+    .cm  { color:#6a8ea8; font-style:italic; }
+    .kw  { color:#79b8ff; }
+    .val { color:#56d364; }
+    .str { color:#e3b341; }
+
+    /* CALLOUT BOXES */
+    .info-box    { background:rgba(13,71,161,0.07);  border-left:4px solid var(--info);    padding:18px 20px; margin:18px 0; border-radius:0 8px 8px 0; font-size:1.05rem; }
+    .warning-box { background:rgba(200,112,0,0.07);  border-left:4px solid var(--warning); padding:18px 20px; margin:18px 0; border-radius:0 8px 8px 0; font-size:1.05rem; }
+    .success-box { background:rgba(26,122,74,0.07);  border-left:4px solid var(--success); padding:18px 20px; margin:18px 0; border-radius:0 8px 8px 0; font-size:1.05rem; }
+    .error-box   { background:rgba(183,28,28,0.07);  border-left:4px solid var(--error);   padding:18px 20px; margin:18px 0; border-radius:0 8px 8px 0; font-size:1.05rem; }
+
+    /* BADGES */
+    .badge { display:inline-block; padding:3px 11px; border-radius:12px; font-size:0.82rem; font-weight:600; font-family:'Space Mono',monospace; }
+    .badge-info    { background:rgba(13,71,161,0.1);  color:var(--info);    border:1px solid var(--info); }
+    .badge-warning { background:rgba(200,112,0,0.1);  color:var(--warning); border:1px solid var(--warning); }
+    .badge-success { background:rgba(26,122,74,0.1);  color:var(--success); border:1px solid var(--success); }
+
+    /* VERSION BANNER */
+    .version-banner { display:flex; gap:16px; flex-wrap:wrap; align-items:center; margin-bottom:20px; }
+    .v-tag { font-family:'Space Mono',monospace; font-size:0.78rem; padding:5px 12px; border-radius:6px; }
+    .v-tag.ver  { background:rgba(21,101,192,0.1);  color:var(--highlight); border:1px solid rgba(21,101,192,0.3); }
+    .v-tag.plat { background:rgba(13,27,42,0.08);   color:var(--primary-dark); border:1px solid rgba(13,27,42,0.2); }
+
+    /* FLOW STEPS */
+    .workflow-diagram { background:rgba(21,101,192,0.03); border:2px solid var(--border-color); border-radius:10px; padding:26px; margin:26px 0; }
+    .flow-step { display:flex; align-items:flex-start; margin:14px 0; padding:18px 20px; background:var(--card-bg); border-radius:8px; box-shadow:0 2px 4px rgba(13,27,42,0.06); gap:18px; }
+    .flow-number { min-width:40px; height:40px; border-radius:50%; background:var(--highlight); color:white; display:flex; align-items:center; justify-content:center; font-weight:700; font-family:'Space Mono',monospace; flex-shrink:0; font-size:0.9rem; }
+    .flow-content { flex:1; }
+    .flow-title { font-weight:700; color:var(--highlight); margin-bottom:4px; font-size:1.05rem; }
+    .flow-description { color:var(--text-muted); font-size:0.97rem; line-height:1.6; }
+
+    /* TWO-COL GRID */
+    .two-col { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin:20px 0; }
+    .grid-card { background:var(--bg-light); border:1px solid var(--border-color); border-radius:10px; padding:20px; }
+    .grid-card h4 { color:var(--highlight); margin:0 0 10px 0; font-size:1.05rem; }
+
+    /* QUERY CATEGORY CARD */
+    .qcat { background:var(--bg-light); border:1px solid var(--border-color); border-radius:10px; padding:24px; margin-bottom:20px; }
+    .qcat-title { font-family:'Space Mono',monospace; font-size:0.9rem; font-weight:700; color:var(--highlight); margin-bottom:14px; letter-spacing:0.5px; }
+    .qcat-note { font-size:0.95rem; color:var(--text-muted); margin-top:12px; line-height:1.7; }
+
+    /* QUERY TABLE inside qcat */
+    .qtable { width:100%; border-collapse:collapse; font-size:0.88rem; }
+    .qtable th { padding:9px 12px; background:var(--highlight); color:white; text-align:left; font-weight:600; }
+    .qtable td { padding:8px 12px; border-bottom:1px solid var(--border-color); vertical-align:top; font-family:'Space Mono',monospace; font-size:0.78rem; word-break:break-all; }
+    .qtable td:first-child { font-family:'Crimson Pro',serif; font-size:0.95rem; white-space:nowrap; font-weight:600; color:var(--text-dark); word-break:normal; }
+    .qtable tbody tr:hover { background:rgba(21,101,192,0.03); }
+
+    /* PLACEHOLDER LEGEND */
+    .ph-legend { display:flex; flex-wrap:wrap; gap:10px; margin:14px 0 20px; }
+    .ph-tag { font-family:'Space Mono',monospace; font-size:0.78rem; padding:4px 10px; border-radius:5px; background:rgba(21,101,192,0.08); border:1px solid rgba(21,101,192,0.25); color:#0d2757; }
+
+    /* CHECKLIST */
+    .checklist { list-style:none; padding:0; margin:16px 0; }
+    .checklist li { display:flex; align-items:flex-start; gap:12px; padding:12px 14px; border-bottom:1px solid var(--border-color); font-size:1rem; line-height:1.6; }
+    .checklist li:last-child { border-bottom:none; }
+    .check-box { width:20px; height:20px; border:2px solid var(--border-color); border-radius:4px; flex-shrink:0; margin-top:2px; }
+
+    @keyframes fadeInUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+
+    @media (max-width:900px) {
+        .two-col { grid-template-columns:1fr; }
+        .section { padding:24px; }
+        h2 { font-size:1.7rem; } h3 { font-size:1.3rem; }
+    }
+    a { color:var(--highlight); }
+    .flow-content { min-width:0; }
+    code { overflow-wrap:anywhere; }
+    @media (max-width:700px) {
+        .nav-wrapper { position:static; }
+        .section { scroll-margin-top:12px; }
+        table { display:block; overflow-x:auto; }
+    }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- NAV -->
+<div class="nav-wrapper">
+    <nav class="nav-menu" id="quickNav">
+        <div class="nav-title"><span style="-webkit-text-fill-color:initial;">🚀</span> NotifyBot Runbook</div>
+        <p class="nav-sub">Automated Email Batch Sender &nbsp;·&nbsp; Runbook &amp; Reference Guide &nbsp;·&nbsp; sendmail</p>
+        <hr class="nav-divider">
+        <div class="nav-grid">
+            <a href="#overview"    class="nav-item">Overview</a>
+            <a href="#usage"       class="nav-item">Usage</a>
+            <a href="#files"       class="nav-item">Input Files</a>
+            <a href="#modes"       class="nav-item">Modes &amp; Recipients</a>
+            <a href="#exclude"     class="nav-item">Exclusion List</a>
+            <a href="#filters"     class="nav-item">Filters &amp; Placeholders</a>
+            <a href="#dryrun"      class="nav-item">Dry-Run &amp; Approval</a>
+            <a href="#resume"      class="nav-item">Resume</a>
+            <a href="#logging"     class="nav-item">Logging &amp; Output</a>
+            <a href="#trouble"     class="nav-item">Troubleshooting</a>
+            <a href="#bestpractice" class="nav-item">Best Practices</a>
+        </div>
+    </nav>
+</div>
+
+<!-- 1. OVERVIEW -->
+<section id="overview" class="section">
+    <h2>Overview</h2>
+
+    <div class="grid-card" style="margin-bottom:26px;">
+        <h3 style="margin-top:0;">🚀 NotifyBot User Runbook</h3>
+        <p><strong>NotifyBot</strong>, our smart, scalable solution for email automation. Whether you're sending a handful of emails or thousands, NotifyBot makes it effortless, safe, and efficient. It supports both single and multi modes, with dry-run and signature capabilities.</p>
+        <ul style="list-style:none;padding-left:0;">
+            <li>📧 <strong>Batch Email Sending:</strong> Deliver emails in customizable batches with controlled delays</li>
+            <li>🖋️ <strong>HTML Email Support:</strong> Craft rich, styled messages (with attachments!)</li>
+            <li>🎯 <strong>Recipient Filtering:</strong> Easily target the right audience with CSV filters</li>
+            <li>🧪 <strong>Dry Run Mode:</strong> Test configurations safely without sending actual emails</li>
+            <li>✅ <strong>Email Validation:</strong> Automatically validate addresses to reduce bounces</li>
+            <li>📎 <strong>Attachment Support:</strong> Attach files up to 15MB each</li>
+            <li>🔁 <strong>Deduplication:</strong> Automatically remove duplicate recipients</li>
+            <li>📊 <strong>Logging &amp; Transparency:</strong> Detailed logs with automatic log rotation</li>
+        </ul>
+        <p style="margin-bottom:0;"><em>Stay in control. Stay efficient. That’s the NotifyBot way.</em></p>
+    </div>
+
+    <div class="version-banner">
+        <span class="v-tag ver">notifybot.py</span>
+        <span class="v-tag plat">Python 3 · sendmail</span>
+        <span class="v-tag plat">/notifybot</span>
+    </div>
+    <p><code>notifybot.py</code> sends HTML emails in controlled batches through the local <code>sendmail</code>. It supports <strong>single mode</strong> (one email to a whole list) and <strong>multi mode</strong> (one personalised email per filter line), with dry-run approval, a strictly enforced exclusion list and safe resume after failures.</p>
+
+    <div class="error-box">
+        <strong>Critical:</strong> always run with <code>--dry-run</code> first and get the DRAFT approved. Do <strong>not</strong> use <code>--force</code> unless running an approved automated job. Running live without a dry-run review may result in unintended mass emails.
+    </div>
+
+    <h3>How a Run Works</h3>
+    <div class="workflow-diagram">
+        <div class="flow-step">
+            <div class="flow-number">1</div>
+            <div class="flow-content">
+                <div class="flow-title">Validate Folder &amp; Inputs</div>
+                <div class="flow-description"><code>--base-folder</code> must be inside <code>/notifybot/basefolder</code>. Required files are checked, filter/field names are validated against the inventory headers, and <code>exclude.txt</code> is checked — any unreadable entry stops the run.</div>
+            </div>
+        </div>
+        <div class="flow-step">
+            <div class="flow-number">2</div>
+            <div class="flow-content">
+                <div class="flow-title">Build Recipient Lists</div>
+                <div class="flow-description">TO from <code>to.txt</code> or <code>filter.txt</code> + <code>inventory.csv</code>, merged with <code>additional_to.txt</code>; CC/BCC from <code>cc.txt</code> / <code>bcc.txt</code>. Addresses are validated and de-duplicated (case-insensitive).</div>
+            </div>
+        </div>
+        <div class="flow-step">
+            <div class="flow-number">3</div>
+            <div class="flow-content">
+                <div class="flow-title">Apply Exclusions</div>
+                <div class="flow-description">Every address in <code>exclude.txt</code> is removed from TO, CC, BCC and approvers.</div>
+            </div>
+        </div>
+        <div class="flow-step">
+            <div class="flow-number">4</div>
+            <div class="flow-content">
+                <div class="flow-title">Summary &amp; Confirmation</div>
+                <div class="flow-description">Counts, batch size, delay and resume status are shown. You must type <code>yes</code> to proceed (skipped only with <code>--force</code>).</div>
+            </div>
+        </div>
+        <div class="flow-step">
+            <div class="flow-number">5</div>
+            <div class="flow-content">
+                <div class="flow-title">Send in Batches</div>
+                <div class="flow-description">Recipients already in <code>sent.log</code> are skipped. Each batch is re-checked against <code>exclude.txt</code> immediately before sendmail is called, then sent with <code>--delay</code> seconds between batches.</div>
+            </div>
+        </div>
+        <div class="flow-step">
+            <div class="flow-number">6</div>
+            <div class="flow-content">
+                <div class="flow-title">Record &amp; Report</div>
+                <div class="flow-description">Delivered addresses are appended to <code>sent.log</code> (live only). A summary of successful/failed batches is logged to <code>/notifybot/logs/notifybot.log</code>.</div>
+            </div>
+        </div>
+    </div>
+
+    <h3>What's New</h3>
+    <div class="success-box">
+        <ul style="margin:0;">
+            <li><strong><code>exclude.txt</code></strong> — listed addresses never receive the email (TO, CC, BCC or approvers). See <a href="#exclude">Exclusion List</a>.</li>
+            <li><strong>Resume</strong> — re-running the same command sends only to recipients not yet delivered (<code>sent.log</code>). New <code>--ignore-sent-log</code>.</li>
+            <li><strong>Helper options</strong> — <code>--test-filter</code> and <code>--analyze-inventory</code> (never send email).</li>
+            <li><strong>Anchored regex</strong> — <code>=~</code> / <code>!~</code> must match the whole value: <code>country=~"UK"</code> no longer matches "Ukraine".</li>
+            <li><strong>Comma-separated addresses</strong> accepted in recipient files, as well as <code>;</code> and one per line.</li>
+            <li><strong>Safety checks</strong> — base folder confinement, <code>--batch-size</code> ≥ 1, <code>--delay</code> ≥ 0, and dry-run stops if there is no valid approver.</li>
+            <li><strong>Attachment names</strong> in any language (e.g. <code>報告.pdf</code>) are preserved.</li>
+        </ul>
+    </div>
+</section>
+
+<!-- 2. USAGE -->
+<section id="usage" class="section">
+    <h2>Usage</h2>
+    <pre>/notifybot/venv/bin/python notifybot.py --base-folder &lt;user-basefolder&gt; [OPTIONS]</pre>
+
+    <div class="info-box">
+        <strong>Tip:</strong> replace <code>&lt;user-basefolder&gt;</code> with your campaign folder name inside <code>/notifybot/basefolder/</code> — e.g. <code>--base-folder newsletter_august</code>. Pass the name only, not a full path.
+    </div>
+
+    <h3>Command-Line Options</h3>
+    <table>
+        <thead><tr><th>Option</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr><td><code>--base-folder</code></td><td>—</td><td>Campaign folder inside <code>/notifybot/basefolder</code> <strong>(required, except with <code>--analyze-inventory</code>)</strong>. Absolute paths, <code>..</code> and symlinks leading outside are rejected.</td></tr>
+            <tr><td><code>--mode</code></td><td><code>single</code></td><td><code>single</code> or <code>multi</code>. Overrides <code>mode.txt</code>.</td></tr>
+            <tr><td><code>--dry-run</code></td><td>off</td><td>Send only to approvers, with <strong>DRAFT</strong> subject prefix and a recipient-count banner.</td></tr>
+            <tr><td><code>--batch-size</code></td><td><code>500</code></td><td>TO recipients per email/batch, minimum 1. Applies to both modes.</td></tr>
+            <tr><td><code>--delay</code></td><td><code>5.0</code></td><td>Seconds between batches and between multi-mode filters, minimum 0.</td></tr>
+            <tr><td><code>--force</code></td><td>off</td><td>Skip the confirmation prompt. <strong>Approved automation only.</strong></td></tr>
+            <tr><td><code>--ignore-sent-log</code> <span class="badge badge-success">NEW</span></td><td>off</td><td>Don't skip addresses already in <code>sent.log</code> — resends an identical email to everyone. Deliveries are still recorded.</td></tr>
+            <tr><td><code>--test-filter</code> <span class="badge badge-success">NEW</span></td><td>off</td><td>Show which inventory rows <code>filter.txt</code> matches and the addresses found. <strong>Sends nothing.</strong></td></tr>
+            <tr><td><code>--analyze-inventory</code> <span class="badge badge-success">NEW</span></td><td>off</td><td>List <code>inventory.csv</code> columns and sample values. <strong>Sends nothing</strong>; no base folder needed.</td></tr>
+            <tr><td><code>--help</code></td><td>—</td><td>Show help (including current inventory fields) and exit.</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Common Invocations</h3>
+    <pre><span class="cm"># Dry-run (always first)</span>
+/notifybot/venv/bin/python notifybot.py --base-folder &lt;user-basefolder&gt; --dry-run
+
+<span class="cm"># Live, single mode (default)</span>
+/notifybot/venv/bin/python notifybot.py --base-folder &lt;user-basefolder&gt;
+
+<span class="cm"># Live, multi mode with custom batch size and delay</span>
+/notifybot/venv/bin/python notifybot.py --base-folder &lt;user-basefolder&gt; --mode multi --batch-size 500 --delay 5.0
+
+<span class="cm"># Preview filter matches (sends nothing)</span>
+/notifybot/venv/bin/python notifybot.py --base-folder &lt;user-basefolder&gt; --test-filter
+
+<span class="cm"># Inspect inventory fields and values (sends nothing)</span>
+/notifybot/venv/bin/python notifybot.py --analyze-inventory
+
+<span class="cm"># Approved full resend of an identical email</span>
+/notifybot/venv/bin/python notifybot.py --base-folder &lt;user-basefolder&gt; --ignore-sent-log</pre>
+</section>
+
+<!-- 3. INPUT FILES -->
+<section id="files" class="section">
+    <h2>Input Files</h2>
+
+    <h3>File Reference</h3>
+    <table>
+        <thead><tr><th>File</th><th>Location</th><th>Purpose</th></tr></thead>
+        <tbody>
+            <tr><td><code>subject.txt</code></td><td>base folder</td><td>Subject line; <code>{field}</code> placeholders allowed in multi mode. <span class="badge badge-warning">required</span></td></tr>
+            <tr><td><code>body.html</code></td><td>base folder</td><td>HTML body; <code>{field}</code> placeholders allowed in multi mode. <span class="badge badge-warning">required</span></td></tr>
+            <tr><td><code>from.txt</code></td><td>base folder</td><td>Sender address, e.g. <code>ops@example.com</code>. <span class="badge badge-warning">required</span></td></tr>
+            <tr><td><code>approver.txt</code></td><td>base folder</td><td>Recipients of dry-run DRAFTs. <span class="badge badge-warning">required</span></td></tr>
+            <tr><td><code>to.txt</code></td><td>base folder</td><td>Direct TO list. Takes priority over <code>filter.txt</code> in single mode.</td></tr>
+            <tr><td><code>filter.txt</code></td><td>base folder</td><td>Filter conditions on <code>inventory.csv</code>. Required in multi mode.</td></tr>
+            <tr><td><code>additional_to.txt</code></td><td>base folder</td><td>Extra TO recipients, merged with the main source (added to every multi-mode email).</td></tr>
+            <tr><td><code>cc.txt</code> / <code>bcc.txt</code></td><td>base folder</td><td>CC / BCC, included in every batch and every multi-mode email.</td></tr>
+            <tr><td><code>exclude.txt</code> <span class="badge badge-success">NEW</span></td><td>base folder</td><td>Addresses that must never receive the email.</td></tr>
+            <tr><td><code>field.txt</code></td><td>base folder</td><td>Multi mode: inventory field names (one per line) used for <code>{field}</code> placeholders.</td></tr>
+            <tr><td><code>field-inventory.csv</code></td><td>base folder</td><td>Optional local inventory used for placeholder values instead of the global one.</td></tr>
+            <tr><td><code>mode.txt</code></td><td>base folder</td><td><code>single</code> or <code>multi</code>; overridden by <code>--mode</code>.</td></tr>
+            <tr><td><code>attachment/</code> · <code>images/</code></td><td>base folder</td><td>Files to attach · images to embed in the body.</td></tr>
+            <tr><td><code>signature.html</code></td><td><code>/notifybot/</code></td><td>Global signature appended to every email, all campaigns.</td></tr>
+            <tr><td><code>inventory.csv</code></td><td><code>/notifybot/inventory/</code></td><td>Global inventory for filters; must contain an <code>email</code> column.</td></tr>
+        </tbody>
+    </table>
+    <div class="info-box"><strong>Recipient file format</strong> (<code>to.txt</code>, <code>cc.txt</code>, <code>bcc.txt</code>, <code>additional_to.txt</code>, <code>approver.txt</code>): one address per line, or several separated by <code>;</code> or <code>,</code>. Invalid addresses — including any starting with <code>-</code> — are skipped with a warning.</div>
+
+    <h3>Directory Structure</h3>
+    <pre>/notifybot
+  ├── basefolder/
+  │   └── &lt;user-basefolder&gt;/
+  │       ├── subject.txt
+  │       ├── body.html
+  │       ├── from.txt
+  │       ├── approver.txt
+  │       ├── to.txt               <span class="cm">(optional)</span>
+  │       ├── filter.txt           <span class="cm">(optional in single, required in multi)</span>
+  │       ├── additional_to.txt    <span class="cm">(optional)</span>
+  │       ├── cc.txt / bcc.txt     <span class="cm">(optional)</span>
+  │       ├── exclude.txt          <span class="cm">(optional)</span>
+  │       ├── field.txt            <span class="cm">(optional, multi)</span>
+  │       ├── field-inventory.csv  <span class="cm">(optional, multi)</span>
+  │       ├── mode.txt             <span class="cm">(optional)</span>
+  │       ├── attachment/          <span class="cm">(optional)</span>
+  │       ├── images/              <span class="cm">(optional)</span>
+  │       ├── sent.log             <span class="cm">(auto — live runs)</span>
+  │       └── recipients/          <span class="cm">(auto — multi mode)</span>
+  ├── signature.html               <span class="cm">(optional, global)</span>
+  ├── inventory/
+  │   └── inventory.csv
+  └── logs/
+      └── notifybot.log</pre>
+</section>
+
+<!-- 4. MODES & RECIPIENTS -->
+<section id="modes" class="section">
+    <h2>Modes &amp; Recipients</h2>
+
+    <div class="two-col">
+        <div class="grid-card">
+            <h4>Single Mode (default)</h4>
+            <p style="font-size:1rem;margin-bottom:8px;">One email to the whole list, split into batches of <code>--batch-size</code>.</p>
+            <ul style="margin:0;padding-left:22px;">
+                <li><strong>Required:</strong> <code>subject.txt</code>, <code>body.html</code>, <code>from.txt</code>, <code>approver.txt</code></li>
+                <li><strong>At least one source:</strong> <code>to.txt</code>, <code>filter.txt</code> + inventory, <code>additional_to.txt</code>, <code>cc.txt</code> or <code>bcc.txt</code></li>
+                <li><strong>Optional:</strong> <code>exclude.txt</code>, <code>attachment/</code>, <code>images/</code>, <code>mode.txt</code></li>
+            </ul>
+        </div>
+        <div class="grid-card">
+            <h4>Multi Mode</h4>
+            <p style="font-size:1rem;margin-bottom:8px;">One personalised email <strong>per line of <code>filter.txt</code></strong>, each to the rows that line matches.</p>
+            <ul style="margin:0;padding-left:22px;">
+                <li><strong>Required:</strong> the four files above + <code>filter.txt</code> + global <code>inventory.csv</code></li>
+                <li><strong>Optional:</strong> <code>field.txt</code>, <code>field-inventory.csv</code>, <code>additional_to.txt</code>, <code>cc.txt</code>, <code>bcc.txt</code>, <code>exclude.txt</code>, <code>attachment/</code>, <code>images/</code></li>
+                <li>Writes a <code>recipients/</code> folder with each filter's list and a summary.</li>
+            </ul>
+        </div>
+    </div>
+
+    <h3>Recipient Priority — Single Mode</h3>
+    <table>
+        <thead><tr><th>Step</th><th>Source</th><th>Behaviour</th></tr></thead>
+        <tbody>
+            <tr><td>1</td><td><code>to.txt</code></td><td>If present, always the primary TO list.</td></tr>
+            <tr><td>2</td><td><code>filter.txt</code> + <code>inventory.csv</code></td><td>Used only if <code>to.txt</code> is absent. The result is <strong>saved as <code>to.txt</code></strong>.</td></tr>
+            <tr><td>3</td><td><code>additional_to.txt</code></td><td>Merged with the source above, or used alone.</td></tr>
+            <tr><td>4</td><td><code>cc.txt</code> / <code>bcc.txt</code></td><td>Added to every batch; don't affect TO.</td></tr>
+            <tr><td>5</td><td><code>exclude.txt</code></td><td>Removes listed addresses from TO, CC and BCC.</td></tr>
+        </tbody>
+    </table>
+    <div class="error-box"><strong>Stale <code>to.txt</code>:</strong> when <code>filter.txt</code> is used, the result is saved as <code>to.txt</code> — <strong>even during a dry-run</strong>. From then on <code>to.txt</code> wins and later edits to <code>filter.txt</code> are ignored. After changing <code>filter.txt</code>, <strong>delete <code>to.txt</code></strong> and dry-run again before going live.</div>
+
+    <h3>Recipient Priority — Multi Mode</h3>
+    <table>
+        <thead><tr><th>Step</th><th>Source</th><th>Behaviour</th></tr></thead>
+        <tbody>
+            <tr><td>1</td><td><code>filter.txt</code> + <code>inventory.csv</code></td><td>Each line = one email; recipients are the matched rows' <code>email</code> values.</td></tr>
+            <tr><td>2</td><td><code>field.txt</code></td><td>Placeholder values from matched rows (<code>field-inventory.csv</code> if present).</td></tr>
+            <tr><td>3</td><td><code>additional_to.txt</code></td><td>Added to <strong>every</strong> email.</td></tr>
+            <tr><td>4</td><td><code>cc.txt</code> / <code>bcc.txt</code></td><td>Added to every email.</td></tr>
+            <tr><td>5</td><td><code>exclude.txt</code></td><td>Removes listed addresses; a filter whose recipients are all excluded is skipped.</td></tr>
+        </tbody>
+    </table>
+    <div class="warning-box"><strong>CC/BCC copies:</strong> CC and BCC are included in every batch (and every multi-mode email), so they receive one copy per batch. Example: 1,200 TO recipients with <code>--batch-size 500</code> = 3 batches = 3 copies per CC recipient.</div>
+    <div class="info-box">If no recipient source is found, the run stops with an error in both dry-run and live mode. Multi mode also stops if <code>filter.txt</code> / <code>inventory.csv</code> is missing or a field name doesn't exist in the inventory headers.</div>
+</section>
+
+<!-- 5. EXCLUSION LIST -->
+<section id="exclude" class="section">
+    <h2>Exclusion List <span class="badge badge-success">NEW</span></h2>
+    <p>Any address in <code>exclude.txt</code> will <strong>never</strong> receive the email — not as TO, CC, BCC, nor as a dry-run approver — whichever file it came from.</p>
+
+    <h3>Format</h3>
+    <pre><span class="cm"># Opted out - ticket 4521</span>
+john@example.com
+"Tan, John" &lt;john.tan@example.com&gt;
+Carol &lt;carol@example.com&gt;; dave@example.com, erin@example.com</pre>
+    <ul>
+        <li>One address per line, or separated by <code>;</code> or <code>,</code>. <code>Name &lt;address&gt;</code> is accepted.</li>
+        <li>Lines starting with <code>#</code> are comments.</li>
+        <li>Matching is case-insensitive.</li>
+    </ul>
+
+    <h3>Enforcement</h3>
+    <table>
+        <thead><tr><th>Layer</th><th>What Happens</th></tr></thead>
+        <tbody>
+            <tr><td>Strict file check</td><td>If any line can't be read as an address, the run <strong>stops before sending anything</strong> and names the line.</td></tr>
+            <tr><td>List filtering</td><td>Excluded addresses are removed from TO, CC, BCC and approvers while lists are built.</td></tr>
+            <tr><td>Final pre-send check</td><td><code>exclude.txt</code> is re-read immediately before every batch. If any excluded address is present, the whole batch is <strong>BLOCKED</strong> — nothing is sent for it. This also catches edits made while a run is in progress.</td></tr>
+            <tr><td>Approvers</td><td>An excluded approver is skipped; if every approver is excluded, the dry-run stops.</td></tr>
+            <tr><td><code>to.txt</code></td><td>Not modified — exclusions apply at send time, so removing someone from <code>exclude.txt</code> restores them.</td></tr>
+        </tbody>
+    </table>
+    <div class="warning-box">If every TO recipient is excluded but CC/BCC remain, the email still goes to CC/BCC (a warning is logged). If nobody remains, the run stops.</div>
+    <div class="error-box"><strong>Aliases are not detected.</strong> Excluding <code>john@example.com</code> does not block <code>john+hr@example.com</code> or <code>j.tan@example.com</code>. List every address the person uses.</div>
+</section>
+
+<!-- 6. FILTERS & PLACEHOLDERS -->
+<section id="filters" class="section">
+    <h2>Filters &amp; Placeholders</h2>
+
+    <h3>Filter Syntax (<code>filter.txt</code>)</h3>
+    <table>
+        <thead><tr><th>Operator</th><th>Meaning</th><th>Example</th></tr></thead>
+        <tbody>
+            <tr><td><code>=</code></td><td>Exact match (case-insensitive)</td><td><code>department="sales"</code></td></tr>
+            <tr><td><code>!=</code></td><td>Not equal (case-insensitive)</td><td><code>region!="europe"</code></td></tr>
+            <tr><td><code>=~</code></td><td>Regex match — must match the <strong>whole</strong> value</td><td><code>country=~"USA|Canada"</code></td></tr>
+            <tr><td><code>!~</code></td><td>Regex not match — whole value</td><td><code>email!~".*(test|demo).*"</code></td></tr>
+            <tr><td><code>*</code> <code>?</code> <code>[ ]</code></td><td>Wildcards with <code>=</code></td><td><code>status=active*</code></td></tr>
+            <tr><td><code>,</code></td><td>AND — all conditions on the line</td><td><code>department="sales",region="north"</code></td></tr>
+            <tr><td>New line</td><td>OR — and a separate email in multi mode</td><td>—</td></tr>
+            <tr><td><code>#</code></td><td>Comment line</td><td><code># Sales only</code></td></tr>
+        </tbody>
+    </table>
+
+    <h3>Sample filter.txt</h3>
+    <pre><span class="cm"># Sales in North America OR Marketing globally</span>
+department="sales",country=~"USA|Canada|Mexico"
+department="marketing"
+
+<span class="cm"># Everyone except contractors (contains-match needs .*)</span>
+name!~".*(Contract|Temp|Intern).*"</pre>
+
+    <div class="warning-box">
+        <strong>Anchored regex:</strong> <code>country=~"UK"</code> matches <code>UK</code> but not <code>Ukraine</code>; use <code>.*UK.*</code> for "contains".<br>
+        <strong>No commas in values:</strong> commas always split conditions, so <code>"Washington, DC"</code> or regex counts like <code>{2,5}</code> are not supported.<br>
+        <strong>Field names</strong> must exist in the <code>inventory.csv</code> headers or the run stops — check with <code>--analyze-inventory</code>, preview with <code>--test-filter</code>.
+    </div>
+
+    <h3>Placeholders (Multi Mode)</h3>
+    <p>List field names in <code>field.txt</code> and use them as <code>{field}</code> in <code>subject.txt</code> / <code>body.html</code>. Each email gets values from the rows its filter line matched.</p>
+    <pre><span class="cm"># field.txt</span>
+department
+region
+
+<span class="cm"># subject.txt</span>
+Maintenance notice for {department} ({region})</pre>
+    <table>
+        <thead><tr><th>Values Found</th><th>Rendered As</th></tr></thead>
+        <tbody>
+            <tr><td>1</td><td><code>sales</code></td></tr>
+            <tr><td>2</td><td><code>sales and hr</code></td></tr>
+            <tr><td>3 – 5</td><td><code>a, b, and c</code></td></tr>
+            <tr><td>More than 5</td><td>First 3 + <code>and N more</code></td></tr>
+            <tr><td>None</td><td>Left as-is (e.g. <code>{region}</code>) — check the DRAFT</td></tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- 7. DRY-RUN & APPROVAL -->
+<section id="dryrun" class="section">
+    <h2>Dry-Run &amp; Approval</h2>
+    <p>With <code>--dry-run</code>, NotifyBot sends only to <code>approver.txt</code> (minus any in <code>exclude.txt</code>). The subject gets a <strong>DRAFT</strong> prefix and the body starts with a banner showing the real TO / CC / BCC counts after exclusions (and the filter used, in multi mode).</p>
+    <div class="info-box">A dry-run never reads or writes <code>sent.log</code>, but it <strong>may create <code>to.txt</code></strong> — see the stale <code>to.txt</code> warning in <a href="#modes">Modes &amp; Recipients</a>.</div>
+
+    <h3>Approval Flow</h3>
+    <div class="workflow-diagram">
+        <div class="flow-step">
+            <div class="flow-number">1</div>
+            <div class="flow-content">
+                <div class="flow-title">Run Dry-Run</div>
+                <div class="flow-description">Approvers receive the DRAFT with the real recipient counts.</div>
+            </div>
+        </div>
+        <div class="flow-step">
+            <div class="flow-number">2</div>
+            <div class="flow-content">
+                <div class="flow-title">Review &amp; Approve</div>
+                <div class="flow-description">Approvers check content, subject, attachments and counts, and confirm by reply.</div>
+            </div>
+        </div>
+        <div class="flow-step">
+            <div class="flow-number">3</div>
+            <div class="flow-content">
+                <div class="flow-title">Run Live</div>
+                <div class="flow-description">Run the same command without <code>--dry-run</code>. Don't change subject, body or recipient files between approval and the live run.</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 8. RESUME -->
+<section id="resume" class="section">
+    <h2>Resume <span class="badge badge-success">NEW</span></h2>
+    <p>In live mode, each address is appended to <code>&lt;user-basefolder&gt;/sent.log</code> as soon as its batch succeeds. If a run is interrupted or some batches fail, fix the cause and <strong>re-run the same command</strong> — only recipients not yet delivered are sent to. The confirmation summary shows how many will be skipped.</p>
+
+    <h3>sent.log Format</h3>
+    <pre><span class="cm"># timestamp            message-fingerprint   address</span>
+2026-09-27T21:31:57    acd697cb26c38534      a1@example.com
+2026-09-27T21:31:57    acd697cb26c38534      a2@example.com</pre>
+
+    <table>
+        <thead><tr><th>Situation</th><th>Behaviour</th></tr></thead>
+        <tbody>
+            <tr><td>Same command re-run</td><td>Already-delivered recipients skipped</td></tr>
+            <tr><td>Subject or body changed</td><td>Treated as a <strong>new message</strong> — sent to everyone</td></tr>
+            <tr><td>Only attachments changed</td><td><strong>Not</strong> a new message — use <code>--ignore-sent-log</code> to resend</td></tr>
+            <tr><td>Multi mode</td><td>Tracked per filter line (per personalised email)</td></tr>
+            <tr><td>sendmail hangs</td><td>Killed after 60 s; batch marked failed and retried on re-run</td></tr>
+            <tr><td><code>sent.log</code> deleted</td><td>History cleared for that campaign</td></tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- 9. LOGGING & OUTPUT -->
+<section id="logging" class="section">
+    <h2>Logging &amp; Output</h2>
+    <p>Logs are written to <code>/notifybot/logs/notifybot.log</code> in CSV format <code>timestamp_ms,username,message</code>, with emojis for quick scanning:</p>
+    <div class="ph-legend">
+        <span class="ph-tag">ℹ️ Info</span><span class="ph-tag">⚠️ Warning</span><span class="ph-tag">❌ Error</span><span class="ph-tag">✅ Success</span>
+        <span class="ph-tag">📝 Draft</span><span class="ph-tag">🔧 Mode</span><span class="ph-tag">⏳ Processing</span><span class="ph-tag">✋ Confirmation</span>
+        <span class="ph-tag">📂 File</span><span class="ph-tag">💾 Backup</span><span class="ph-tag">✍️ Signature</span>
+    </div>
+    <div class="warning-box">The log records full recipient addresses (including excluded and BLOCKED ones) for auditing — treat it as confidential.</div>
+    <p>All logs are also forwarded in real time to <strong>Splunk</strong> for auditing and long-term reference: <a href="https://tinyurl/notifybot" target="_blank">📊 Open Splunk Dashboard</a></p>
+
+    <h3>Generated Files</h3>
+    <table>
+        <thead><tr><th>File</th><th>When</th><th>Contents</th></tr></thead>
+        <tbody>
+            <tr><td><code>to.txt</code></td><td>Single mode, filter or <code>additional_to.txt</code> only</td><td>Resolved TO list (before exclusions)</td></tr>
+            <tr><td><code>sent.log</code></td><td>Live runs</td><td>Delivered addresses per message</td></tr>
+            <tr><td><code>recipients/filter_NNN_*.txt</code></td><td>Multi mode</td><td>Recipients of each filter line</td></tr>
+            <tr><td><code>recipients/multi_mode_summary.txt</code></td><td>Multi mode</td><td>Per-filter counts and grand total</td></tr>
+            <tr><td><code>recipients/all_unique_recipients.txt</code></td><td>Multi mode</td><td>Every unique TO address</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Attachments &amp; Images</h3>
+    <ul>
+        <li>Every file in <code>attachment/</code> is attached to every email; file names in any language are kept.</li>
+        <li>Images referenced in <code>body.html</code> (e.g. <code>&lt;img src="logo.png"&gt;</code>) are embedded when the file exists in <code>images/</code>. External <code>http(s)</code> images stay as links and may be blocked by mail clients.</li>
+        <li>No size limit is enforced by NotifyBot; the mail server's message-size limit applies.</li>
+    </ul>
+</section>
+
+<!-- 10. TROUBLESHOOTING -->
+<section id="trouble" class="section">
+    <h2>Troubleshooting</h2>
+    <table>
+        <thead><tr><th>Message</th><th>Action</th></tr></thead>
+        <tbody>
+            <tr><td><code>Invalid base folder ... must be a directory inside '/notifybot/basefolder'</code></td><td>Pass the folder name only (e.g. <code>newsletter_august</code>), not a path or <code>..</code>.</td></tr>
+            <tr><td><code>exclude.txt has N entry that could not be read as an email address</code></td><td>Fix or remove the named line(s). Nothing was sent.</td></tr>
+            <tr><td><code>BLOCKED: batch contained ... listed in exclude.txt</code></td><td>An excluded address reached the send stage (e.g. <code>exclude.txt</code> edited mid-run). Nothing was sent for that batch — re-run the same command.</td></tr>
+            <tr><td><code>No valid approver emails found</code> / <code>Every approver is listed in exclude.txt</code></td><td>Add at least one valid, non-excluded address to <code>approver.txt</code>.</td></tr>
+            <tr><td><code>No recipients left after applying exclude.txt</code></td><td>Everyone is excluded — check the recipient files and <code>exclude.txt</code>.</td></tr>
+            <tr><td><code>Field validation failed</code> / <code>Field '...' not found</code></td><td>Names in <code>filter.txt</code> / <code>field.txt</code> must match inventory headers exactly. Run <code>--analyze-inventory</code>.</td></tr>
+            <tr><td><code>All TO recipients already received this email</code></td><td>Delivered on an earlier run (<code>sent.log</code>). Use <code>--ignore-sent-log</code> only for an approved resend.</td></tr>
+            <tr><td><code>Sendmail failed with return code ...</code> / <code>Sendmail timeout</code></td><td>Check the mail server, then re-run the same command to retry only failed batches.</td></tr>
+            <tr><td><code>argument --batch-size: must be at least 1</code></td><td>Use batch size ≥ 1 and delay ≥ 0.</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Filter Matches Unexpected Rows</h3>
+    <pre><span class="cm"># Preview matches and extracted addresses</span>
+/notifybot/venv/bin/python notifybot.py --base-folder &lt;user-basefolder&gt; --test-filter
+
+<span class="cm"># See available fields and sample values</span>
+/notifybot/venv/bin/python notifybot.py --analyze-inventory
+
+<span class="cm"># After editing filter.txt, remove the stale list before dry-run</span>
+rm /notifybot/basefolder/&lt;user-basefolder&gt;/to.txt</pre>
+
+    <h3>Check What Was Delivered</h3>
+    <pre><span class="cm"># Delivered addresses for a campaign</span>
+cut -f3 /notifybot/basefolder/&lt;user-basefolder&gt;/sent.log | sort -u
+
+<span class="cm"># Errors and blocked batches in the main log</span>
+grep -E "❌|BLOCKED" /notifybot/logs/notifybot.log | tail -20</pre>
+</section>
+
+<!-- 11. BEST PRACTICES -->
+<section id="bestpractice" class="section">
+    <h2>Best Practices</h2>
+
+    <ul class="checklist">
+        <li>
+            <div class="check-box"></div>
+            <div><strong>Always dry-run first</strong> — get the DRAFT approved and confirm the TO / CC / BCC counts in the banner before any live run.</div>
+        </li>
+        <li>
+            <div class="check-box"></div>
+            <div><strong>Maintain exclude.txt</strong> — add opt-outs with a <code>#</code> comment (who / why / ticket), and list every alias the person uses.</div>
+        </li>
+        <li>
+            <div class="check-box"></div>
+            <div><strong>Test filters before sending</strong> — use <code>--test-filter</code>; remember regex must match the whole value.</div>
+        </li>
+        <li>
+            <div class="check-box"></div>
+            <div><strong>Delete stale to.txt</strong> — after changing <code>filter.txt</code>, remove <code>to.txt</code> and dry-run again.</div>
+        </li>
+        <li>
+            <div class="check-box"></div>
+            <div><strong>Don't change content between approval and live</strong> — subject, body, attachments and recipient files should be exactly what approvers saw.</div>
+        </li>
+        <li>
+            <div class="check-box"></div>
+            <div><strong>Retry with the same command</strong> — after a failure, re-run unchanged so <code>sent.log</code> skips delivered recipients. Use <code>--ignore-sent-log</code> only for an approved full resend.</div>
+        </li>
+        <li>
+            <div class="check-box"></div>
+            <div><strong>Keep CC/BCC small on large sends</strong> — they receive one copy per batch; raise <code>--batch-size</code> if CC recipients must get fewer copies.</div>
+        </li>
+        <li>
+            <div class="check-box"></div>
+            <div><strong>Avoid --force for manual runs</strong> — the confirmation prompt is your last chance to catch a wrong count.</div>
+        </li>
+        <li>
+            <div class="check-box"></div>
+            <div><strong>Protect the logs</strong> — <code>notifybot.log</code> and <code>sent.log</code> contain recipient addresses; restrict access accordingly.</div>
+        </li>
+    </ul>
+
+    <div class="success-box"><strong>End of Runbook</strong> — notifybot.py &nbsp;·&nbsp; Automated Email Batch Sender</div>
+</section>
+
+</div>
+
+<script>
+    window.addEventListener('scroll', function () {
+        const nav = document.getElementById('quickNav');
+        if (window.scrollY > 80) nav.classList.add('scrolled');
+        else nav.classList.remove('scrolled');
+    });
+    document.querySelectorAll('.nav-item').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('href').substring(1);
+            const targetEl = document.getElementById(targetId);
+            if (targetEl) {
+                const nav = document.getElementById("quickNav"); const navH = getComputedStyle(nav.parentElement).position === "sticky" ? nav.offsetHeight : 0;
+                const pos = targetEl.getBoundingClientRect().top + window.pageYOffset - navH - 20;
+                window.scrollTo({ top: pos, behavior: 'smooth' });
+            }
+        });
+    });
+</script>
+</script>
+</body>
+</html>
