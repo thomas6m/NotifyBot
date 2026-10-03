@@ -39,6 +39,7 @@ Column handling
 import argparse
 import csv
 import logging
+import os
 import re
 import sys
 import time
@@ -50,6 +51,17 @@ from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 
 # Encodings tried, in order, for a Managed_Segments.csv file.
 CSV_ENCODINGS = ("utf-8-sig", "cp1252")
+
+# Python's default CSV cell limit (131,072 characters) is too small for an
+# `ids` cell of a namespace with thousands of users; hitting it used to stop
+# the build part-way. Raise it as far as the platform allows.
+_limit = sys.maxsize
+while True:
+    try:
+        csv.field_size_limit(_limit)
+        break
+    except OverflowError:   # e.g. Windows: C long is 32-bit
+        _limit //= 10
 
 
 OUTPUT_FILENAME = "notifybot.csv"
@@ -371,10 +383,14 @@ def build_notifybot(notification_path: Path, segments_path: Path,
         inv_blank = {inv_rename[c]: "" for c in inv_cols}
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        # Write to a temporary file and move it into place only when every row
+        # has been written, so a failed build never leaves a truncated
+        # notifybot.csv behind (the previous good file stays as it was).
+        tmp_path = temp_output_path(output_path)
 
         n_rows = seg_hits = inv_hits = seg_miss = inv_miss = 0
         rows_enriched = emails_added = 0
-        with open(output_path, "w", newline="") as out_fh:
+        with open(tmp_path, "w", newline="") as out_fh:
             writer = csv.DictWriter(out_fh, fieldnames=out_header)
             writer.writeheader()
 
@@ -437,6 +453,12 @@ def build_notifybot(notification_path: Path, segments_path: Path,
                 writer.writerow(record)
                 n_rows += 1
 
+    if n_rows == 0:
+        tmp_path.unlink(missing_ok=True)
+        logger.error(f"{notification_path} has no data rows - {output_path} left unchanged")
+        return 1
+    os.replace(tmp_path, output_path)   # atomic: readers never see a partial file
+
     logger.info("=" * 60)
     logger.info(f"notifybot rows written: {n_rows}")
     logger.info(f"  segment matches:  {seg_hits} hit / {seg_miss} miss")
@@ -469,6 +491,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
     return p
 
 
+def temp_output_path(output_path: Path) -> Path:
+    """Hidden temp file next to the output, so the final rename stays atomic."""
+    return output_path.with_name(f".{output_path.name}.tmp")
+
+
 def resolve_output(output_arg: Optional[Path]) -> Path:
     if output_arg is None:
         return DEFAULT_OUTPUT_DIR / OUTPUT_FILENAME
@@ -499,6 +526,8 @@ def main() -> int:
         import traceback
         logger.error(f"Build failed: {type(exc).__name__}: {exc}")
         logger.debug(traceback.format_exc())
+        temp_output_path(output_path).unlink(missing_ok=True)
+        logger.error(f"{output_path} was NOT changed (previous version kept)")
         return 1
 
     logger.info(f"Elapsed: {time.time() - wall_start:.2f}s")
