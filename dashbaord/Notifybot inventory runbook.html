@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NotifyBot Inventory Runbook</title>
+<style>
+  :root {
+    --brand: #2557d6; --brand-dark: #18254a; --teal: #0e9384; --violet: #7a5af8;
+    --amber: #dc6803; --pink: #dd2590; --red: #b42318; --green: #067647;
+    --bg: #f5f7fb; --card: #ffffff; --text: #1d2330; --muted: #5b6377; --line: #dfe4ee;
+    --code-bg: #0f172a; --code-text: #e2e8f0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1220; --card: #151c2e; --text: #e6e9f2; --muted: #9aa3b8; --line: #263049;
+      --code-bg: #0a0f1c;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.6 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  header {
+    background: linear-gradient(120deg, #1a3fa8 0%, #2557d6 55%, #4f7cf0 100%);
+    color: #fff; padding: 34px 16px 30px; text-align: center;
+  }
+  header h1 { margin: 0; font-size: 2rem; letter-spacing: .3px; }
+  header p { margin: 8px 0 0; color: rgba(255,255,255,.85); }
+  header .meta { margin-top: 14px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  header .meta span {
+    background: rgba(255,255,255,.18); padding: 3px 11px; border-radius: 999px; font-size: .8rem;
+  }
+  .layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 28px; max-width: 1180px; margin: 0 auto; padding: 28px 16px 60px; }
+  nav { position: sticky; top: 16px; align-self: start; max-height: calc(100vh - 32px); overflow: auto; }
+  nav .toc { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 10px; }
+  nav h2 { font-size: .72rem; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 0 8px 8px; }
+  nav a {
+    display: block; padding: 5px 10px; border-radius: 7px; color: var(--text);
+    text-decoration: none; font-size: .88rem;
+  }
+  nav a:hover { background: color-mix(in srgb, var(--brand) 12%, transparent); color: var(--brand); }
+  main section {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 22px 26px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(29,35,48,.04);
+  }
+  h2.sec {
+    margin: 0 0 14px; font-size: 1.3rem; display: flex; align-items: center; gap: 10px;
+  }
+  h2.sec .n {
+    background: var(--brand); color: #fff; border-radius: 8px; font-size: .85rem;
+    min-width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
+  }
+  h3 { font-size: 1.02rem; margin: 22px 0 8px; }
+  p, li { color: var(--text); }
+  .muted { color: var(--muted); }
+  code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; font-size: .86em;
+    background: color-mix(in srgb, var(--brand) 9%, transparent); padding: 1px 6px; border-radius: 5px;
+  }
+  .code {
+    position: relative; background: var(--code-bg); color: var(--code-text); border-radius: 10px;
+    margin: 10px 0 14px; overflow: hidden;
+  }
+  .code pre { margin: 0; padding: 14px 16px; overflow-x: auto; font-size: .84rem; line-height: 1.55; }
+  .code pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+  .code .lbl {
+    display: block; font-size: .7rem; letter-spacing: .7px; text-transform: uppercase;
+    color: #94a3b8; padding: 8px 16px 0;
+  }
+  .code button {
+    position: absolute; top: 8px; right: 8px; background: #1e293b; color: #cbd5e1;
+    border: 1px solid #334155; border-radius: 6px; font-size: .75rem; padding: 3px 10px; cursor: pointer;
+  }
+  .code button:hover { background: #334155; color: #fff; }
+  .cm { color: #7dd3fc; }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 10px 0 14px; font-size: .9rem; }
+  .tbl { border: 1px solid var(--line); border-radius: 10px; overflow: auto; margin: 10px 0 14px; }
+  .tbl table { margin: 0; }
+  th {
+    background: linear-gradient(180deg, #1f2f57 0%, #18254a 100%); color: #fff; text-align: left;
+    font-size: .72rem; text-transform: uppercase; letter-spacing: .7px; padding: 10px 12px; white-space: nowrap;
+  }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--brand) 3%, transparent); }
+  .callout {
+    border-left: 4px solid var(--brand); background: color-mix(in srgb, var(--brand) 7%, transparent);
+    padding: 10px 14px; border-radius: 0 10px 10px 0; margin: 12px 0;
+  }
+  .callout.warn { border-color: var(--amber); background: color-mix(in srgb, var(--amber) 9%, transparent); }
+  .callout.ok { border-color: var(--teal); background: color-mix(in srgb, var(--teal) 9%, transparent); }
+  .callout b:first-child { display: block; margin-bottom: 2px; }
+  ol.steps { counter-reset: s; list-style: none; padding-left: 0; }
+  ol.steps > li { counter-increment: s; position: relative; padding-left: 40px; margin: 12px 0; }
+  ol.steps > li::before {
+    content: counter(s); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%;
+    background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--brand);
+    font-weight: 700; font-size: .82rem; display: flex; align-items: center; justify-content: center;
+  }
+  .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+  .flow .box {
+    border: 1px solid var(--line); background: color-mix(in srgb, var(--brand) 6%, var(--card));
+    border-radius: 10px; padding: 8px 12px; font-size: .85rem; text-align: center;
+  }
+  .flow .arrow { color: var(--muted); }
+  .tag { display: inline-block; font-size: .72rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; }
+  .tag.b { background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--brand); }
+  .tag.t { background: color-mix(in srgb, var(--teal) 14%, transparent); color: var(--teal); }
+  .tag.a { background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
+  footer { text-align: center; color: var(--muted); font-size: .82rem; padding: 0 16px 30px; }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    nav { position: static; max-height: none; }
+    main section { padding: 18px 16px; }
+  }
+  @media print {
+    nav, .code button { display: none; }
+    .layout { display: block; }
+    header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    main section { break-inside: avoid; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>📧 NotifyBot Inventory Runbook</h1>
+  <p>Setup, daily operation, refresh, review and troubleshooting of the NotifyBot Inventory Summary dashboard</p>
+  <div class="meta"><span>Location: /notifybot</span><span>Stack: Python · Streamlit · pandas</span><span>Version: October 2026</span></div>
+</header>
+
+<div class="layout">
+<nav><div class="toc">
+  <h2>Contents</h2>
+  <a href="#overview">1. Overview</a>
+  <a href="#files">2. Files &amp; folder layout</a>
+  <a href="#prereq">3. Prerequisites &amp; sizing</a>
+  <a href="#install">4. Installation</a>
+  <a href="#run">5. Running the dashboard</a>
+  <a href="#format">6. Inventory file format</a>
+  <a href="#refresh">7. Refreshing the inventory</a>
+  <a href="#automate">8. Automating the refresh</a>
+  <a href="#use">9. Using the dashboard</a>
+  <a href="#review">10. Reviewing an old inventory</a>
+  <a href="#compare">11. Comparing two inventories</a>
+  <a href="#meta">12. Metadata files</a>
+  <a href="#retention">13. Retention &amp; disk space</a>
+  <a href="#rollback">14. Rollback</a>
+  <a href="#upgrade">15. Updating the application</a>
+  <a href="#trouble">16. Troubleshooting</a>
+  <a href="#cheat">17. Quick reference</a>
+</div></nav>
+
+<main>
+
+<section id="overview">
+  <h2 class="sec"><span class="n">1</span>Overview</h2>
+  <p>The <b>NotifyBot Inventory Summary</b> is a web dashboard over NotifyBot's inventory file. It shows how many clusters, namespaces, app IDs and unique notification email addresses the inventory covers, how those numbers change from one inventory refresh to the next, and lets users filter the inventory and copy the matching email lists.</p>
+  <div class="flow">
+    <div class="box">Inventory generator<br><span class="muted">your existing process</span></div><span class="arrow">→</span>
+    <div class="box"><code>rotate_inventory.py</code><br><span class="muted">validate, archive, install</span></div><span class="arrow">→</span>
+    <div class="box"><code>inventory.csv</code> + archives<br><span class="muted">with .meta.json sidecars</span></div><span class="arrow">→</span>
+    <div class="box">Streamlit dashboard<br><span class="muted">browser, port 8501</span></div>
+  </div>
+  <p>Each time the inventory is refreshed, the previous <code>inventory.csv</code> is kept as an archive named <code>inventory.csv-&lt;epoch&gt;</code>. The dashboard reads these archives to draw the trend and lets users open any of them for review.</p>
+</section>
+
+<section id="files">
+  <h2 class="sec"><span class="n">2</span>Files &amp; folder layout</h2>
+  <div class="code"><span class="lbl">/notifybot</span><button>Copy</button><pre><code>/notifybot/
+├── inventory_portal_st.py          <span class="cm"># the dashboard (Streamlit app)</span>
+├── inventory_meta.py               <span class="cm"># parsing, KPIs, metadata sidecars (+ CLI)</span>
+├── rotate_inventory.py             <span class="cm"># installs a new inventory file safely</span>
+├── requirements.txt                <span class="cm"># streamlit&gt;=1.50, pandas</span>
+├── .streamlit/config.toml          <span class="cm"># theme + upload size limit</span>
+├── venv/                           <span class="cm"># Python virtual environment</span>
+├── inventory.csv                   <span class="cm"># CURRENT inventory</span>
+├── inventory.csv.meta.json         <span class="cm"># its KPIs (auto-generated)</span>
+├── inventory.csv-1789567199        <span class="cm"># archived snapshot (epoch = latest time in that file)</span>
+├── inventory.csv-1789567199.meta.json
+└── ...</code></pre></div>
+  <div class="tbl"><table>
+    <thead><tr><th>File</th><th>Purpose</th><th>Edited by</th></tr></thead>
+    <tbody>
+      <tr><td><code>inventory_portal_st.py</code></td><td>Web UI: KPIs, trend, filters, email lists, snapshot picker.</td><td>Developers</td></tr>
+      <tr><td><code>inventory_meta.py</code></td><td>Shared logic. Also a command: <code>python inventory_meta.py inventory.csv</code> builds missing/stale metadata.</td><td>Developers</td></tr>
+      <tr><td><code>rotate_inventory.py</code></td><td>The only supported way to install a new inventory file.</td><td>Developers</td></tr>
+      <tr><td><code>inventory.csv</code></td><td>Current inventory. Never edit in place; install new versions with the rotate script.</td><td>Rotate script</td></tr>
+      <tr><td><code>inventory.csv-&lt;epoch&gt;</code></td><td>Archived inventories, one per refresh.</td><td>Rotate script</td></tr>
+      <tr><td><code>*.meta.json</code></td><td>Cached KPIs per CSV so the trend loads instantly. Safe to delete; rebuilt automatically.</td><td>Automatic</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout warn"><b>Keep the three .py files together and from the same release.</b>The dashboard imports <code>inventory_meta.py</code>; mixing versions causes errors such as <code>ImportError: cannot import name 'valid_meta'</code>.</div>
+</section>
+
+<section id="prereq">
+  <h2 class="sec"><span class="n">3</span>Prerequisites &amp; sizing</h2>
+  <ul>
+    <li>Linux host with Python 3.10 or newer.</li>
+    <li>Network access from users' browsers to the dashboard port (default <code>8501</code>).</li>
+    <li>pip access to install <code>streamlit</code> (1.50 or newer) and <code>pandas</code>.</li>
+  </ul>
+  <h3>Sizing for ~70,000-row / ~300 MB inventory files</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Item</th><th>Measured / recommended</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>RAM per open file</td><td>≈ 1.5 GB</td><td>Up to 3 files are kept open (latest + 2 being reviewed) → plan for <b>≈ 5 GB</b> free.</td></tr>
+      <tr><td>First open of a file</td><td>≈ 7–8 s</td><td>Once per file version, shared by all users.</td></tr>
+      <tr><td>Clicks, tab switches, email search</td><td>≈ 0.1 s</td><td>Results are cached.</td></tr>
+      <tr><td>Changing a filter</td><td>≈ 1–2 s</td><td>First time for each filter combination.</td></tr>
+      <tr><td>Disk per archive</td><td>≈ 300 MB</td><td>Weekly refresh, 1 year ≈ 15 GB. See <a href="#retention">retention</a>.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted">Low on memory? Reduce <code>max_entries=3</code> to <code>2</code> on <code>load_file</code> in <code>inventory_portal_st.py</code>.</p>
+</section>
+
+<section id="install">
+  <h2 class="sec"><span class="n">4</span>Installation</h2>
+  <ol class="steps">
+    <li><b>Create the folder and copy the application files</b>
+      <div class="code"><button>Copy</button><pre><code>mkdir -p /notifybot/.streamlit
+cd /notifybot
+<span class="cm"># copy in: inventory_portal_st.py  inventory_meta.py  rotate_inventory.py  requirements.txt</span>
+cp config.toml /notifybot/.streamlit/config.toml</code></pre></div></li>
+    <li><b>Create the virtual environment and install dependencies</b>
+      <div class="code"><button>Copy</button><pre><code>cd /notifybot
+python3 -m venv venv
+venv/bin/pip install --upgrade pip
+venv/bin/pip install -r requirements.txt
+venv/bin/streamlit version      <span class="cm"># must report 1.50 or newer</span></code></pre></div></li>
+    <li><b>Check the Streamlit config</b> — <code>/notifybot/.streamlit/config.toml</code> should contain:
+      <div class="code"><span class="lbl">.streamlit/config.toml</span><button>Copy</button><pre><code>[theme]
+primaryColor = "#2557d6"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f3f5f9"
+textColor = "#1d2330"
+font = "sans serif"
+
+[server]
+maxUploadSize = 1024</code></pre></div>
+      <p class="muted">Streamlit reads this file from the folder it is started in, so always start it from <code>/notifybot</code>.</p></li>
+    <li><b>Install the first inventory file</b> (see <a href="#refresh">section 7</a>)
+      <div class="code"><button>Copy</button><pre><code>cd /notifybot
+venv/bin/python rotate_inventory.py /path/to/inventory_export.csv</code></pre></div></li>
+  </ol>
+</section>
+
+<section id="run">
+  <h2 class="sec"><span class="n">5</span>Running the dashboard</h2>
+  <h3>Option A — manual (testing)</h3>
+  <div class="code"><button>Copy</button><pre><code>cd /notifybot
+venv/bin/streamlit run inventory_portal_st.py --server.port 8501 --server.address 0.0.0.0 --server.headless true</code></pre></div>
+  <p>Open <code>http://&lt;server&gt;:8501</code>. Stop with <code>Ctrl+C</code>.</p>
+
+  <h3>Option B — systemd service (recommended)</h3>
+  <ol class="steps">
+    <li><b>Create the unit file</b>
+      <div class="code"><span class="lbl">/etc/systemd/system/notifybot-inventory.service</span><button>Copy</button><pre><code>[Unit]
+Description=NotifyBot Inventory Summary (Streamlit)
+After=network.target
+
+[Service]
+WorkingDirectory=/notifybot
+ExecStart=/notifybot/venv/bin/streamlit run inventory_portal_st.py --server.port 8501 --server.address 0.0.0.0 --server.headless true
+Restart=on-failure
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target</code></pre></div>
+      <p class="muted">Prefer a dedicated non-root user that owns <code>/notifybot</code> if your policies require it.</p></li>
+    <li><b>Enable and start</b>
+      <div class="code"><button>Copy</button><pre><code>systemctl daemon-reload
+systemctl enable --now notifybot-inventory
+systemctl status notifybot-inventory</code></pre></div></li>
+    <li><b>Day-to-day commands</b>
+      <div class="code"><button>Copy</button><pre><code>systemctl restart notifybot-inventory      <span class="cm"># after updating the .py files</span>
+systemctl stop notifybot-inventory
+journalctl -u notifybot-inventory -f       <span class="cm"># live logs</span></code></pre></div></li>
+  </ol>
+  <div class="callout"><b>Firewall</b>If users cannot reach the page, open the port, e.g. <code>firewall-cmd --add-port=8501/tcp --permanent &amp;&amp; firewall-cmd --reload</code>.</div>
+</section>
+
+<section id="format">
+  <h2 class="sec"><span class="n">6</span>Inventory file format</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Column</th><th>Required</th><th>Rules</th></tr></thead>
+    <tbody>
+      <tr><td><b>First column</b> (e.g. <code>time</code>)</td><td><span class="tag a">Yes</span></td><td>Epoch time in seconds or milliseconds. The latest value is used as the file's snapshot time and as the archive name.</td></tr>
+      <tr><td><code>email</code></td><td><span class="tag a">Yes</span></td><td>Addresses separated by <code>;</code> (commas also accepted). Case-insensitive; duplicates are de-duplicated.</td></tr>
+      <tr><td><code>cluster</code>, <code>namespace</code>, <code>env</code>, <code>appid</code></td><td><span class="tag b">Recommended</span></td><td>Drive the KPI cards and the By environment table. Missing columns show “n/a”.</td></tr>
+      <tr><td>Any other columns</td><td><span class="tag t">Optional</span></td><td>Available as filter fields and in the Breakdown / Field overview tabs.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Column names are matched case-insensitively. The file must be UTF-8 CSV with a header row; a <code>cluster + namespace</code> pair is expected to be one row.</p>
+</section>
+
+<section id="refresh">
+  <h2 class="sec"><span class="n">7</span>Refreshing the inventory (manual)</h2>
+  <p>Generate the new inventory with your existing process to <b>any</b> path and name, then install it with the rotate script. Never copy over <code>inventory.csv</code> by hand.</p>
+  <ol class="steps">
+    <li><b>Preview</b> — checks the file and shows what will change, without touching anything.
+      <div class="code"><button>Copy</button><pre><code>cd /notifybot
+venv/bin/python rotate_inventory.py /path/to/new_inventory.csv --dry-run</code></pre></div></li>
+    <li><b>Install</b>
+      <div class="code"><button>Copy</button><pre><code>venv/bin/python rotate_inventory.py /path/to/new_inventory.csv</code></pre></div>
+      <p>Expected output:</p>
+      <div class="code"><button>Copy</button><pre><code>checking /path/to/new_inventory.csv
+new file OK: 70,412 rows, latest time 1791285461 (2026-10-06 11:17 UTC)
+current file will be archived as inventory.csv-1790680661
+changes: Clusters 6→6, Cluster + namespace 70,100→70,412, Namespaces ..., App IDs 98→101, Unique emails ...
+installed inventory.csv (70,412 rows)
+done</code></pre></div></li>
+    <li><b>Verify</b> — reload the dashboard. The new file appears as <i>Latest</i>, the previous one as the first <i>Archived</i> entry, and the KPI arrows show the change. No restart is needed.</li>
+  </ol>
+  <h3>What the script does</h3>
+  <ol>
+    <li>Parses the new file and checks it has rows, an <code>email</code> column and valid epoch times.</li>
+    <li>Refuses if the new file is not newer than the current one (protects against installing the same or an old export twice).</li>
+    <li>Renames <code>inventory.csv</code> → <code>inventory.csv-&lt;epoch&gt;</code> and moves its <code>.meta.json</code> with it.</li>
+    <li>Copies the new file in as <code>inventory.csv</code> with an atomic rename (users never see a half-written file). The source file is left untouched.</li>
+    <li>Builds <code>inventory.csv.meta.json</code>, then applies <code>--keep</code> retention if given.</li>
+  </ol>
+  <h3>Options</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Option</th><th>Default</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>--base PATH</code></td><td><code>inventory.csv</code></td><td>Current inventory file (use the full path when running from another folder or cron).</td></tr>
+      <tr><td><code>--keep N</code></td><td>0 (keep all)</td><td>After installing, delete all but the newest N archives.</td></tr>
+      <tr><td><code>--dry-run</code></td><td>off</td><td>Validate and report only.</td></tr>
+      <tr><td><code>--force</code></td><td>off</td><td>Install even if the new file is not newer (e.g. a deliberate correction).</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="automate">
+  <h2 class="sec"><span class="n">8</span>Automating the refresh</h2>
+  <p>If the generator writes to a fixed location, schedule the rotate script right after it. Example — every day at 06:30:</p>
+  <div class="code"><span class="lbl">crontab -e</span><button>Copy</button><pre><code>30 6 * * *  cd /notifybot &amp;&amp; venv/bin/python rotate_inventory.py /data/export/inventory_new.csv --keep 52 &gt;&gt; /notifybot/rotate.log 2&gt;&amp;1</code></pre></div>
+  <ul>
+    <li>If no newer export exists that day, the run logs <i>“not newer”</i> and changes nothing.</li>
+    <li>A lock prevents two rotations running at the same time.</li>
+    <li>Check <code>/notifybot/rotate.log</code> after the first scheduled runs.</li>
+  </ul>
+</section>
+
+<section id="use">
+  <h2 class="sec"><span class="n">9</span>Using the dashboard</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Area</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><b>Full inventory</b> (top KPI row)</td><td>Clusters, Cluster + namespace, Namespaces, App IDs and Unique emails for the whole file, with ▲/▼ change versus the previous snapshot and a mini trend line.</td></tr>
+      <tr><td><b>Trend over time</b></td><td>Line chart of the KPIs across all snapshots (choose metrics with the buttons) and a table of every snapshot with its changes.</td></tr>
+      <tr><td><b>Based on selection</b></td><td>The same KPIs for rows matching the sidebar filters.</td></tr>
+      <tr><td><b>By environment</b></td><td>KPIs per <code>env</code> value for the filtered rows.</td></tr>
+      <tr><td><b>Unique emails</b> tab</td><td>De-duplicated addresses with row counts, search, CSV download and <b>📋 Copy emails</b> (<code>;</code>-separated).</td></tr>
+      <tr><td><b>Breakdown</b> tab</td><td>Unique emails per value of any field (top 300), and the email list for one value.</td></tr>
+      <tr><td><b>Matching rows</b> tab</td><td>The filtered rows (first 2,000 shown).</td></tr>
+      <tr><td><b>Field overview</b> tab</td><td>Distinct values and most common value of every field.</td></tr>
+      <tr><td><b>🔍 Compare</b> view</td><td>Differences between any two inventory files. See <a href="#compare">section 11</a>.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Filters</h3>
+  <ol>
+    <li>In the sidebar, pick one or more fields under <b>Fields to filter on</b>.</li>
+    <li>Type a value for each. Multiple fields are combined with <b>AND</b>.</li>
+  </ol>
+  <div class="tbl"><table>
+    <thead><tr><th>Value</th><th>Matches</th></tr></thead>
+    <tbody>
+      <tr><td><code>*</code></td><td>Everything (default)</td></tr>
+      <tr><td><code>prod</code></td><td>Exactly “prod” (case-insensitive)</td></tr>
+      <tr><td><code>prod*</code></td><td>Starts with “prod”</td></tr>
+      <tr><td><code>*-177207</code></td><td>Ends with “-177207”</td></tr>
+      <tr><td><code>?at</code></td><td>Any one character followed by “at” (e.g. uat)</td></tr>
+      <tr><td><code>uat, prod*</code></td><td>Either pattern (comma = OR within one field)</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout"><b>Copying emails</b>The copy button works over plain <code>http://</code>. If a locked-down browser still blocks it, a red message appears — click the text box below the button, press Ctrl+A, then Ctrl+C.</div>
+</section>
+
+<section id="review">
+  <h2 class="sec"><span class="n">10</span>Reviewing an old inventory</h2>
+  <ol class="steps">
+    <li>In the sidebar, open <b>Inventory snapshot</b>. Entries are listed newest first, e.g. <code>Archived · 2026-09-16 13:59 UTC · 69,880 rows</code>.</li>
+    <li>Select the snapshot. The header turns <b>orange</b> with an <span class="tag a">ARCHIVED SNAPSHOT</span> badge.</li>
+    <li>All KPIs, filters, tabs and email lists now use that file. KPI arrows compare it with the snapshot before it.</li>
+    <li>Switch back by selecting the <b>Latest</b> entry.</li>
+  </ol>
+  <p class="muted">The first open of an archive takes ~7–8 s for a 300 MB file; after that it stays in memory (up to 3 files). Files not on the server can be loaded via <b>Upload a file instead</b> (limit 1 GB), but loading from the server is much faster.</p>
+  <div class="callout warn"><b>Why is an archive missing from the list?</b>An archive is hidden when its name does not match <code>inventory.csv-&lt;9–13 digit epoch&gt;</code>, or when its epoch falls inside the current file's own time range (it is then treated as a copy of the current data).</div>
+</section>
+
+<section id="compare">
+  <h2 class="sec"><span class="n">11</span>Comparing two inventories</h2>
+  <p>Use this when the trend shows a sudden jump or drop and you need to know exactly what was added or removed.</p>
+  <ol class="steps">
+    <li>At the top of the sidebar, switch <b>View</b> to <b>🔍 Compare</b>. The header turns purple.</li>
+    <li>Pick <b>Older inventory (A)</b> and <b>Newer inventory (B)</b>. By default A is the previous snapshot and B the latest.</li>
+    <li>Optional: add sidebar filters (e.g. <code>env = prod</code>) to compare only matching rows in both files.</li>
+    <li>Read the results (below). Switch <b>View</b> back to <b>📊 Dashboard</b> when done.</li>
+  </ol>
+  <h3>How rows are matched</h3>
+  <p>A row is identified by <b>cluster + namespace</b>. (If either file lacks those columns, rows are matched on all the columns both files share.) The time column is ignored because it changes on every run.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Result</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><b>Rows added</b></td><td>cluster + namespace present in B but not in A.</td></tr>
+      <tr><td><b>Rows removed</b></td><td>cluster + namespace present in A but not in B.</td></tr>
+      <tr><td><b>Rows changed</b></td><td>In both files, but a field value (e.g. <code>env: uat → prod</code>) or the email list differs.</td></tr>
+      <tr><td><b>Emails added / removed</b></td><td>Addresses that appear in one file and <i>nowhere</i> in the other (not just moved between rows).</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Sections on the page</h3>
+  <ul>
+    <li><b>What changed</b> — the five counts above, rows in A → B and the net change.</li>
+    <li><b>KPI comparison</b> — each KPI for A and B with ▲/▼ difference.</li>
+    <li><b>Where the changes are</b> — added / removed / changed counts per value of a field you choose (default <code>env</code>) and per cluster. Start here to find which environment or cluster caused a big swing.</li>
+    <li><b>Tabs</b> — full lists of added, removed and changed rows (searchable, first 2,000 shown, CSV download for all), a summary of which fields changed, the per-row email changes with copy buttons, and the added / removed email addresses with copy and download.</li>
+  </ul>
+  <div class="callout"><b>Performance</b>The first comparison of a pair loads both files (~7–8 s each for 300 MB files, skipped if already open) and takes ~3 s to compare. After that, switching tabs and searching are instant. Comparing keeps both files in memory (2 of the 3 file slots).</div>
+  <div class="callout warn"><b>Reading direction</b>If A is newer than B, a warning appears: “added” and “removed” are then reversed in time. Swap the two files to read changes forward.</div>
+</section>
+
+<section id="meta">
+  <h2 class="sec"><span class="n">12</span>Metadata files (.meta.json)</h2>
+  <p>Each CSV gets a small sidecar with its row count, snapshot time and KPIs. The trend and the snapshot list use only these, so the 300 MB archives are never read unless someone opens them.</p>
+  <ul>
+    <li>A sidecar is <b>valid</b> while its CSV's size and modification time match what it recorded. Otherwise it is rebuilt automatically.</li>
+    <li>They are safe to delete at any time; they will be rebuilt (each rebuild reads the full CSV once, ~3–7 s per 300 MB file).</li>
+    <li>To pre-build or repair all of them:</li>
+  </ul>
+  <div class="code"><button>Copy</button><pre><code>cd /notifybot
+venv/bin/python inventory_meta.py inventory.csv</code></pre></div>
+  <p class="muted">Output lists each file with <code>ok</code> and its KPIs, or <code>skip</code> with the reason for unreadable files.</p>
+</section>
+
+<section id="retention">
+  <h2 class="sec"><span class="n">13</span>Retention &amp; disk space</h2>
+  <ul>
+    <li>Each archive is roughly the size of the inventory (~300 MB).</li>
+    <li>Use <code>--keep N</code> on the rotate script to keep only the newest N archives; the matching <code>.meta.json</code> files are removed too.</li>
+    <li>Removing archives removes those points from the trend chart.</li>
+  </ul>
+  <div class="code"><span class="lbl">check usage</span><button>Copy</button><pre><code>du -ch /notifybot/inventory.csv-* | tail -1
+ls -1 /notifybot/inventory.csv-* | grep -v meta.json | wc -l</code></pre></div>
+  <p>To delete a specific archive manually, remove both files:</p>
+  <div class="code"><button>Copy</button><pre><code>rm /notifybot/inventory.csv-1786546799 /notifybot/inventory.csv-1786546799.meta.json</code></pre></div>
+</section>
+
+<section id="rollback">
+  <h2 class="sec"><span class="n">14</span>Rollback (bad inventory installed)</h2>
+  <p>Restores the previous inventory as current. Replace <code>&lt;epoch&gt;</code> with the newest archive (the file the bad one replaced).</p>
+  <div class="code"><button>Copy</button><pre><code>cd /notifybot
+ls -1 inventory.csv-* | grep -v meta.json | sort -t- -k2 -n | tail -1   <span class="cm"># newest archive = &lt;epoch&gt;</span>
+
+mkdir -p /notifybot/rejected
+mv inventory.csv           rejected/inventory.csv.$(date +%Y%m%d%H%M%S)
+rm -f inventory.csv.meta.json
+mv inventory.csv-&lt;epoch&gt;           inventory.csv
+mv inventory.csv-&lt;epoch&gt;.meta.json inventory.csv.meta.json</code></pre></div>
+  <p>Reload the dashboard; no restart is needed. Fix the export, then install it again with the rotate script.</p>
+</section>
+
+<section id="upgrade">
+  <h2 class="sec"><span class="n">15</span>Updating the application</h2>
+  <ol class="steps">
+    <li>Back up the current code: <code>cp /notifybot/*.py /notifybot/backup_$(date +%Y%m%d)/</code> (create the folder first).</li>
+    <li>Copy <b>all</b> updated <code>.py</code> files from the same release into <code>/notifybot</code>.</li>
+    <li>Restart the service — imported modules are only reloaded on restart:
+      <div class="code"><button>Copy</button><pre><code>systemctl restart notifybot-inventory
+<span class="cm"># or, if run manually:</span>
+pkill -f "streamlit run inventory_portal_st.py"; cd /notifybot &amp;&amp; venv/bin/streamlit run inventory_portal_st.py</code></pre></div></li>
+    <li>If the release notes say the metadata format changed, nothing is required — sidecars rebuild automatically. Optionally pre-build: <code>venv/bin/python inventory_meta.py inventory.csv</code>.</li>
+  </ol>
+</section>
+
+<section id="trouble">
+  <h2 class="sec"><span class="n">16</span>Troubleshooting</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+    <tbody>
+      <tr><td><code>ImportError: cannot import name '…' from 'inventory_meta'</code></td><td>Old <code>inventory_meta.py</code> on disk, or the server still has the old module loaded.</td><td>Copy both .py files from the same release, then restart the service. Check with <code>grep -n "META_VERSION =" inventory_meta.py</code>.</td></tr>
+      <tr><td>“Enter the path of the inventory file…” message</td><td><code>inventory.csv</code> not found from the server's working folder.</td><td>Start Streamlit from <code>/notifybot</code>, or type the full path in the sidebar.</td></tr>
+      <tr><td>“No 'email' column found in the CSV”</td><td>Export is missing the <code>email</code> header.</td><td>Fix the export; the rotate script rejects such files before installing.</td></tr>
+      <tr><td>Rotate: “not newer than the current one”</td><td>Same or older export.</td><td>Expected for a repeated run. Use <code>--force</code> only for a deliberate correction.</td></tr>
+      <tr><td>Rotate: “already exists; refusing to overwrite”</td><td>An archive with that epoch already exists.</td><td>Check whether the current file was already archived; remove the duplicate if so.</td></tr>
+      <tr><td>Rotate: “Another rotation is already running”</td><td>Overlapping runs.</td><td>Wait for the other run; check cron timing.</td></tr>
+      <tr><td>Archive not shown in snapshot list / trend</td><td>Name doesn't match <code>inventory.csv-&lt;epoch&gt;</code>, or it duplicates the current data.</td><td>Rename correctly; delete duplicates. See <a href="#review">section 10</a>.</td></tr>
+      <tr><td>Copy button does nothing / red message</td><td>Browser blocks clipboard on http.</td><td>Use the text box below: Ctrl+A, Ctrl+C. Serving over HTTPS also fixes it.</td></tr>
+      <tr><td>Upload rejected as too large</td><td>Config not loaded.</td><td>Ensure <code>/notifybot/.streamlit/config.toml</code> has <code>maxUploadSize = 1024</code> and Streamlit starts from <code>/notifybot</code>.</td></tr>
+      <tr><td>Theme colours missing</td><td>Same as above.</td><td>Same as above.</td></tr>
+      <tr><td>Page slow on every click</td><td>Server restarted (cache empty) or memory pressure.</td><td>First open after restart is ~7–8 s per file; check <code>free -g</code>. Lower <code>max_entries</code> if memory is tight.</td></tr>
+      <tr><td>Process killed / out of memory</td><td>Too many large files open.</td><td>Add RAM or set <code>max_entries=2</code> on <code>load_file</code>; restart.</td></tr>
+      <tr><td>KPI numbers look wrong for an archive</td><td>Stale or corrupt sidecar (rare).</td><td>Delete that <code>.meta.json</code>; it is rebuilt on next load.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="cheat">
+  <h2 class="sec"><span class="n">17</span>Quick reference</h2>
+  <div class="code"><button>Copy</button><pre><code><span class="cm"># --- refresh inventory</span>
+cd /notifybot
+venv/bin/python rotate_inventory.py /path/to/new.csv --dry-run
+venv/bin/python rotate_inventory.py /path/to/new.csv --keep 52
+
+<span class="cm"># --- metadata</span>
+venv/bin/python inventory_meta.py inventory.csv
+
+<span class="cm"># --- service</span>
+systemctl status  notifybot-inventory
+systemctl restart notifybot-inventory
+journalctl -u notifybot-inventory -f
+
+<span class="cm"># --- housekeeping</span>
+ls -lt /notifybot/inventory.csv*
+du -ch /notifybot/inventory.csv-* | tail -1
+tail -50 /notifybot/rotate.log</code></pre></div>
+</section>
+
+</main>
+</div>
+<footer>NotifyBot Inventory Summary · Runbook</footer>
+
+<script>
+  function copyText(text, btn) {
+    const done = ok => { btn.textContent = ok ? "Copied" : "Select & Ctrl+C"; setTimeout(() => btn.textContent = "Copy", 1800); };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(() => done(true), () => done(legacy(text)));
+    } else { done(legacy(text)); }
+  }
+  function legacy(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    let ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta); return ok;
+  }
+  document.querySelectorAll(".code button").forEach(btn => {
+    btn.addEventListener("click", () => copyText(btn.parentElement.querySelector("pre").innerText, btn));
+  });
+</script>
+</body>
+</html>
