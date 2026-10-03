@@ -6,6 +6,13 @@ python3 notifybot_builder.py \
   -i /data/scripts/inventory/inventory.csv \
   -o /data/OSE/output/notifybot.csv
 
+/data/notifybot-portal/venv/bin/python /data/notifybot-portal/inventory_meta.py /data/OSE/output/notifybot.csv
+
+
+streamlit run inventory_portal_st.py --server.address 0.0.0.0 --server.port 8501 \
+  -- --inventory /data/OSE/output/notifybot.csv
+
+
 ###################################################################################
 
 cat <<'EOF' > requirements.txt
