@@ -6,16 +6,27 @@ python3 notifybot_builder.py \
   -i /data/scripts/inventory/inventory.csv \
   -o /data/OSE/output/notifybot.csv
 
+###################################################################################
 
-
-
-requirements.txt
-requests
-urllib3
+cat <<'EOF' > requirements.txt
 cryptography
-openshift
-kubernetes
 pytz
 openpyxl
+pandas
+streamlit>=1.50
+email-validator
+requests
+urllib3
+openshift
+kubernetes
+EOF
+
+python3 -m venv venv
+source venv/bin/activate
+
+python -m pip install --upgrade pip
+python -m pip install --no-cache-dir -r requirements.txt
+
+###################################################################################
 
 
