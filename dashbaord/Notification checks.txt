@@ -1,0 +1,48 @@
+# notification.csv - 7 quick checks (unix commands)
+#
+# Run all of them at once:
+#     bash notification_checks.txt output/notification.csv
+# or copy/paste single commands after setting F and ids() below.
+#
+# Expected result for a good file: checks 1, 4, 5, 6 and 7 print nothing or 0.
+# Check 1 printing anything usually means the file came from the old collector version.
+
+F="${1:-output/notification.csv}"
+
+# The ids column is quoted and contains commas, so awk -F, cannot read it.
+# ids() prints just that column, one row per line: it drops the first 5 columns
+# (time,cluster,namespace,env,appid) and the last one (groups, never has commas).
+ids() { tail -n +2 "$F" | sed -E 's/^([^,]*,){5}//; s/,[^,]*$//; s/"//g'; }
+
+echo "File: $F"
+
+echo
+echo "1) Invalid ids - anything not xx12345@citi.com (expect: nothing)"
+ids | tr ',' '\n' | grep -vE '^[a-z]{2}[0-9]{5}@citi\.com$' | sort | uniq -c | sort -rn | head -20
+
+echo
+echo "2) Total unique ids"
+ids | tr ',' '\n' | sort -u | wc -l
+
+echo
+echo "3) Rows per cluster (expect: each cluster you ran)"
+awk -F, 'NR>1 {print $2}' "$F" | sort | uniq -c
+
+echo
+echo "4) Env not matching cluster suffix p=prod u=uat d=dev (expect: nothing)"
+awk -F, 'NR>1 {s=substr($2,length($2)); e=(s=="p")?"prod":(s=="u")?"uat":(s=="d")?"dev":"?"; if (e!=$4) print NR": "$2" env="$4" expected="e}' "$F"
+
+echo
+echo "5) Namespace listed more than once (expect: nothing)"
+awk -F, 'NR>1 {print $2","$3}' "$F" | sort | uniq -d
+
+echo
+echo "6) Rows with no ids (expect: 0)"
+ids | grep -cE '^$'
+
+echo
+echo "7) Same id repeated within a row (expect: nothing)"
+ids | awk -F, '{split("",s); for(i=1;i<=NF;i++) if(s[$i]++) {print "row "NR+1": "$i; break}}'
+
+# Look at one namespace:
+#     grep ',<namespace>,' output/notification.csv
