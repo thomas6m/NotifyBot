@@ -1,0 +1,11 @@
+[theme]
+primaryColor = "#2557d6"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f3f5f9"
+textColor = "#1d2330"
+font = "sans serif"
+
+[server]
+# Streamlit's default upload limit is 200 MB; inventory files are ~300 MB.
+# (Loading by file path is still much faster than uploading through the browser.)
+maxUploadSize = 1024
