@@ -1,0 +1,21 @@
+
+
+python3 notifybot_builder.py \
+  -n /data/OSE/output/notification.csv \
+  -s /data/scripts/inventory/Managed_Segments.xlsx \
+  -i /data/scripts/inventory/inventory.csv \
+  -o /data/OSE/output/notifybot.csv
+
+
+
+
+requirements.txt
+requests
+urllib3
+cryptography
+openshift
+kubernetes
+pytz
+openpyxl
+
+
