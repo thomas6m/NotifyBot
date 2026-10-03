@@ -28,8 +28,13 @@ from one `oc get rolebinding --all-namespaces` call, so the whole cluster still
 costs a fixed number of API calls. If the login may not list RoleBindings
 cluster-wide, the run falls back to the naming convention with a warning.
 
-Each user id is suffixed with @citi.com (ids that already contain '@' are kept
-as they are). Namespaces with no users are skipped. The output file is only
+Only real person ids are kept. A user name must contain an SOEID - two letters
+followed by five digits - optionally with a few extra characters before or after
+it (e.g. "xab12345", "ab12345_adm", "CN=ab12345,OU=Users"). The SOEID itself is
+used: "ab12345_adm" -> ab12345@citi.com. Names without one ("kube:admin",
+"admin", "svc-deploy", "john.smith@...") are rejected and logged, so they never
+become e-mail addresses. --id-pattern changes the rule ('' = keep every name,
+the old behaviour). Namespaces with no valid users are skipped. The output file is only
 created when at least one row exists. The "groups" column lists the groups
 whose members were used, for auditing.
 
@@ -75,7 +80,15 @@ NAMING_SUFFIXES      = ("edit", "view")
 DEFAULT_EXCLUDE_GROUPS = r"^system:"
 
 # Subject names that are not people (service accounts, system identities).
+# Skipped before the id rule, so e.g. "system:serviceaccount:ns-ab12345:sa"
+# can never yield a bogus "ab12345".
 NON_PERSON_PREFIXES = ("system:",)
+
+# A person's id (SOEID): two letters + five digits. Letters or other characters
+# may come before/after it; another digit may not, so a 6+ digit run such as
+# "ab123456" is not mistaken for "ab12345". The matched text is the id used.
+DEFAULT_ID_PATTERN = r"(?<!\d)[A-Za-z]{2}\d{5}(?!\d)"
+REJECTED_LOG_EXAMPLES = 10
 OUTPUT_FILENAME = "notification.csv"
 
 SGT_TZ = pytz.timezone("Asia/Singapore")
@@ -207,6 +220,7 @@ class ClusterMetrics:
     rolebindings_fetched: int = 0
     group_source_used:  str   = ""
     groups_not_found:   int   = 0   # bound groups with no Group object (no members)
+    rejected_names: Set[str] = field(default_factory=set)  # user names without an SOEID
     error_count:        int   = 0
     final_attempt:      int   = 0
     error_messages: List[str] = field(default_factory=list)
@@ -230,7 +244,8 @@ class NotificationInventoryScript:
                  group_source: str = DEFAULT_GROUP_SOURCE,
                  roles: Optional[Set[str]] = None,
                  exclude_groups: Optional[str] = DEFAULT_EXCLUDE_GROUPS,
-                 include_direct_users: bool = True):
+                 include_direct_users: bool = True,
+                 id_pattern: Optional[str] = DEFAULT_ID_PATTERN):
         self.logger: Optional[logging.Logger] = None
         self.exec_home: Optional[Path]        = None
         self.base_folder: Path                = base_folder
@@ -238,6 +253,7 @@ class NotificationInventoryScript:
         self.roles                = {r.lower() for r in roles} if roles else None
         self.exclude_groups_re    = re.compile(exclude_groups) if exclude_groups else None
         self.include_direct_users = include_direct_users
+        self.id_re                = re.compile(id_pattern) if id_pattern else None
 
     # ---------------------------------------------------------------- setup
     def setup_logging(self, base_paths: Dict, log_level: str = "INFO",
@@ -409,9 +425,21 @@ class NotificationInventoryScript:
     def _is_person(name: str) -> bool:
         return bool(name) and not name.startswith(NON_PERSON_PREFIXES)
 
-    @staticmethod
-    def _to_id(user: str) -> str:
-        return user if "@" in user else f"{user}{ID_DOMAIN}"
+    def extract_id(self, name: str) -> Optional[str]:
+        """E-mail id for a user name, or None when it is not a person's id.
+
+        With the default rule the SOEID inside the name is used, lower-cased:
+        "AB12345" / "xab12345" / "ab12345_adm" / "ab12345@citi.com" ->
+        "ab12345@citi.com". With --id-pattern '' the name is kept as before
+        (@citi.com appended unless it already contains '@').
+        """
+        name = name.strip()
+        if not self._is_person(name):
+            return None
+        if self.id_re is None:
+            return name if "@" in name else f"{name}{ID_DOMAIN}"
+        m = self.id_re.search(name)
+        return f"{m.group(0).lower()}{ID_DOMAIN}" if m else None
 
     def access_for_namespace(self, namespace: str, env: str,
                              groups: Dict[str, List[str]],
@@ -444,6 +472,20 @@ class NotificationInventoryScript:
                 if name in groups:
                     group_names.add(name)
 
+        ids: Set[str] = set()
+
+        def add(user_name: str) -> bool:
+            uid = self.extract_id(user_name)
+            if uid:
+                ids.add(uid)
+                return True
+            if self._is_person(user_name.strip()):   # system:* is skipped silently
+                metrics.rejected_names.add(user_name.strip())
+            return False
+
+        for u in users:                          # users bound directly
+            add(u)
+
         used_groups: List[str] = []
         for name in sorted(group_names):
             if self.exclude_groups_re and self.exclude_groups_re.search(name):
@@ -453,13 +495,11 @@ class NotificationInventoryScript:
                 metrics.groups_not_found += 1
                 self.logger.debug(f"{namespace}: group '{name}' is bound but does not exist")
                 continue
-            members = groups[name]
-            if members:
+            contributed = [add(member) for member in groups[name]]
+            if any(contributed):                 # list only groups that gave a valid id
                 used_groups.append(name)
-                users.update(members)
 
-        ids = sorted({self._to_id(u.strip()) for u in users if self._is_person(u.strip())})
-        return ids, used_groups
+        return sorted(ids), used_groups
 
     # -------------------------------------------------------------- output
     def get_single_mode_output_path(self, cluster_name: str,
@@ -559,6 +599,7 @@ class NotificationInventoryScript:
                                              else "naming (fallback)")
 
                 metrics.groups_not_found = 0  # count per attempt
+                metrics.rejected_names = set()
                 rows: List[Dict] = []
                 for ns in namespaces:
                     ids, used_groups = self.access_for_namespace(
@@ -574,6 +615,14 @@ class NotificationInventoryScript:
                         "ids":       ",".join(ids),  # DictWriter quotes this field
                         "groups":    GROUPS_SEPARATOR.join(used_groups),
                     })
+                if metrics.rejected_names:
+                    sample = sorted(metrics.rejected_names)
+                    more = len(sample) - REJECTED_LOG_EXAMPLES
+                    self.logger.warning(
+                        f"{len(sample)} user name(s) rejected - no SOEID "
+                        f"(2 letters + 5 digits): {', '.join(sample[:REJECTED_LOG_EXAMPLES])}"
+                        + (f" ... +{more} more (see --log-level DEBUG)" if more > 0 else ""))
+                    self.logger.debug(f"All rejected user names: {sample}")
                 if metrics.groups_not_found:
                     self.logger.info(
                         f"{metrics.groups_not_found} namespace group binding(s) "
@@ -639,6 +688,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
     p.add_argument("--groups-only", action="store_true",
                    help="Ignore users bound directly to a namespace "
                         "(RoleBinding subject kind=User); only group members count")
+    p.add_argument("--id-pattern", default=DEFAULT_ID_PATTERN,
+                   help="Regex a user name must contain to count as a person; the "
+                        "matched text becomes the id (default: SOEID = 2 letters + "
+                        "5 digits, extra characters allowed around it). "
+                        "'' = keep every name (old behaviour)")
     p.add_argument("--backup-count",       type=int, default=3)
     p.add_argument("-r",  "--retries",     type=int, default=DEFAULT_RETRIES)
     p.add_argument("--log-level",
@@ -675,9 +729,10 @@ def main() -> int:
                 roles=roles,
                 exclude_groups=args.exclude_groups or None,
                 include_direct_users=not args.groups_only,
+                id_pattern=args.id_pattern or None,
             )
         except re.error as exc:
-            print(f"Error: invalid --exclude-groups regex: {exc}")
+            print(f"Error: invalid --exclude-groups or --id-pattern regex: {exc}")
             return 2
         script.setup_logging(base_paths, args.log_level,
                              cluster_name=args.cluster_name, mode=args.mode)
@@ -687,7 +742,8 @@ def main() -> int:
             f"Group source: {args.group_source} | roles: "
             f"{','.join(sorted(roles)) if roles else 'all'} | exclude groups: "
             f"{args.exclude_groups or 'none'} | direct users: "
-            f"{'no' if args.groups_only else 'yes'}"
+            f"{'no' if args.groups_only else 'yes'} | id rule: "
+            f"{args.id_pattern or 'none (every name kept)'}"
         )
         script.logger.info(
             "Namespace scope: "
